@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Agent Chat - 群聊</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .message-container {
+      scroll-behavior: smooth;
+    }
+    .message-container::-webkit-scrollbar {
+      width: 6px;
+    }
+    .message-container::-webkit-scrollbar-track {
+      background: #f1f1f1;
+    }
+    .message-container::-webkit-scrollbar-thumb {
+      background: #c1c1c1;
+      border-radius: 3px;
+    }
+    .sidebar {
+      transition: transform 0.3s ease;
+    }
+    .sidebar.hidden-mobile {
+      transform: translateX(100%);
+    }
+    @media (min-width: 768px) {
+      .sidebar.hidden-mobile {
+        transform: translateX(0);
+      }
+    }
+  </style>
+</head>
+<body class="h-screen flex flex-col bg-gray-100">
+  <!-- Header -->
+  <header class="bg-white shadow-sm px-4 py-3 flex items-center justify-between z-10">
+    <div class="flex items-center space-x-3">
+      <span class="text-2xl">💬</span>
+      <div>
+        <h1 class="font-bold text-gray-800">Agent Chat</h1>
+        <p class="text-xs text-gray-500">
+          在线: <span id="onlineCount">0</span> 人 · <span id="agentCount">0</span> Agent
+        </p>
+      </div>
+    </div>
+    <div class="flex items-center space-x-2">
+      <button id="toggleSidebar" class="md:hidden p-2 hover:bg-gray-100 rounded-lg">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7"/>
+        </svg>
+      </button>
+      <button id="logoutBtn" class="px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">
+        退出
+      </button>
+    </div>
+  </header>
+
+  <div class="flex-1 flex overflow-hidden">
+    <!-- 消息区域 -->
+    <main class="flex-1 flex flex-col bg-gray-50">
+      <div id="messageContainer" class="message-container flex-1 overflow-y-auto p-4 space-y-4">
+        <!-- 消息会动态插入这里 -->
+      </div>
+
+      <!-- 输入区域 -->
+      <div class="bg-white border-t p-4">
+        <form id="messageForm" class="flex space-x-3">
+          <input
+            type="text"
+            id="messageInput"
+            placeholder="输入消息... (@提及Agent)"
+            class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none"
+            autocomplete="off"
+          >
+          <button
+            type="submit"
+            class="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition font-medium"
+          >
+            发送
+          </button>
+        </form>
+      </div>
+    </main>
+
+    <!-- 侧边栏 -->
+    <aside id="sidebar" class="sidebar hidden-mobile fixed md:relative right-0 top-14 md:top-0 h-full md:h-auto w-72 bg-white border-l shadow-lg md:shadow-none z-20 overflow-y-auto">
+      <div class="p-4">
+        <!-- 在线用户 -->
+        <div class="mb-6">
+          <h3 class="text-sm font-semibold text-gray-500 mb-3 flex items-center">
+            <span class="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
+            在线用户
+          </h3>
+          <div id="userList" class="space-y-2">
+            <!-- 用户列表 -->
+          </div>
+        </div>
+
+        <!-- Agent列表 -->
+        <div>
+          <h3 class="text-sm font-semibold text-gray-500 mb-3 flex items-center">
+            <span class="mr-2">🤖</span>
+            Agent
+          </h3>
+          <div id="agentList" class="space-y-2">
+            <!-- Agent列表 -->
+          </div>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <!-- 遮罩层 -->
+  <div id="overlay" class="hidden fixed inset-0 bg-black bg-opacity-50 z-10 md:hidden"></div>
+
+  <script>
+    const messageContainer = document.getElementById('messageContainer');
+    const messageForm = document.getElementById('messageForm');
+    const messageInput = document.getElementById('messageInput');
+    const userList = document.getElementById('userList');
+    const agentList = document.getElementById('agentList');
+    const onlineCount = document.getElementById('onlineCount');
+    const agentCount = document.getElementById('agentCount');
+    const logoutBtn = document.getElementById('logoutBtn');
+    const toggleSidebar = document.getElementById('toggleSidebar');
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('overlay');
+
+    let ws = null;
+    let sessionId = localStorage.getItem('session_id');
+    let currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+
+    // 检查登录状态
+    if (!sessionId) {
+      window.location.href = '/';
+    }
+
+    // 侧边栏切换
+    toggleSidebar.addEventListener('click', () => {
+      sidebar.classList.toggle('hidden-mobile');
+      overlay.classList.toggle('hidden');
+    });
+
+    overlay.addEventListener('click', () => {
+      sidebar.classList.add('hidden-mobile');
+      overlay.classList.add('hidden');
+    });
+
+    // 登出
+    logoutBtn.addEventListener('click', async () => {
+      try {
+        await fetch('/api/logout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ session_id: sessionId })
+        });
+      } catch (e) {}
+      localStorage.removeItem('session_id');
+      localStorage.removeItem('user');
+      window.location.href = '/';
+    });
+
+    // 连接WebSocket
+    function connect() {
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      ws = new WebSocket(`${protocol}//${window.location.host}`);
+
+      ws.onopen = () => {
+        console.log('WebSocket已连接');
+        ws.send(JSON.stringify({
+          type: 'join',
+          payload: { session_id: sessionId }
+        }));
+      };
+
+      ws.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        handleMessage(data);
+      };
+
+      ws.onclose = () => {
+        console.log('WebSocket已断开，3秒后重连...');
+        setTimeout(connect, 3000);
+      };
+
+      ws.onerror = (err) => {
+        console.error('WebSocket错误:', err);
+      };
+    }
+
+    // 处理收到的消息
+    function handleMessage(data) {
+      const { type, payload } = data;
+
+      switch (type) {
+        case 'history':
+          messageContainer.innerHTML = '';
+          payload.messages.forEach(msg => addMessage(msg, false));
+          scrollToBottom();
+          break;
+
+        case 'message':
+          addMessage(payload, true);
+          break;
+
+        case 'user_list':
+          renderUserList(payload.users);
+          break;
+
+        case 'agent_list':
+          renderAgentList(payload.agents);
+          break;
+
+        case 'agent_status':
+          updateAgentStatus(payload);
+          break;
+
+        case 'error':
+          console.error('错误:', payload.message);
+          break;
+      }
+    }
+
+    // 添加消息到界面
+    function addMessage(msg, scroll = true) {
+      const isAgent = msg.sender_type === 'agent';
+      const isSelf = msg.sender_id === currentUser.id;
+      const time = new Date(msg.created_at).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+
+      const div = document.createElement('div');
+      div.className = `flex ${isSelf ? 'justify-end' : 'justify-start'}`;
+
+      div.innerHTML = `
+        <div class="max-w-xs md:max-w-md lg:max-w-lg ${isSelf ? 'order-2' : ''}">
+          <div class="flex items-end space-x-2 ${isSelf ? 'flex-row-reverse space-x-reverse' : ''}">
+            <div class="w-8 h-8 rounded-full flex items-center justify-center text-sm ${isAgent ? 'bg-purple-100' : 'bg-blue-100'}">
+              ${isAgent ? '🤖' : '👤'}
+            </div>
+            <div>
+              <div class="text-xs text-gray-500 mb-1 ${isSelf ? 'text-right' : ''}">${msg.sender_name}</div>
+              <div class="px-4 py-2 rounded-2xl ${isSelf ? 'bg-purple-600 text-white' : isAgent ? 'bg-purple-100 text-purple-900' : 'bg-white text-gray-800'} shadow-sm">
+                ${escapeHtml(msg.content)}
+              </div>
+              <div class="text-xs text-gray-400 mt-1 ${isSelf ? 'text-right' : ''}">${time}</div>
+            </div>
+          </div>
+        </div>
+      `;
+
+      messageContainer.appendChild(div);
+
+      if (scroll) {
+        scrollToBottom();
+      }
+    }
+
+    // 渲染用户列表
+    function renderUserList(users) {
+      onlineCount.textContent = users.length;
+      userList.innerHTML = users.map(user => `
+        <div class="flex items-center space-x-2 p-2 rounded-lg hover:bg-gray-50">
+          <div class="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-sm">👤</div>
+          <span class="text-sm text-gray-700">${user.display_name || user.username}</span>
+        </div>
+      `).join('');
+    }
+
+    // 渲染Agent列表
+    function renderAgentList(agents) {
+      const onlineAgents = agents.filter(a => a.status === 'online');
+      agentCount.textContent = onlineAgents.length;
+
+      agentList.innerHTML = agents.map(agent => `
+        <div class="flex items-center space-x-2 p-2 rounded-lg hover:bg-gray-50">
+          <div class="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center text-sm">🤖</div>
+          <span class="text-sm text-gray-700 flex-1">${agent.name}</span>
+          <span class="w-2 h-2 rounded-full ${agent.status === 'online' ? 'bg-green-500' : 'bg-gray-300'}"></span>
+        </div>
+      `).join('');
+    }
+
+    // 更新Agent状态
+    function updateAgentStatus(data) {
+      // 重新请求Agent列表
+      // 这里简化处理，实际可以局部更新
+    }
+
+    // 发送消息
+    messageForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const content = messageInput.value.trim();
+      if (!content || !ws || ws.readyState !== 1) return;
+
+      ws.send(JSON.stringify({
+        type: 'message',
+        payload: { content }
+      }));
+
+      messageInput.value = '';
+    });
+
+    // 回车发送
+    messageInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        messageForm.dispatchEvent(new Event('submit'));
+      }
+    });
+
+    // 滚动到底部
+    function scrollToBottom() {
+      messageContainer.scrollTop = messageContainer.scrollHeight;
+    }
+
+    // HTML转义
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    // 启动
+    connect();
+  </script>
+</body>
+</html>
