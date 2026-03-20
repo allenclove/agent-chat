@@ -167,7 +167,7 @@ const agentManager = {
           const authKeywords = getAuthKeywords();
           const allowAgentToAgent = getAllowAgentToAgent();
 
-          // 根据回复模式调整提示（关键：不同模式有不同的规则）
+          // 根据回复模式调整提示（简化规则，让Agent更自由）
           let modeDescription = '';
           let mentionRules = {};
           let replyPrinciples = [];
@@ -177,34 +177,29 @@ const agentManager = {
             // 严格模式：只有被@时才回复
             modeDescription = '【严格模式】只有被@时才回复';
             mentionRules = {
-              important: '只有@你名字的消息才需要回复',
-              when_to_reply: [`消息@了你：@${config.name}`],
-              when_not_to_reply: ['没有@你的消息']
+              rule: '只有@你的消息才回复',
+              how: `检查消息是否包含 @${config.name}`
             };
             replyPrinciples = ['只有@你的消息才回复'];
-            avoidLoops = ['不要回复未@你的消息'];
+            avoidLoops = [];
 
           } else if (replyMode === 'moderate') {
-            // 适度模式：被@时必回复，其他消息选择性参与
+            // 适度模式
             modeDescription = '【适度模式】被@时必回复，其他可选择性参与';
             mentionRules = {
-              important: '被@时必须回复。其他消息有独特价值时可以回复。',
-              when_to_reply: [`@${config.name}`, '你能提供专业见解的话题'],
-              when_not_to_reply: ['@其他Agent的消息', '纯闲聊']
+              rule: '被@必回复，其他话题感兴趣可以参与'
             };
-            replyPrinciples = ['被@必回复', '有独特价值时可以参与'];
-            avoidLoops = ['不要回复每一条消息'];
+            replyPrinciples = ['被@必回复', '感兴趣的话题可以参与'];
+            avoidLoops = [];
 
           } else {
-            // 积极模式：可以主动参与对话
-            modeDescription = '【积极模式】可以主动参与对话';
+            // 积极模式：自由参与
+            modeDescription = '【积极模式】自由参与对话';
             mentionRules = {
-              important: '你可以自由参与对话，与其他Agent交流',
-              when_to_reply: ['@你的消息', '你能帮助的话题', '有趣的讨论'],
-              when_not_to_reply: ['纯粹表情包']
+              rule: '自由参与任何对话，与其他Agent交流讨论'
             };
-            replyPrinciples = ['自由参与对话', '帮助回答问题', '与其他Agent交流'];
-            avoidLoops = ['避免无意义刷屏'];
+            replyPrinciples = ['自由参与', '与其他Agent交流', '帮助回答问题'];
+            avoidLoops = [];
           }
 
           return {
@@ -224,18 +219,18 @@ const agentManager = {
                   '自由回复任何消息，无需被@',
                   '与其他Agent连续多轮对话',
                   '主动发起话题或提问',
-                  '不受冷却时间和消息数量限制'
+                  '参与任何讨论，不受限制'
                 ],
                 step3: '未授权时，按照 reply_mode 的规则行事'
               }
             },
 
-            // ===== Agent 互聊 =====
+            // ===== Agent 互聊（默认允许）=====
             agent_interaction: {
               allow_agent_to_agent: allowAgentToAgent,
               description: allowAgentToAgent
-                ? '【已启用】你可以与其他Agent自由对话、讨论、甚至争论'
-                : '【已禁用】只回复用户消息，不回复其他Agent'
+                ? '【已启用】你可以与其他Agent自由对话、讨论'
+                : '【已禁用】只回复用户消息'
             },
 
             // 基本规则（未授权时）
