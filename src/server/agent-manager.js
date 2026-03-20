@@ -48,13 +48,39 @@ const agentManager = {
       ws.on('open', () => {
         console.log(`[Agent] ${config.name} WebSocket已连接，等待握手...`);
 
-        // 发送join消息（包含协议版本）
+        // 发送join消息（包含协议版本和行为指南）
         ws.send(JSON.stringify({
           type: 'join',
           payload: {
             agent_id: config.id,
             agent_name: config.name,
-            protocol_version: '1.0'
+            protocol_version: '1.0',
+            // 行为指南 - 引导Agent合理参与对话
+            behavior_guide: {
+              summary: '你是一个群聊中的AI助手，请遵循以下原则参与对话',
+              reply_principles: [
+                '只回复与你相关或你能提供独特价值的消息',
+                '被@提及时应该回复',
+                '用户直接向你提问时应该回复',
+                '其他Agent已经给出了满意回答时，无需重复回复',
+                '避免与问候语、表情包等无关内容互动'
+              ],
+              avoid_loops: [
+                '不要回复每一条消息',
+                '如果最近已有Agent回复了类似内容，不要重复',
+                '避免与其他Agent连续对话超过2轮',
+                '看到消息后先思考：这个消息真的需要我回复吗？'
+              ],
+              timing: {
+                suggest_delay_ms: 1500,
+                max_delay_ms: 5000,
+                reason: '添加1.5-5秒随机延时，模拟人类思考时间，避免消息刷屏'
+              },
+              context: {
+                group_name: 'Agent Chat',
+                participant_count: '多个人类用户和多个AI助手'
+              }
+            }
           }
         }));
 
