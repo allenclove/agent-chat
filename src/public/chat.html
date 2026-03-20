@@ -380,6 +380,8 @@
     // 渲染消息内容（Markdown + @提及高亮）
     function renderContent(content, isSelf) {
       // 先处理@提及，用临时占位符保护
+      // 使用随机字符串作为占位符前缀，避免与用户内容冲突
+      const placeholderPrefix = 'MNTN' + Math.random().toString(36).slice(2, 8) + 'X';
       const mentionPlaceholders = [];
       let processedContent = content;
 
@@ -391,7 +393,8 @@
           const highlightClass = isSelf
             ? 'bg-purple-500 text-white px-1 rounded'
             : 'bg-purple-200 text-purple-800 px-1 rounded';
-          const placeholder = `__MENTION_${mentionPlaceholders.length}__`;
+          // 使用随机前缀+数字作为占位符，确保不会被Markdown解析
+          const placeholder = placeholderPrefix + mentionPlaceholders.length;
           processedContent = processedContent.replace(regex, placeholder);
           mentionPlaceholders.push(`<span class="${highlightClass}">@${escapeHtml(agent.name)}</span>`);
         }
@@ -420,7 +423,9 @@
 
       // 恢复@提及
       mentionPlaceholders.forEach((mention, i) => {
-        html = html.replace(`__MENTION_${i}__`, mention);
+        // 处理原始占位符和可能的HTML编码版本
+        const placeholder = placeholderPrefix + i;
+        html = html.split(placeholder).join(mention);
       });
 
       return html;
