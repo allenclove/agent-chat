@@ -66,6 +66,9 @@ const agentManager = {
       status: 'online'
     });
 
+    // 通知所有Agent更新成员列表
+    this.broadcastParticipantsUpdate();
+
     // 设置消息处理
     this.setupAgentMessageHandler(ws, agentConfig);
 
@@ -85,7 +88,17 @@ const agentManager = {
       }
     }));
 
-    // 发送平台信息
+    // 获取当前群成员信息
+    const onlineUsers = chat.getOnlineUsers();
+    const allAgents = db.getAllAgents().map(a => ({
+      id: a.id,
+      name: a.name,
+      type: 'agent',
+      status: connectedAgents.has(a.id) ? 'online' : 'offline'
+    }));
+    const onlineAgents = allAgents.filter(a => a.status === 'online');
+
+    // 发送平台信息（包含群成员）
     ws.send(JSON.stringify({
       type: 'platform',
       payload: {
@@ -98,6 +111,16 @@ const agentManager = {
           '消息来源可能是人类或其他Agent'
         ],
         your_role: '群聊中的AI成员，不是用户的专属1对1助手',
+        // 当前群成员信息
+        participants: {
+          users: onlineUsers.map(u => ({
+            id: u.id,
+            name: u.display_name || u.username,
+            type: 'human'
+          })),
+          agents: allAgents,
+          online_count: onlineUsers.length + onlineAgents.length
+        },
         // 行为指南 - 引导Agent合理参与对话
         behavior_guide: {
           summary: '你是一个群聊中的AI助手，请遵循以下原则参与对话',
@@ -125,7 +148,8 @@ const agentManager = {
           },
           context: {
             group_name: 'Agent Chat',
-            participant_count: '多个人类用户和多个AI助手'
+            participant_count: `${onlineUsers.length}个人类用户和${onlineAgents.length}个AI助手`,
+            your_identity: `你的名字是"${config.name}"，ID是"${config.id}"。请记住自己的身份，不要混淆。`
           }
         }
       }
@@ -162,6 +186,9 @@ const agentManager = {
         name: config.name,
         status: 'offline'
       });
+
+      // 通知其他Agent更新成员列表
+      this.broadcastParticipantsUpdate();
     });
 
     ws.on('error', (err) => {
@@ -337,6 +364,35 @@ const agentManager = {
   // 获取在线Agent数量
   getOnlineCount() {
     return connectedAgents.size;
+  },
+
+  // 广播成员更新给所有Agent
+  broadcastParticipantsUpdate() {
+    const onlineUsers = chat.getOnlineUsers();
+    const allAgents = db.getAllAgents().map(a => ({
+      id: a.id,
+      name: a.name,
+      type: 'agent',
+      status: connectedAgents.has(a.id) ? 'online' : 'offline'
+    }));
+
+    const updateMsg = JSON.stringify({
+      type: 'participants_update',
+      payload: {
+        users: onlineUsers.map(u => ({
+          id: u.id,
+          name: u.display_name || u.username,
+          type: 'human'
+        })),
+        agents: allAgents
+      }
+    });
+
+    for (const [, agent] of connectedAgents) {
+      if (agent.ws.readyState === 1) {
+        agent.ws.send(updateMsg);
+      }
+    }
   }
 };
 

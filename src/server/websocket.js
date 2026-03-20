@@ -28,6 +28,8 @@ function setupWebSocket(server) {
         chat.removeClient(sessionId);
         console.log(`[WS] 用户断开: ${sessionId}`);
         broadcastUserList();
+        // 通知所有Agent更新成员列表
+        agentManager.broadcastParticipantsUpdate();
       } else if (isAgent && agentId) {
         console.log(`[WS] Agent断开: ${agentId}`);
         chat.broadcast('agent_status', {
@@ -130,6 +132,9 @@ function setupWebSocket(server) {
 
       // 广播用户列表更新给所有人
       broadcastUserList();
+
+      // 通知所有Agent更新成员列表
+      agentManager.broadcastParticipantsUpdate();
     }
 
     function handleAgentJoin(ws, msg) {
