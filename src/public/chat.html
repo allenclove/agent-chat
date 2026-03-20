@@ -64,15 +64,21 @@
       </div>
 
       <!-- 输入区域 -->
-      <div class="bg-white border-t p-4">
+      <div class="bg-white border-t p-4 relative">
         <form id="messageForm" class="flex space-x-3">
-          <input
-            type="text"
-            id="messageInput"
-            placeholder="输入消息... (@提及Agent)"
-            class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none"
-            autocomplete="off"
-          >
+          <div class="flex-1 relative">
+            <input
+              type="text"
+              id="messageInput"
+              placeholder="输入消息... (@提及Agent)"
+              class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none"
+              autocomplete="off"
+            >
+            <!-- @提及下拉菜单 -->
+            <div id="mentionDropdown" class="absolute left-0 bottom-full mb-1 w-full bg-white border rounded-lg shadow-lg hidden z-10 max-h-48 overflow-y-auto">
+              <!-- Agent列表动态插入 -->
+            </div>
+          </div>
           <button
             type="submit"
             class="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition font-medium"
@@ -119,17 +125,21 @@
     const messageForm = document.getElementById('messageForm');
     const messageInput = document.getElementById('messageInput');
     const userList = document.getElementById('userList');
-    const agentList = document.getElementById('agentList');
+    const agentListEl = document.getElementById('agentList');
     const onlineCount = document.getElementById('onlineCount');
     const agentCount = document.getElementById('agentCount');
     const logoutBtn = document.getElementById('logoutBtn');
     const toggleSidebar = document.getElementById('toggleSidebar');
     const sidebar = document.getElementById('sidebar');
     const overlay = document.getElementById('overlay');
+    const mentionDropdown = document.getElementById('mentionDropdown');
 
     let ws = null;
     let sessionId = localStorage.getItem('session_id');
     let currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+    let agents = []; // 存储Agent列表
+    let mentionStartIndex = -1; // @符号的位置
+    let showMentionDropdown = false;
 
     // 检查登录状态
     if (!sessionId) {
@@ -240,7 +250,7 @@
             <div>
               <div class="text-xs text-gray-500 mb-1 ${isSelf ? 'text-right' : ''}">${msg.sender_name}</div>
               <div class="px-4 py-2 rounded-2xl ${isSelf ? 'bg-purple-600 text-white' : isAgent ? 'bg-purple-100 text-purple-900' : 'bg-white text-gray-800'} shadow-sm">
-                ${escapeHtml(msg.content)}
+                ${highlightMentions(escapeHtml(msg.content), isSelf)}
               </div>
               <div class="text-xs text-gray-400 mt-1 ${isSelf ? 'text-right' : ''}">${time}</div>
             </div>
@@ -255,6 +265,25 @@
       }
     }
 
+    // 高亮消息中的@提及
+    function highlightMentions(text, isSelf) {
+      if (!agents || agents.length === 0) return text;
+
+      // 按名字长度降序排列，避免短名字先替换影响长名字
+      const sortedAgents = [...agents].sort((a, b) => b.name.length - a.name.length);
+
+      for (const agent of sortedAgents) {
+        const escapedName = agent.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const regex = new RegExp(`@${escapedName}`, 'g');
+        const highlightClass = isSelf
+          ? 'bg-purple-500 text-white px-1 rounded'
+          : 'bg-purple-200 text-purple-800 px-1 rounded';
+        text = text.replace(regex, `<span class="${highlightClass}">@$1</span>`.replace('$1', agent.name));
+      }
+
+      return text;
+    }
+
     // 渲染用户列表
     function renderUserList(users) {
       onlineCount.textContent = users.length;
@@ -267,11 +296,12 @@
     }
 
     // 渲染Agent列表
-    function renderAgentList(agents) {
+    function renderAgentList(agentList) {
+      agents = agentList; // 存储到全局变量
       const onlineAgents = agents.filter(a => a.status === 'online');
       agentCount.textContent = onlineAgents.length;
 
-      agentList.innerHTML = agents.map(agent => `
+      agentListEl.innerHTML = agents.map(agent => `
         <div class="flex items-center space-x-2 p-2 rounded-lg hover:bg-gray-50">
           <div class="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center text-sm">🤖</div>
           <span class="text-sm text-gray-700 flex-1">${agent.name}</span>
@@ -303,8 +333,141 @@
     // 回车发送
     messageInput.addEventListener('keypress', (e) => {
       if (e.key === 'Enter' && !e.shiftKey) {
+        if (showMentionDropdown) {
+          e.preventDefault();
+          selectFirstMention();
+        } else {
+          e.preventDefault();
+          messageForm.dispatchEvent(new Event('submit'));
+        }
+      }
+    });
+
+    // @提及功能 - 输入监听
+    messageInput.addEventListener('input', (e) => {
+      const value = messageInput.value;
+      const cursorPos = messageInput.selectionStart;
+
+      // 查找当前光标前最近的@符号
+      const textBeforeCursor = value.substring(0, cursorPos);
+      const lastAtIndex = textBeforeCursor.lastIndexOf('@');
+
+      if (lastAtIndex !== -1) {
+        // 检查@后面是否有空格（如果有空格说明已经结束提及）
+        const textAfterAt = textBeforeCursor.substring(lastAtIndex + 1);
+        if (!textAfterAt.includes(' ')) {
+          mentionStartIndex = lastAtIndex;
+          const searchText = textAfterAt.toLowerCase();
+          showMentionSuggestions(searchText);
+          return;
+        }
+      }
+
+      hideMentionDropdown();
+    });
+
+    // 显示@提及建议
+    function showMentionSuggestions(searchText) {
+      const filteredAgents = agents.filter(agent =>
+        agent.status === 'online' &&
+        agent.name.toLowerCase().includes(searchText)
+      );
+
+      if (filteredAgents.length === 0) {
+        hideMentionDropdown();
+        return;
+      }
+
+      mentionDropdown.innerHTML = filteredAgents.map((agent, index) => `
+        <div class="mention-item px-4 py-2 hover:bg-purple-50 cursor-pointer flex items-center space-x-2 ${index === 0 ? 'bg-purple-50' : ''}"
+             data-agent-name="${escapeHtml(agent.name)}">
+          <span class="text-purple-600">🤖</span>
+          <span>${highlightMatch(agent.name, searchText)}</span>
+        </div>
+      `).join('');
+
+      mentionDropdown.classList.remove('hidden');
+      showMentionDropdown = true;
+
+      // 绑定点击事件
+      mentionDropdown.querySelectorAll('.mention-item').forEach(item => {
+        item.addEventListener('click', () => {
+          insertMention(item.dataset.agentName);
+        });
+      });
+    }
+
+    // 高亮匹配文字
+    function highlightMatch(name, search) {
+      if (!search) return escapeHtml(name);
+      const escapedName = escapeHtml(name);
+      const escapedSearch = escapeHtml(search);
+      const regex = new RegExp(`(${escapedSearch})`, 'gi');
+      return escapedName.replace(regex, '<span class="text-purple-600 font-semibold">$1</span>');
+    }
+
+    // 插入选中的Agent名称
+    function insertMention(agentName) {
+      const value = messageInput.value;
+      const beforeMention = value.substring(0, mentionStartIndex);
+      const afterCursor = value.substring(messageInput.selectionStart);
+
+      messageInput.value = beforeMention + '@' + agentName + ' ' + afterCursor;
+      messageInput.focus();
+
+      // 设置光标位置到插入内容之后
+      const newPos = beforeMention.length + agentName.length + 2;
+      messageInput.setSelectionRange(newPos, newPos);
+
+      hideMentionDropdown();
+    }
+
+    // 选择第一个提及建议
+    function selectFirstMention() {
+      const firstItem = mentionDropdown.querySelector('.mention-item');
+      if (firstItem) {
+        insertMention(firstItem.dataset.agentName);
+      }
+    }
+
+    // 隐藏@提及下拉菜单
+    function hideMentionDropdown() {
+      mentionDropdown.classList.add('hidden');
+      showMentionDropdown = false;
+    }
+
+    // 点击其他地方关闭下拉菜单
+    document.addEventListener('click', (e) => {
+      if (!messageInput.contains(e.target) && !mentionDropdown.contains(e.target)) {
+        hideMentionDropdown();
+      }
+    });
+
+    // 方向键导航@提及列表
+    messageInput.addEventListener('keydown', (e) => {
+      if (!showMentionDropdown) return;
+
+      const items = mentionDropdown.querySelectorAll('.mention-item');
+      const currentIndex = Array.from(items).findIndex(item => item.classList.contains('bg-purple-50'));
+
+      if (e.key === 'ArrowDown') {
         e.preventDefault();
-        messageForm.dispatchEvent(new Event('submit'));
+        const nextIndex = (currentIndex + 1) % items.length;
+        items[currentIndex]?.classList.remove('bg-purple-50');
+        items[nextIndex]?.classList.add('bg-purple-50');
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        const prevIndex = (currentIndex - 1 + items.length) % items.length;
+        items[currentIndex]?.classList.remove('bg-purple-50');
+        items[prevIndex]?.classList.add('bg-purple-50');
+      } else if (e.key === 'Tab' || e.key === 'Enter') {
+        e.preventDefault();
+        const selectedItem = mentionDropdown.querySelector('.mention-item.bg-purple-50');
+        if (selectedItem) {
+          insertMention(selectedItem.dataset.agentName);
+        }
+      } else if (e.key === 'Escape') {
+        hideMentionDropdown();
       }
     });
 

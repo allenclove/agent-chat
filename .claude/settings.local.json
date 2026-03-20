@@ -3,7 +3,9 @@
     "allow": [
       "Bash(npm install:*)",
       "Bash(timeout 5 node server.js)",
-      "Bash(PORT=3300 timeout 5 node server.js)"
+      "Bash(PORT=3300 timeout 5 node server.js)",
+      "Bash(gh auth:*)",
+      "Bash(gh repo:*)"
     ]
   }
 }
