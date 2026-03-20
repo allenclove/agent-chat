@@ -55,7 +55,7 @@ async function init() {
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
       avatar_url TEXT,
-      websocket_url TEXT NOT NULL,
+      token TEXT NOT NULL,
       message_filter TEXT DEFAULT 'all',
       keywords TEXT,
       history_limit INTEGER DEFAULT 50,
@@ -227,11 +227,11 @@ function addAgent(config) {
   if (existing) {
     // 更新配置
     db.run(
-      `UPDATE agent_configs SET name = ?, avatar_url = ?, websocket_url = ?, message_filter = ?, keywords = ?, history_limit = ?, enabled = 1 WHERE id = ?`,
+      `UPDATE agent_configs SET name = ?, avatar_url = ?, token = ?, message_filter = ?, keywords = ?, history_limit = ?, enabled = 1 WHERE id = ?`,
       [
         config.name,
         config.avatar_url || null,
-        config.websocket_url,
+        config.token,
         config.message_filter || 'all',
         config.keywords ? JSON.stringify(config.keywords) : null,
         config.history_limit || 50,
@@ -241,13 +241,13 @@ function addAgent(config) {
   } else {
     // 插入新配置
     db.run(
-      `INSERT INTO agent_configs (id, name, avatar_url, websocket_url, message_filter, keywords, history_limit, enabled)
+      `INSERT INTO agent_configs (id, name, avatar_url, token, message_filter, keywords, history_limit, enabled)
        VALUES (?, ?, ?, ?, ?, ?, ?, 1)`,
       [
         config.id,
         config.name,
         config.avatar_url || null,
-        config.websocket_url,
+        config.token,
         config.message_filter || 'all',
         config.keywords ? JSON.stringify(config.keywords) : null,
         config.history_limit || 50
@@ -255,6 +255,18 @@ function addAgent(config) {
     );
   }
   save();
+}
+
+// 通过token验证Agent
+function getAgentByToken(token) {
+  const result = db.exec('SELECT * FROM agent_configs WHERE token = ? AND enabled = 1', [token]);
+  if (result.length === 0 || result[0].values.length === 0) return null;
+
+  const columns = result[0].columns;
+  const values = result[0].values[0];
+  const agent = {};
+  columns.forEach((col, i) => agent[col] = values[i]);
+  return agent;
 }
 
 // 从配置文件加载Agent
@@ -293,6 +305,7 @@ module.exports = {
   // Agent
   getAllAgents,
   getAgentById,
+  getAgentByToken,
   addAgent,
   loadAgentsFromConfig
 };

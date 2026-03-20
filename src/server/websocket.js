@@ -8,6 +8,8 @@ function setupWebSocket(server) {
 
   wss.on('connection', (ws, req) => {
     let sessionId = null;
+    let isAgent = false;
+    let agentId = null;
 
     console.log('[WS] 新连接');
 
@@ -22,12 +24,17 @@ function setupWebSocket(server) {
     });
 
     ws.on('close', () => {
-      if (sessionId) {
+      if (sessionId && !isAgent) {
         chat.removeClient(sessionId);
         console.log(`[WS] 用户断开: ${sessionId}`);
-
-        // 广播用户列表更新
         broadcastUserList();
+      } else if (isAgent && agentId) {
+        console.log(`[WS] Agent断开: ${agentId}`);
+        chat.broadcast('agent_status', {
+          agent_id: agentId,
+          name: agentManager.getAgentStatus().find(a => a.id === agentId)?.name || agentId,
+          status: 'offline'
+        });
       }
     });
 
@@ -44,6 +51,25 @@ function setupWebSocket(server) {
     function handleMessage(ws, msg) {
       const { type, payload } = msg;
 
+      // 处理Agent消息
+      if (type === 'agent_join') {
+        handleAgentJoin(ws, msg);
+        return;
+      }
+
+      // 处理Agent的pong响应
+      if (type === 'pong' && isAgent) {
+        ws.isAlive = true;
+        return;
+      }
+
+      // 处理Agent发送的消息
+      if (type === 'message' && isAgent) {
+        agentManager.handleAgentMessage(ws, msg);
+        return;
+      }
+
+      // 处理人类用户消息
       switch (type) {
         case 'join':
           handleJoin(ws, payload);
@@ -77,6 +103,7 @@ function setupWebSocket(server) {
       }
 
       sessionId = session_id;
+      isAgent = false;
       chat.addClient(sessionId, ws, {
         id: session.user_id,
         username: session.username,
@@ -98,6 +125,19 @@ function setupWebSocket(server) {
 
       // 广播用户列表更新给所有人
       broadcastUserList();
+    }
+
+    function handleAgentJoin(ws, msg) {
+      const result = agentManager.handleAgentConnection(ws, msg);
+
+      if (result.success) {
+        isAgent = true;
+        agentId = msg.payload.agent_id;
+        console.log(`[WS] Agent验证成功: ${agentId}`);
+      } else {
+        sendError(ws, result.error);
+        ws.close();
+      }
     }
 
     function handleUserMessage(ws, payload) {
@@ -131,6 +171,9 @@ function setupWebSocket(server) {
       ws.isAlive = false;
       ws.ping();
     });
+
+    // 同时ping所有Agent
+    agentManager.pingAllAgents();
   }, 30000);
 
   wss.on('close', () => {

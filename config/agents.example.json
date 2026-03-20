@@ -3,7 +3,7 @@
     {
       "id": "example-bot",
       "name": "示例机器人",
-      "websocket_url": "ws://localhost:8081",
+      "token": "your-secret-token-here",
       "message_filter": "all",
       "history_limit": 50
     }
