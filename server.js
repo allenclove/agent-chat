@@ -148,6 +148,43 @@ async function start() {
       return true;
     }
 
+    // 获取系统设置
+    if (req.url === '/api/settings' && req.method === 'GET') {
+      const settings = db.getAllSettings();
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: true, settings }));
+      return true;
+    }
+
+    // 更新系统设置
+    if (req.url === '/api/settings' && req.method === 'POST') {
+      let body = '';
+      req.on('data', chunk => body += chunk);
+      req.on('end', () => {
+        try {
+          const { settings } = JSON.parse(body);
+          if (!settings || typeof settings !== 'object') {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: '无效的设置数据' }));
+            return;
+          }
+
+          db.updateSettings(settings);
+          console.log('[Settings] 系统设置已更新');
+
+          // 通知所有Agent重新加载设置
+          agentManager.notifySettingsChanged();
+
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: true }));
+        } catch (e) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: '无效的请求数据' }));
+        }
+      });
+      return true;
+    }
+
     return false;
   };
 
@@ -162,9 +199,6 @@ async function start() {
 
   // 设置WebSocket
   setupWebSocket(server);
-
-  // 连接所有配置的Agent
-  agentManager.connectAll();
 
   // 启动服务器
   server.listen(PORT, () => {

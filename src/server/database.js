@@ -64,6 +64,19 @@ async function init() {
     )
   `);
 
+  // 系统设置表
+  db.run(`
+    CREATE TABLE IF NOT EXISTS system_settings (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL,
+      description TEXT,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  // 初始化默认设置
+  initDefaultSettings();
+
   // 从配置文件加载Agent
   loadAgentsFromConfig();
 
@@ -288,6 +301,118 @@ function loadAgentsFromConfig() {
   }
 }
 
+// 默认系统设置
+const defaultSettings = {
+  // Agent回复模式：strict_mention（仅@时回复）、moderate（适度参与）、active（积极参与）
+  agent_reply_mode: {
+    value: 'strict_mention',
+    description: 'Agent回复模式：strict_mention(仅@时回复)、moderate(适度参与)、active(积极参与)'
+  },
+  // Agent冷却时间（毫秒）
+  agent_cooldown_ms: {
+    value: 10000,
+    description: 'Agent回复冷却时间（毫秒），防止刷屏'
+  },
+  // 连续消息限制
+  max_consecutive_msg: {
+    value: 3,
+    description: 'Agent连续发送消息的最大数量'
+  },
+  // 是否允许Agent之间互相回复
+  allow_agent_to_agent: {
+    value: true,
+    description: '是否允许Agent之间互相回复'
+  },
+  // 用户授权关键词
+  auth_keywords: {
+    value: ['继续', '请继续', 'go on', 'continue', '/allow-chat'],
+    description: '用户授权Agent持续对话的关键词'
+  },
+  // 回复延时范围（毫秒）
+  reply_delay_range: {
+    value: { min: 1500, max: 5000 },
+    description: 'Agent回复延时范围（毫秒），模拟人类思考时间'
+  }
+};
+
+// 初始化默认设置
+function initDefaultSettings() {
+  for (const [key, setting] of Object.entries(defaultSettings)) {
+    const result = db.exec('SELECT key FROM system_settings WHERE key = ?', [key]);
+    if (result.length === 0 || result[0].values.length === 0) {
+      db.run(
+        'INSERT INTO system_settings (key, value, description) VALUES (?, ?, ?)',
+        [key, JSON.stringify(setting.value), setting.description]
+      );
+    }
+  }
+  console.log('[DB] 系统设置初始化完成');
+}
+
+// 获取单个设置
+function getSetting(key) {
+  const result = db.exec('SELECT value FROM system_settings WHERE key = ?', [key]);
+  if (result.length === 0 || result[0].values.length === 0) {
+    // 返回默认值
+    if (defaultSettings[key]) {
+      return defaultSettings[key].value;
+    }
+    return null;
+  }
+  try {
+    return JSON.parse(result[0].values[0][0]);
+  } catch (e) {
+    return result[0].values[0][0];
+  }
+}
+
+// 获取所有设置
+function getAllSettings() {
+  const result = db.exec('SELECT key, value, description FROM system_settings');
+  const settings = {};
+
+  if (result.length > 0) {
+    const columns = result[0].columns;
+    result[0].values.forEach(values => {
+      const row = {};
+      columns.forEach((col, i) => row[col] = values[i]);
+      try {
+        row.value = JSON.parse(row.value);
+      } catch (e) {
+        // 保持原始值
+      }
+      settings[row.key] = {
+        value: row.value,
+        description: row.description
+      };
+    });
+  }
+
+  return settings;
+}
+
+// 更新设置
+function updateSetting(key, value) {
+  db.run(
+    "UPDATE system_settings SET value = ?, updated_at = datetime('now') WHERE key = ?",
+    [JSON.stringify(value), key]
+  );
+  save();
+  return true;
+}
+
+// 批量更新设置
+function updateSettings(settings) {
+  for (const [key, value] of Object.entries(settings)) {
+    db.run(
+      "UPDATE system_settings SET value = ?, updated_at = datetime('now') WHERE key = ?",
+      [JSON.stringify(value), key]
+    );
+  }
+  save();
+  return true;
+}
+
 module.exports = {
   init,
   // 用户
@@ -307,5 +432,10 @@ module.exports = {
   getAgentById,
   getAgentByToken,
   addAgent,
-  loadAgentsFromConfig
+  loadAgentsFromConfig,
+  // 系统设置
+  getSetting,
+  getAllSettings,
+  updateSetting,
+  updateSettings
 };

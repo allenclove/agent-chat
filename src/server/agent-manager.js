@@ -5,17 +5,40 @@ const chat = require('./chat');
 // Map<agentId, { ws, config, connected, lastPing }>
 const connectedAgents = new Map();
 
-// 冷却时间配置（方案B）
-const AGENT_COOLDOWN_MS = 10000; // 10秒冷却
+// Agent回复时间记录
 const agentLastReply = new Map(); // agentId -> timestamp
 
-// 连续消息限制
-const MAX_CONSECUTIVE_MSG = 3;
+// 连续消息计数
 let consecutiveMsgCount = 0;
 let lastMsgTime = 0;
 
 // 心跳超时
 const HEARTBEAT_TIMEOUT = 60000;
+
+// 获取设置值的辅助函数
+function getCooldownMs() {
+  return db.getSetting('agent_cooldown_ms') || 10000;
+}
+
+function getMaxConsecutiveMsg() {
+  return db.getSetting('max_consecutive_msg') || 3;
+}
+
+function getAllowAgentToAgent() {
+  return db.getSetting('allow_agent_to_agent') !== false;
+}
+
+function getReplyMode() {
+  return db.getSetting('agent_reply_mode') || 'strict_mention';
+}
+
+function getReplyDelayRange() {
+  return db.getSetting('reply_delay_range') || { min: 1500, max: 5000 };
+}
+
+function getAuthKeywords() {
+  return db.getSetting('auth_keywords') || ['继续', '请继续', 'go on', 'continue', '/allow-chat'];
+}
 
 // Agent管理器（反向连接模式）
 const agentManager = {
@@ -121,54 +144,77 @@ const agentManager = {
           agents: allAgents,
           online_count: onlineUsers.length + onlineAgents.length
         },
-        // 行为指南 - 引导Agent合理参与对话
-        behavior_guide: {
-          summary: '你是一个群聊中的AI助手，请遵循以下原则参与对话',
-          mention_rules: {
-            important: '【关键规则】只有@你名字的消息才需要回复！',
-            how_to_check: `检查消息中是否包含 "@${config.name}"（不区分大小写）`,
-            when_to_reply: [
-              `消息明确@了你：@${config.name}`,
-              '别人在对话中直接叫你的名字提问'
-            ],
-            when_not_to_reply: [
-              `消息@了其他Agent（如@其他机器人名字），不是@你`,
-              '消息没有@任何人，且与你的专长无关',
-              '其他Agent已经被@并给出了回答'
-            ],
-            example: {
-              should_reply: [`@${config.name} 你好`, `@${config.name} 帮我看看这个`],
-              should_not_reply: ['@其他Agent 你好', '大家觉得呢？', '今天天气不错']
-            }
-          },
-          reply_principles: [
-            '【最重要】只有@你的消息才必须回复',
-            '@其他Agent的消息，你不要回复，让被@的Agent回复',
-            '没有@任何人的普通消息，除非与你的专长高度相关，否则不要回复',
-            '其他Agent已经回答了的问题，不要重复回答'
-          ],
-          user_authorization: {
-            description: '用户可以通过特定方式授权Agent持续对话',
-            auth_keywords: ['继续', '请继续', 'go on', 'continue', '/allow-chat'],
-            when_authorized: '用户授权后，你可以与其他Agent自由对话，无需担心循环限制'
-          },
-          avoid_loops: [
-            '默认情况下，不要回复每一条消息',
-            '如果最近已有Agent回复了类似内容，不要重复',
-            '看到消息后先思考：这个消息是@我的吗？真的需要我回复吗？'
-          ],
-          timing: {
-            suggest_delay_ms: 1500,
-            max_delay_ms: 5000,
-            reason: '添加1.5-5秒随机延时，模拟人类思考时间，避免消息刷屏'
-          },
-          context: {
-            group_name: 'Agent Chat',
-            participant_count: `${onlineUsers.length}个人类用户和${onlineAgents.length}个AI助手`,
-            your_identity: `你的名字是"${config.name}"，ID是"${config.id}"。请记住自己的身份，不要混淆。`,
-            environment: '这是一个多人群聊环境，不是1对1对话。消息会广播给所有人，包括其他AI助手。每条消息都有sender_name和sender_type字段，表示发送者是谁。'
+        // 行为指南 - 引导Agent合理参与对话（使用数据库设置）
+        behavior_guide: (() => {
+          const replyMode = getReplyMode();
+          const delayRange = getReplyDelayRange();
+          const authKeywords = getAuthKeywords();
+          const allowAgentToAgent = getAllowAgentToAgent();
+
+          // 根据回复模式调整提示
+          let modeDescription = '';
+          if (replyMode === 'strict_mention') {
+            modeDescription = '当前为严格模式：只有被@时才回复';
+          } else if (replyMode === 'moderate') {
+            modeDescription = '当前为适度模式：被@时必回复，其他消息选择性参与';
+          } else {
+            modeDescription = '当前为积极模式：可以主动参与对话';
           }
-        }
+
+          return {
+            summary: '你是一个群聊中的AI助手，请遵循以下原则参与对话',
+            reply_mode: replyMode,
+            mode_description: modeDescription,
+            mention_rules: {
+              important: '【关键规则】只有@你名字的消息才需要回复！',
+              how_to_check: `检查消息中是否包含 "@${config.name}"（不区分大小写）`,
+              when_to_reply: [
+                `消息明确@了你：@${config.name}`,
+                '别人在对话中直接叫你的名字提问'
+              ],
+              when_not_to_reply: [
+                `消息@了其他Agent（如@其他机器人名字），不是@你`,
+                '消息没有@任何人，且与你的专长无关',
+                '其他Agent已经被@并给出了回答'
+              ],
+              example: {
+                should_reply: [`@${config.name} 你好`, `@${config.name} 帮我看看这个`],
+                should_not_reply: ['@其他Agent 你好', '大家觉得呢？', '今天天气不错']
+              }
+            },
+            reply_principles: [
+              '【最重要】只有@你的消息才必须回复',
+              '@其他Agent的消息，你不要回复，让被@的Agent回复',
+              '没有@任何人的普通消息，除非与你的专长高度相关，否则不要回复',
+              '其他Agent已经回答了的问题，不要重复回答'
+            ],
+            user_authorization: {
+              description: '用户可以通过特定方式授权Agent持续对话',
+              auth_keywords: authKeywords,
+              when_authorized: '用户授权后，你可以与其他Agent自由对话，无需担心循环限制'
+            },
+            avoid_loops: [
+              '默认情况下，不要回复每一条消息',
+              '如果最近已有Agent回复了类似内容，不要重复',
+              '看到消息后先思考：这个消息是@我的吗？真的需要我回复吗？'
+            ],
+            timing: {
+              suggest_delay_ms: delayRange.min,
+              max_delay_ms: delayRange.max,
+              reason: `添加${delayRange.min/1000}-${delayRange.max/1000}秒随机延时，模拟人类思考时间，避免消息刷屏`
+            },
+            agent_interaction: {
+              allow_agent_to_agent: allowAgentToAgent,
+              description: allowAgentToAgent ? '可以与其他Agent互动' : '只能回复用户消息，不回复其他Agent'
+            },
+            context: {
+              group_name: 'Agent Chat',
+              participant_count: `${onlineUsers.length}个人类用户和${onlineAgents.length}个AI助手`,
+              your_identity: `你的名字是"${config.name}"，ID是"${config.id}"。请记住自己的身份，不要混淆。`,
+              environment: '这是一个多人群聊环境，不是1对1对话。消息会广播给所有人，包括其他AI助手。每条消息都有sender_name和sender_type字段，表示发送者是谁。'
+            }
+          };
+        })()
       }
     }));
 
@@ -226,18 +272,20 @@ const agentManager = {
     }
 
     if (msg.type === 'message' && msg.payload?.content) {
-      // 检查冷却时间（方案B）
+      // 检查冷却时间
+      const cooldownMs = getCooldownMs();
       const lastReply = agentLastReply.get(config.id) || 0;
-      if (Date.now() - lastReply < AGENT_COOLDOWN_MS) {
+      if (Date.now() - lastReply < cooldownMs) {
         console.log(`[Agent] ${config.name} 冷却中，跳过`);
         return;
       }
 
       // 检查连续消息限制
+      const maxConsecutive = getMaxConsecutiveMsg();
       const now = Date.now();
       if (now - lastMsgTime < 5000) {
         consecutiveMsgCount++;
-        if (consecutiveMsgCount > MAX_CONSECUTIVE_MSG) {
+        if (consecutiveMsgCount > maxConsecutive) {
           console.log(`[Agent] ${config.name} 连续消息过多，阻止`);
           consecutiveMsgCount = 0;
           return;
@@ -259,6 +307,11 @@ const agentManager = {
         chat.broadcast('message', message);
 
         // 转发给其他Agent（排除自己）
+        // 检查是否允许Agent互聊
+        if (!getAllowAgentToAgent()) {
+          return; // 不转发给其他Agent
+        }
+
         for (const [agentId, agent] of connectedAgents) {
           if (agentId === config.id) continue;  // 不转发给自己
           if (!agent.connected || agent.ws.readyState !== 1) continue;
@@ -410,6 +463,36 @@ const agentManager = {
         agent.ws.send(updateMsg);
       }
     }
+  },
+
+  // 通知所有Agent设置已更新
+  notifySettingsChanged() {
+    const replyMode = getReplyMode();
+    const delayRange = getReplyDelayRange();
+    const authKeywords = getAuthKeywords();
+    const allowAgentToAgent = getAllowAgentToAgent();
+    const cooldownMs = getCooldownMs();
+    const maxConsecutive = getMaxConsecutiveMsg();
+
+    const settingsMsg = JSON.stringify({
+      type: 'settings_update',
+      payload: {
+        reply_mode: replyMode,
+        delay_range: delayRange,
+        auth_keywords: authKeywords,
+        allow_agent_to_agent: allowAgentToAgent,
+        cooldown_ms: cooldownMs,
+        max_consecutive_msg: maxConsecutive
+      }
+    });
+
+    for (const [, agent] of connectedAgents) {
+      if (agent.ws.readyState === 1) {
+        agent.ws.send(settingsMsg);
+      }
+    }
+
+    console.log('[Agent] 已通知所有Agent设置更新');
   }
 };
 
