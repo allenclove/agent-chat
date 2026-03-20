@@ -167,53 +167,120 @@ const agentManager = {
           const authKeywords = getAuthKeywords();
           const allowAgentToAgent = getAllowAgentToAgent();
 
-          // 根据回复模式调整提示
+          // 根据回复模式调整提示（关键：不同模式有不同的规则）
           let modeDescription = '';
+          let mentionRules = {};
+          let replyPrinciples = [];
+          let avoidLoops = [];
+
           if (replyMode === 'strict_mention') {
-            modeDescription = '当前为严格模式：只有被@时才回复';
+            // 严格模式：只有被@时才回复
+            modeDescription = '【严格模式】只有被@时才回复，其他消息一律不回复';
+            mentionRules = {
+              important: '【关键规则】只有@你名字的消息才需要回复！其他消息不要回复！',
+              how_to_check: `检查消息中是否包含 "@${config.name}"（不区分大小写）`,
+              when_to_reply: [
+                `消息明确@了你：@${config.name}`,
+                '别人直接叫你的名字向你提问'
+              ],
+              when_not_to_reply: [
+                `消息@了其他Agent，不是@你`,
+                '消息没有@任何人',
+                '普通聊天、问候、表情包'
+              ],
+              example: {
+                should_reply: [`@${config.name} 你好`, `@${config.name} 帮我看看`],
+                should_not_reply: ['@其他Agent 你好', '大家觉得呢？', '今天天气不错', '你好啊']
+              }
+            };
+            replyPrinciples = [
+              '【最重要】只有@你的消息才必须回复',
+              '@其他Agent的消息，不要回复',
+              '没有@的消息，不要回复'
+            ];
+            avoidLoops = [
+              '默认情况下，不要回复任何消息',
+              '只有确认@你的消息才回复'
+            ];
+
           } else if (replyMode === 'moderate') {
-            modeDescription = '当前为适度模式：被@时必回复，其他消息选择性参与';
+            // 适度模式：被@时必回复，其他消息选择性参与
+            modeDescription = '【适度模式】被@时必须回复，其他消息可以选择性参与';
+            mentionRules = {
+              important: '【关键规则】被@时必须回复。其他消息如果有独特价值可以回复。',
+              how_to_check: `检查消息中是否包含 "@${config.name}"（不区分大小写）`,
+              when_to_reply: [
+                `消息明确@了你：@${config.name}`,
+                '别人直接叫你的名字向你提问',
+                '你能够提供独特见解或专业知识的讨论'
+              ],
+              when_not_to_reply: [
+                `消息@了其他Agent，让被@的Agent回答`,
+                '其他Agent已经给出了满意回答',
+                '纯闲聊、问候、表情包'
+              ],
+              example: {
+                should_reply: [`@${config.name} 你好`, `@${config.name} 帮我看看`, '有人懂Python吗？'],
+                should_not_reply: ['@其他Agent 你好', '今天天气不错', '哈哈']
+              }
+            };
+            replyPrinciples = [
+              '被@时必须回复',
+              '如果有独特价值可以主动参与讨论',
+              '@其他Agent的消息让被@的Agent回答',
+              '避免与问候、闲聊互动'
+            ];
+            avoidLoops = [
+              '不要回复每一条消息',
+              '思考：这条消息需要我回复吗？我有独特价值吗？'
+            ];
+
           } else {
-            modeDescription = '当前为积极模式：可以主动参与对话';
+            // 积极模式：可以主动参与对话
+            modeDescription = '【积极模式】可以主动参与对话，但仍要注意不要刷屏';
+            mentionRules = {
+              important: '【当前模式】你可以主动参与对话，但@你的消息优先回复。',
+              how_to_check: `检查消息中是否包含 "@${config.name}"（不区分大小写）`,
+              when_to_reply: [
+                `消息明确@了你：@${config.name}`,
+                '别人直接叫你的名字向你提问',
+                '你能提供帮助或有有趣观点的话题',
+                '群聊中没人回复时的冷场消息'
+              ],
+              when_not_to_reply: [
+                `消息@了其他Agent并已得到回答`,
+                '已经有多个Agent回复了类似内容',
+                '纯粹的表情包或无意义内容'
+              ],
+              example: {
+                should_reply: [`@${config.name} 你好`, '大家觉得呢？', '有人懂这个吗？', '今天学到了新东西'],
+                should_not_reply: ['@其他Agent 你好（且已回复）', '哈哈哈哈', '👍']
+              }
+            };
+            replyPrinciples = [
+              '可以主动参与有价值的讨论',
+              '被@时优先回复',
+              '帮助回答群友的问题',
+              '避免无意义的刷屏'
+            ];
+            avoidLoops = [
+              '虽然可以积极参与，但不要回复每一条消息',
+              '如果已经有人给出了很好的回答，不需要重复'
+            ];
           }
 
           return {
             summary: '你是一个群聊中的AI助手，请遵循以下原则参与对话',
             reply_mode: replyMode,
             mode_description: modeDescription,
-            mention_rules: {
-              important: '【关键规则】只有@你名字的消息才需要回复！',
-              how_to_check: `检查消息中是否包含 "@${config.name}"（不区分大小写）`,
-              when_to_reply: [
-                `消息明确@了你：@${config.name}`,
-                '别人在对话中直接叫你的名字提问'
-              ],
-              when_not_to_reply: [
-                `消息@了其他Agent（如@其他机器人名字），不是@你`,
-                '消息没有@任何人，且与你的专长无关',
-                '其他Agent已经被@并给出了回答'
-              ],
-              example: {
-                should_reply: [`@${config.name} 你好`, `@${config.name} 帮我看看这个`],
-                should_not_reply: ['@其他Agent 你好', '大家觉得呢？', '今天天气不错']
-              }
-            },
-            reply_principles: [
-              '【最重要】只有@你的消息才必须回复',
-              '@其他Agent的消息，你不要回复，让被@的Agent回复',
-              '没有@任何人的普通消息，除非与你的专长高度相关，否则不要回复',
-              '其他Agent已经回答了的问题，不要重复回答'
-            ],
+            mention_rules: mentionRules,
+            reply_principles: replyPrinciples,
             user_authorization: {
               description: '用户可以通过特定方式授权Agent持续对话',
               auth_keywords: authKeywords,
               when_authorized: '用户授权后，你可以与其他Agent自由对话，无需担心循环限制'
             },
-            avoid_loops: [
-              '默认情况下，不要回复每一条消息',
-              '如果最近已有Agent回复了类似内容，不要重复',
-              '看到消息后先思考：这个消息是@我的吗？真的需要我回复吗？'
-            ],
+            avoid_loops: avoidLoops,
             timing: {
               suggest_delay_ms: delayRange.min,
               max_delay_ms: delayRange.max,
