@@ -5,6 +5,18 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Agent Chat - 群聊</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Markdown渲染 -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <!-- 代码高亮 -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11/styles/github-dark.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/highlight.js@11/lib/core.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/highlight.js@11/lib/languages/javascript.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/highlight.js@11/lib/languages/python.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/highlight.js@11/lib/languages/bash.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/highlight.js@11/lib/languages/json.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/highlight.js@11/lib/languages/sql.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/highlight.js@11/lib/languages/css.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/highlight.js@11/lib/languages/xml.min.js"></script>
   <style>
     .message-container {
       scroll-behavior: smooth;
@@ -29,6 +41,102 @@
       .sidebar.hidden-mobile {
         transform: translateX(0);
       }
+    }
+    /* Markdown样式 */
+    .markdown-content {
+      line-height: 1.6;
+    }
+    .markdown-content p {
+      margin: 0.5em 0;
+    }
+    .markdown-content p:first-child {
+      margin-top: 0;
+    }
+    .markdown-content p:last-child {
+      margin-bottom: 0;
+    }
+    .markdown-content code:not(pre code) {
+      background: rgba(0,0,0,0.1);
+      padding: 0.1em 0.3em;
+      border-radius: 3px;
+      font-size: 0.9em;
+    }
+    .markdown-content pre {
+      margin: 0.5em 0;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .markdown-content pre code {
+      display: block;
+      padding: 1em;
+      overflow-x: auto;
+      font-size: 0.85em;
+    }
+    .markdown-content ul, .markdown-content ol {
+      margin: 0.5em 0;
+      padding-left: 1.5em;
+    }
+    .markdown-content li {
+      margin: 0.25em 0;
+    }
+    .markdown-content blockquote {
+      border-left: 3px solid rgba(0,0,0,0.2);
+      padding-left: 0.75em;
+      margin: 0.5em 0;
+      opacity: 0.85;
+    }
+    .markdown-content h1, .markdown-content h2, .markdown-content h3 {
+      margin: 0.5em 0 0.25em;
+      font-weight: 600;
+    }
+    .markdown-content a {
+      color: inherit;
+      text-decoration: underline;
+    }
+    /* 代码块容器 */
+    .code-block-wrapper {
+      position: relative;
+      margin: 0.5em 0;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .code-block-wrapper pre {
+      margin: 0;
+    }
+    .code-block-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.25em 0.75em;
+      background: #2d2d2d;
+      color: #888;
+      font-size: 0.75em;
+    }
+    .copy-btn {
+      background: transparent;
+      border: 1px solid #555;
+      color: #aaa;
+      padding: 0.2em 0.5em;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.9em;
+      transition: all 0.2s;
+    }
+    .copy-btn:hover {
+      background: #444;
+      color: #fff;
+    }
+    .copy-btn.copied {
+      background: #22c55e;
+      border-color: #22c55e;
+      color: #fff;
+    }
+    /* 自我消息的markdown调整 */
+    .markdown-content.self-message code:not(pre code) {
+      background: rgba(255,255,255,0.2);
+    }
+    .markdown-content.self-message blockquote {
+      border-left-color: rgba(255,255,255,0.3);
     }
   </style>
 </head>
@@ -237,20 +345,21 @@
       const isAgent = msg.sender_type === 'agent';
       const isSelf = msg.sender_id === currentUser.id;
       const time = new Date(msg.created_at).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+      const msgId = 'msg-' + msg.id + '-' + Date.now();
 
       const div = document.createElement('div');
       div.className = `flex ${isSelf ? 'justify-end' : 'justify-start'}`;
 
       div.innerHTML = `
-        <div class="max-w-xs md:max-w-md lg:max-w-lg ${isSelf ? 'order-2' : ''}">
+        <div class="max-w-xs md:max-w-md lg:max-w-xl ${isSelf ? 'order-2' : ''}">
           <div class="flex items-end space-x-2 ${isSelf ? 'flex-row-reverse space-x-reverse' : ''}">
             <div class="w-8 h-8 rounded-full flex items-center justify-center text-sm ${isAgent ? 'bg-purple-100' : 'bg-blue-100'}">
               ${isAgent ? '🤖' : '👤'}
             </div>
-            <div>
+            <div class="min-w-0">
               <div class="text-xs text-gray-500 mb-1 ${isSelf ? 'text-right' : ''}">${msg.sender_name}</div>
               <div class="px-4 py-2 rounded-2xl ${isSelf ? 'bg-purple-600 text-white' : isAgent ? 'bg-purple-100 text-purple-900' : 'bg-white text-gray-800'} shadow-sm">
-                ${highlightMentions(escapeHtml(msg.content), isSelf)}
+                <div id="${msgId}" class="markdown-content ${isSelf ? 'self-message' : ''}">${renderContent(msg.content, isSelf)}</div>
               </div>
               <div class="text-xs text-gray-400 mt-1 ${isSelf ? 'text-right' : ''}">${time}</div>
             </div>
@@ -260,28 +369,112 @@
 
       messageContainer.appendChild(div);
 
+      // 为代码块添加复制按钮
+      addCopyButtons(msgId);
+
       if (scroll) {
         scrollToBottom();
       }
     }
 
-    // 高亮消息中的@提及
-    function highlightMentions(text, isSelf) {
-      if (!agents || agents.length === 0) return text;
+    // 渲染消息内容（Markdown + @提及高亮）
+    function renderContent(content, isSelf) {
+      // 先处理@提及，用临时占位符保护
+      const mentionPlaceholders = [];
+      let processedContent = content;
 
-      // 按名字长度降序排列，避免短名字先替换影响长名字
-      const sortedAgents = [...agents].sort((a, b) => b.name.length - a.name.length);
-
-      for (const agent of sortedAgents) {
-        const escapedName = agent.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        const regex = new RegExp(`@${escapedName}`, 'g');
-        const highlightClass = isSelf
-          ? 'bg-purple-500 text-white px-1 rounded'
-          : 'bg-purple-200 text-purple-800 px-1 rounded';
-        text = text.replace(regex, `<span class="${highlightClass}">@$1</span>`.replace('$1', agent.name));
+      if (agents && agents.length > 0) {
+        const sortedAgents = [...agents].sort((a, b) => b.name.length - a.name.length);
+        for (const agent of sortedAgents) {
+          const escapedName = agent.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          const regex = new RegExp(`@${escapedName}`, 'g');
+          const highlightClass = isSelf
+            ? 'bg-purple-500 text-white px-1 rounded'
+            : 'bg-purple-200 text-purple-800 px-1 rounded';
+          const placeholder = `__MENTION_${mentionPlaceholders.length}__`;
+          processedContent = processedContent.replace(regex, placeholder);
+          mentionPlaceholders.push(`<span class="${highlightClass}">@${escapeHtml(agent.name)}</span>`);
+        }
       }
 
-      return text;
+      // 渲染Markdown
+      let html;
+      try {
+        // 配置marked
+        marked.setOptions({
+          highlight: function(code, lang) {
+            if (lang && hljs.getLanguage(lang)) {
+              try {
+                return hljs.highlight(code, { language: lang }).value;
+              } catch (e) {}
+            }
+            return hljs.highlightAuto(code).value;
+          },
+          breaks: true,
+          gfm: true
+        });
+        html = marked.parse(processedContent);
+      } catch (e) {
+        html = escapeHtml(processedContent).replace(/\n/g, '<br>');
+      }
+
+      // 恢复@提及
+      mentionPlaceholders.forEach((mention, i) => {
+        html = html.replace(`__MENTION_${i}__`, mention);
+      });
+
+      return html;
+    }
+
+    // 为代码块添加复制按钮
+    function addCopyButtons(containerId) {
+      const container = document.getElementById(containerId);
+      if (!container) return;
+
+      const preBlocks = container.querySelectorAll('pre');
+      preBlocks.forEach((pre, index) => {
+        // 获取语言
+        const code = pre.querySelector('code');
+        const langClass = code?.className.match(/language-(\w+)/);
+        const lang = langClass ? langClass[1] : 'code';
+
+        // 创建包装器
+        const wrapper = document.createElement('div');
+        wrapper.className = 'code-block-wrapper';
+        pre.parentNode.insertBefore(wrapper, pre);
+
+        // 创建头部
+        const header = document.createElement('div');
+        header.className = 'code-block-header';
+        header.innerHTML = `
+          <span>${lang}</span>
+          <button class="copy-btn" data-index="${index}">复制</button>
+        `;
+
+        // 移动pre到wrapper
+        wrapper.appendChild(header);
+        wrapper.appendChild(pre);
+
+        // 绑定复制事件
+        const copyBtn = header.querySelector('.copy-btn');
+        copyBtn.addEventListener('click', async () => {
+          const codeText = code?.textContent || pre.textContent;
+          try {
+            await navigator.clipboard.writeText(codeText);
+            copyBtn.textContent = '已复制';
+            copyBtn.classList.add('copied');
+            setTimeout(() => {
+              copyBtn.textContent = '复制';
+              copyBtn.classList.remove('copied');
+            }, 2000);
+          } catch (e) {
+            copyBtn.textContent = '失败';
+            setTimeout(() => {
+              copyBtn.textContent = '复制';
+            }, 2000);
+          }
+        });
+      });
     }
 
     // 渲染用户列表
