@@ -64,6 +64,18 @@ const agentManager = {
             agent_id: config.id,
             agent_name: config.name,
             protocol_version: '1.0',
+            // 平台介绍 - 帮助Agent理解环境
+            platform: {
+              type: 'multi_agent_group_chat',
+              description: '这是一个多人多Agent群聊平台，不是传统的1对1问答系统',
+              features: [
+                '多人+多Agent同时在线',
+                '所有消息实时广播给所有参与者',
+                '支持@提及指定回复对象',
+                '消息来源可能是人类或其他Agent'
+              ],
+              your_role: '群聊中的AI成员，不是用户的专属1对1助手'
+            },
             // 行为指南 - 引导Agent合理参与对话
             behavior_guide: {
               summary: '你是一个群聊中的AI助手，请遵循以下原则参与对话',
