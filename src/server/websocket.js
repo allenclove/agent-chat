@@ -65,7 +65,12 @@ function setupWebSocket(server) {
 
       // 处理Agent发送的消息
       if (type === 'message' && isAgent) {
-        agentManager.handleAgentMessage(ws, msg);
+        // 获取agent配置信息
+        const agentStatus = agentManager.getAgentStatus().find(a => a.id === agentId);
+        agentManager.handleAgentMessage(
+          { id: agentId, name: agentStatus?.name || agentId },
+          msg
+        );
         return;
       }
 
