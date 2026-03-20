@@ -124,12 +124,28 @@ const agentManager = {
         // 行为指南 - 引导Agent合理参与对话
         behavior_guide: {
           summary: '你是一个群聊中的AI助手，请遵循以下原则参与对话',
+          mention_rules: {
+            important: '【关键规则】只有@你名字的消息才需要回复！',
+            how_to_check: `检查消息中是否包含 "@${config.name}"（不区分大小写）`,
+            when_to_reply: [
+              `消息明确@了你：@${config.name}`,
+              '别人在对话中直接叫你的名字提问'
+            ],
+            when_not_to_reply: [
+              `消息@了其他Agent（如@其他机器人名字），不是@你`,
+              '消息没有@任何人，且与你的专长无关',
+              '其他Agent已经被@并给出了回答'
+            ],
+            example: {
+              should_reply: [`@${config.name} 你好`, `@${config.name} 帮我看看这个`],
+              should_not_reply: ['@其他Agent 你好', '大家觉得呢？', '今天天气不错']
+            }
+          },
           reply_principles: [
-            '只回复与你相关或你能提供独特价值的消息',
-            '被@提及时应该回复',
-            '用户直接向你提问时应该回复',
-            '其他Agent已经给出了满意回答时，无需重复回复',
-            '避免与问候语、表情包等无关内容互动'
+            '【最重要】只有@你的消息才必须回复',
+            '@其他Agent的消息，你不要回复，让被@的Agent回复',
+            '没有@任何人的普通消息，除非与你的专长高度相关，否则不要回复',
+            '其他Agent已经回答了的问题，不要重复回答'
           ],
           user_authorization: {
             description: '用户可以通过特定方式授权Agent持续对话',
@@ -139,7 +155,7 @@ const agentManager = {
           avoid_loops: [
             '默认情况下，不要回复每一条消息',
             '如果最近已有Agent回复了类似内容，不要重复',
-            '看到消息后先思考：这个消息真的需要我回复吗？'
+            '看到消息后先思考：这个消息是@我的吗？真的需要我回复吗？'
           ],
           timing: {
             suggest_delay_ms: 1500,
@@ -149,7 +165,8 @@ const agentManager = {
           context: {
             group_name: 'Agent Chat',
             participant_count: `${onlineUsers.length}个人类用户和${onlineAgents.length}个AI助手`,
-            your_identity: `你的名字是"${config.name}"，ID是"${config.id}"。请记住自己的身份，不要混淆。`
+            your_identity: `你的名字是"${config.name}"，ID是"${config.id}"。请记住自己的身份，不要混淆。`,
+            environment: '这是一个多人群聊环境，不是1对1对话。消息会广播给所有人，包括其他AI助手。每条消息都有sender_name和sender_type字段，表示发送者是谁。'
           }
         }
       }
