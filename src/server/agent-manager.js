@@ -17,11 +17,11 @@ const HEARTBEAT_TIMEOUT = 60000;
 
 // 获取设置值的辅助函数
 function getCooldownMs() {
-  return db.getSetting('agent_cooldown_ms') || 10000;
+  return db.getSetting('agent_cooldown_ms') || 3000;
 }
 
 function getMaxConsecutiveMsg() {
-  return db.getSetting('max_consecutive_msg') || 3;
+  return db.getSetting('max_consecutive_msg') || 10;
 }
 
 function getAllowAgentToAgent() {
@@ -29,15 +29,108 @@ function getAllowAgentToAgent() {
 }
 
 function getReplyMode() {
-  return db.getSetting('agent_reply_mode') || 'strict_mention';
+  return db.getSetting('agent_reply_mode') || 'active';
 }
 
 function getReplyDelayRange() {
-  return db.getSetting('reply_delay_range') || { min: 1500, max: 5000 };
+  return db.getSetting('reply_delay_range') || { min: 500, max: 2000 };
 }
 
 function getAuthKeywords() {
   return db.getSetting('auth_keywords') || ['继续', '请继续', 'go on', 'continue', '/allow-chat'];
+}
+
+// 生成 behavior_guide（独立函数，用于热更新）
+function generateBehaviorGuide(agentName, agentId) {
+  const replyMode = getReplyMode();
+  const delayRange = getReplyDelayRange();
+  const authKeywords = getAuthKeywords();
+  const allowAgentToAgent = getAllowAgentToAgent();
+
+  // 获取在线成员信息
+  const onlineUsers = chat.getOnlineUsers();
+  const allAgents = db.getAllAgents().map(a => ({
+    id: a.id,
+    name: a.name,
+    type: 'agent',
+    status: connectedAgents.has(a.id) ? 'online' : 'offline'
+  }));
+  const onlineAgents = allAgents.filter(a => a.status === 'online');
+
+  // 根据回复模式调整提示
+  let modeDescription = '';
+  let mentionRules = {};
+  let replyPrinciples = [];
+  let avoidLoops = [];
+
+  if (replyMode === 'strict_mention') {
+    modeDescription = '【严格模式】只有被@时才回复';
+    mentionRules = {
+      rule: '只有@你的消息才回复',
+      how: `检查消息是否包含 @${agentName}`
+    };
+    replyPrinciples = ['只有@你的消息才回复'];
+    avoidLoops = [];
+  } else if (replyMode === 'moderate') {
+    modeDescription = '【适度模式】被@时必回复，其他可选择性参与';
+    mentionRules = {
+      rule: '被@必回复，其他话题感兴趣可以参与'
+    };
+    replyPrinciples = ['被@必回复', '感兴趣的话题可以参与'];
+    avoidLoops = [];
+  } else {
+    modeDescription = '【积极模式】自由参与对话';
+    mentionRules = {
+      rule: '自由参与任何对话，与其他Agent交流讨论'
+    };
+    replyPrinciples = ['自由参与', '与其他Agent交流', '帮助回答问题'];
+    avoidLoops = [];
+  }
+
+  return {
+    summary: '你是一个群聊中的AI助手',
+    reply_mode: replyMode,
+    mode_description: modeDescription,
+
+    user_authorization: {
+      enabled: true,
+      auth_keywords: authKeywords,
+      description: '用户发送授权关键词后，你可以自由与其他Agent连续对话',
+      how_it_works: {
+        step1: `当用户发送以下关键词之一时，表示授权：${authKeywords.join(', ')}`,
+        step2: '授权后，你可以：',
+        freedoms: [
+          '自由回复任何消息，无需被@',
+          '与其他Agent连续多轮对话',
+          '主动发起话题或提问',
+          '参与任何讨论，不受限制'
+        ],
+        step3: '未授权时，按照 reply_mode 的规则行事'
+      }
+    },
+
+    agent_interaction: {
+      allow_agent_to_agent: allowAgentToAgent,
+      description: allowAgentToAgent
+        ? '【已启用】你可以与其他Agent自由对话、讨论'
+        : '【已禁用】只回复用户消息'
+    },
+
+    mention_rules: mentionRules,
+    reply_principles: replyPrinciples,
+    avoid_loops: avoidLoops,
+
+    timing: {
+      suggest_delay_ms: delayRange.min,
+      max_delay_ms: delayRange.max
+    },
+
+    context: {
+      group_name: 'Agent Chat',
+      participant_count: `${onlineUsers.length}个人类用户和${onlineAgents.length}个AI助手`,
+      your_identity: `你的名字是"${agentName}"，ID是"${agentId}"`
+    }
+  };
 }
 
 // Agent管理器（反向连接模式）
@@ -160,98 +253,8 @@ const agentManager = {
           agents: allAgents,
           online_count: onlineUsers.length + onlineAgents.length
         },
-        // 行为指南 - 引导Agent合理参与对话（使用数据库设置）
-        behavior_guide: (() => {
-          const replyMode = getReplyMode();
-          const delayRange = getReplyDelayRange();
-          const authKeywords = getAuthKeywords();
-          const allowAgentToAgent = getAllowAgentToAgent();
-
-          // 根据回复模式调整提示（简化规则，让Agent更自由）
-          let modeDescription = '';
-          let mentionRules = {};
-          let replyPrinciples = [];
-          let avoidLoops = [];
-
-          if (replyMode === 'strict_mention') {
-            // 严格模式：只有被@时才回复
-            modeDescription = '【严格模式】只有被@时才回复';
-            mentionRules = {
-              rule: '只有@你的消息才回复',
-              how: `检查消息是否包含 @${config.name}`
-            };
-            replyPrinciples = ['只有@你的消息才回复'];
-            avoidLoops = [];
-
-          } else if (replyMode === 'moderate') {
-            // 适度模式
-            modeDescription = '【适度模式】被@时必回复，其他可选择性参与';
-            mentionRules = {
-              rule: '被@必回复，其他话题感兴趣可以参与'
-            };
-            replyPrinciples = ['被@必回复', '感兴趣的话题可以参与'];
-            avoidLoops = [];
-
-          } else {
-            // 积极模式：自由参与
-            modeDescription = '【积极模式】自由参与对话';
-            mentionRules = {
-              rule: '自由参与任何对话，与其他Agent交流讨论'
-            };
-            replyPrinciples = ['自由参与', '与其他Agent交流', '帮助回答问题'];
-            avoidLoops = [];
-          }
-
-          return {
-            summary: '你是一个群聊中的AI助手',
-            reply_mode: replyMode,
-            mode_description: modeDescription,
-
-            // ===== 核心：用户授权机制 =====
-            user_authorization: {
-              enabled: true,
-              auth_keywords: authKeywords,
-              description: '用户发送授权关键词后，你可以自由与其他Agent连续对话',
-              how_it_works: {
-                step1: `当用户发送以下关键词之一时，表示授权：${authKeywords.join(', ')}`,
-                step2: '授权后，你可以：',
-                freedoms: [
-                  '自由回复任何消息，无需被@',
-                  '与其他Agent连续多轮对话',
-                  '主动发起话题或提问',
-                  '参与任何讨论，不受限制'
-                ],
-                step3: '未授权时，按照 reply_mode 的规则行事'
-              }
-            },
-
-            // ===== Agent 互聊（默认允许）=====
-            agent_interaction: {
-              allow_agent_to_agent: allowAgentToAgent,
-              description: allowAgentToAgent
-                ? '【已启用】你可以与其他Agent自由对话、讨论'
-                : '【已禁用】只回复用户消息'
-            },
-
-            // 基本规则（未授权时）
-            mention_rules: mentionRules,
-            reply_principles: replyPrinciples,
-            avoid_loops: avoidLoops,
-
-            // 延时设置
-            timing: {
-              suggest_delay_ms: delayRange.min,
-              max_delay_ms: delayRange.max
-            },
-
-            // 上下文
-            context: {
-              group_name: 'Agent Chat',
-              participant_count: `${onlineUsers.length}个人类用户和${onlineAgents.length}个AI助手`,
-              your_identity: `你的名字是"${config.name}"，ID是"${config.id}"`
-            }
-          };
-        })()
+        // 行为指南（使用独立函数生成，便于热更新）
+        behavior_guide: generateBehaviorGuide(config.name, config.id)
       }
     }));
 
@@ -516,34 +519,44 @@ const agentManager = {
     }
   },
 
-  // 通知所有Agent设置已更新
+  // 通知所有Agent设置已更新（热更新，无需重连）
   notifySettingsChanged() {
-    const replyMode = getReplyMode();
-    const delayRange = getReplyDelayRange();
-    const authKeywords = getAuthKeywords();
-    const allowAgentToAgent = getAllowAgentToAgent();
-    const cooldownMs = getCooldownMs();
-    const maxConsecutive = getMaxConsecutiveMsg();
+    // 获取更新后的成员信息
+    const onlineUsers = chat.getOnlineUsers();
+    const allAgents = db.getAllAgents().map(a => ({
+      id: a.id,
+      name: a.name,
+      type: 'agent',
+      status: connectedAgents.has(a.id) ? 'online' : 'offline'
+    }));
 
-    const settingsMsg = JSON.stringify({
-      type: 'settings_update',
-      payload: {
-        reply_mode: replyMode,
-        delay_range: delayRange,
-        auth_keywords: authKeywords,
-        allow_agent_to_agent: allowAgentToAgent,
-        cooldown_ms: cooldownMs,
-        max_consecutive_msg: maxConsecutive
-      }
-    });
-
+    // 向每个Agent发送其专属的 behavior_guide 更新
     for (const [, agent] of connectedAgents) {
-      if (agent.ws.readyState === 1) {
-        agent.ws.send(settingsMsg);
-      }
+      if (agent.ws.readyState !== 1) continue;
+
+      const config = agent.config;
+
+      // 发送完整的 behavior_guide 更新（热更新）
+      const updateMsg = JSON.stringify({
+        type: 'behavior_guide_update',
+        payload: {
+          behavior_guide: generateBehaviorGuide(config.name, config.id),
+          participants: {
+            users: onlineUsers.map(u => ({
+              id: u.id,
+              name: u.display_name || u.username,
+              type: 'human'
+            })),
+            agents: allAgents
+          },
+          timestamp: Date.now()
+        }
+      });
+
+      agent.ws.send(updateMsg);
     }
 
-    console.log('[Agent] 已通知所有Agent设置更新');
+    console.log(`[Agent] 已向 ${connectedAgents.size} 个Agent推送行为指南更新`);
   }
 };
 

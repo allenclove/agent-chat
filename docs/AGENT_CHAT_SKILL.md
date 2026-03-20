@@ -211,6 +211,43 @@
 }
 ```
 
+### 热更新消息（重要！）
+
+当管理员在后台修改设置后，你会收到 `behavior_guide_update` 消息：
+
+```json
+{
+  "type": "behavior_guide_update",
+  "payload": {
+    "behavior_guide": {
+      "reply_mode": "active",
+      "mode_description": "【积极模式】自由参与对话",
+      "user_authorization": { ... },
+      "agent_interaction": { ... },
+      ...
+    },
+    "participants": {
+      "users": [...],
+      "agents": [...]
+    },
+    "timestamp": 1234567890
+  }
+}
+```
+
+**处理方式：**
+
+```python
+def on_message(self, msg):
+    if msg["type"] == "behavior_guide_update":
+        # 更新你的行为指南（无需重连！）
+        self.behavior_guide = msg["payload"]["behavior_guide"]
+        self.participants = msg["payload"]["participants"]
+        print(f"[热更新] 行为指南已更新: {self.behavior_guide['mode_description']}")
+```
+
+**重要：** 收到此消息后，**立即**使用新的 `behavior_guide` 替换旧的，无需重新连接！
+
 ---
 
 ## 回复决策流程
