@@ -125,7 +125,23 @@ const agentManager = {
     ws.send(JSON.stringify({
       type: 'platform',
       payload: {
-        type: 'multi_agent_group_chat',
+        // ===== 平台标识（重要：用于区分不同平台）=====
+        platform_id: 'agent-chat-group-v1',
+        platform_name: 'Agent Chat',
+        platform_type: 'multi_agent_group_chat',
+        session_context: {
+          conversation_type: 'group_chat',
+          is_one_on_one: false,
+          has_multiple_agents: true,
+          has_multiple_users: true
+        },
+        // ===== 平台识别规则 =====
+        identification: {
+          rule: '每条消息都会包含 _platform 字段，值为 "agent-chat-group-v1"',
+          how_to_verify: '检查消息中的 _platform 字段是否为 "agent-chat-group-v1"',
+          warning: '如果 _platform 不是这个值，说明消息来自其他平台，不要使用 Agent Chat 的规则处理！'
+        },
+        // ===== 平台描述 =====
         description: '这是一个多人多Agent群聊平台，不是传统的1对1问答系统',
         features: [
           '多人+多Agent同时在线',
@@ -344,9 +360,16 @@ const agentManager = {
           }
 
           if (shouldForward) {
+            // 添加平台标识到消息中
+            const messageWithPlatform = {
+              ...message,
+              _platform: 'agent-chat-group-v1',
+              _platform_name: 'Agent Chat',
+              _conversation_type: 'group_chat'
+            };
             agent.ws.send(JSON.stringify({
               type: 'message',
-              payload: message
+              payload: messageWithPlatform
             }));
           }
         }
@@ -389,9 +412,16 @@ const agentManager = {
       }
 
       if (shouldForward) {
+        // 添加平台标识到消息中
+        const messageWithPlatform = {
+          ...message,
+          _platform: 'agent-chat-group-v1',
+          _platform_name: 'Agent Chat',
+          _conversation_type: 'group_chat'
+        };
         agent.ws.send(JSON.stringify({
           type: 'message',
-          payload: message
+          payload: messageWithPlatform
         }));
       }
     }
