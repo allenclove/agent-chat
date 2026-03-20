@@ -175,126 +175,85 @@ const agentManager = {
 
           if (replyMode === 'strict_mention') {
             // 严格模式：只有被@时才回复
-            modeDescription = '【严格模式】只有被@时才回复，其他消息一律不回复';
+            modeDescription = '【严格模式】只有被@时才回复';
             mentionRules = {
-              important: '【关键规则】只有@你名字的消息才需要回复！其他消息不要回复！',
-              how_to_check: `检查消息中是否包含 "@${config.name}"（不区分大小写）`,
-              when_to_reply: [
-                `消息明确@了你：@${config.name}`,
-                '别人直接叫你的名字向你提问'
-              ],
-              when_not_to_reply: [
-                `消息@了其他Agent，不是@你`,
-                '消息没有@任何人',
-                '普通聊天、问候、表情包'
-              ],
-              example: {
-                should_reply: [`@${config.name} 你好`, `@${config.name} 帮我看看`],
-                should_not_reply: ['@其他Agent 你好', '大家觉得呢？', '今天天气不错', '你好啊']
-              }
+              important: '只有@你名字的消息才需要回复',
+              when_to_reply: [`消息@了你：@${config.name}`],
+              when_not_to_reply: ['没有@你的消息']
             };
-            replyPrinciples = [
-              '【最重要】只有@你的消息才必须回复',
-              '@其他Agent的消息，不要回复',
-              '没有@的消息，不要回复'
-            ];
-            avoidLoops = [
-              '默认情况下，不要回复任何消息',
-              '只有确认@你的消息才回复'
-            ];
+            replyPrinciples = ['只有@你的消息才回复'];
+            avoidLoops = ['不要回复未@你的消息'];
 
           } else if (replyMode === 'moderate') {
             // 适度模式：被@时必回复，其他消息选择性参与
-            modeDescription = '【适度模式】被@时必须回复，其他消息可以选择性参与';
+            modeDescription = '【适度模式】被@时必回复，其他可选择性参与';
             mentionRules = {
-              important: '【关键规则】被@时必须回复。其他消息如果有独特价值可以回复。',
-              how_to_check: `检查消息中是否包含 "@${config.name}"（不区分大小写）`,
-              when_to_reply: [
-                `消息明确@了你：@${config.name}`,
-                '别人直接叫你的名字向你提问',
-                '你能够提供独特见解或专业知识的讨论'
-              ],
-              when_not_to_reply: [
-                `消息@了其他Agent，让被@的Agent回答`,
-                '其他Agent已经给出了满意回答',
-                '纯闲聊、问候、表情包'
-              ],
-              example: {
-                should_reply: [`@${config.name} 你好`, `@${config.name} 帮我看看`, '有人懂Python吗？'],
-                should_not_reply: ['@其他Agent 你好', '今天天气不错', '哈哈']
-              }
+              important: '被@时必须回复。其他消息有独特价值时可以回复。',
+              when_to_reply: [`@${config.name}`, '你能提供专业见解的话题'],
+              when_not_to_reply: ['@其他Agent的消息', '纯闲聊']
             };
-            replyPrinciples = [
-              '被@时必须回复',
-              '如果有独特价值可以主动参与讨论',
-              '@其他Agent的消息让被@的Agent回答',
-              '避免与问候、闲聊互动'
-            ];
-            avoidLoops = [
-              '不要回复每一条消息',
-              '思考：这条消息需要我回复吗？我有独特价值吗？'
-            ];
+            replyPrinciples = ['被@必回复', '有独特价值时可以参与'];
+            avoidLoops = ['不要回复每一条消息'];
 
           } else {
             // 积极模式：可以主动参与对话
-            modeDescription = '【积极模式】可以主动参与对话，但仍要注意不要刷屏';
+            modeDescription = '【积极模式】可以主动参与对话';
             mentionRules = {
-              important: '【当前模式】你可以主动参与对话，但@你的消息优先回复。',
-              how_to_check: `检查消息中是否包含 "@${config.name}"（不区分大小写）`,
-              when_to_reply: [
-                `消息明确@了你：@${config.name}`,
-                '别人直接叫你的名字向你提问',
-                '你能提供帮助或有有趣观点的话题',
-                '群聊中没人回复时的冷场消息'
-              ],
-              when_not_to_reply: [
-                `消息@了其他Agent并已得到回答`,
-                '已经有多个Agent回复了类似内容',
-                '纯粹的表情包或无意义内容'
-              ],
-              example: {
-                should_reply: [`@${config.name} 你好`, '大家觉得呢？', '有人懂这个吗？', '今天学到了新东西'],
-                should_not_reply: ['@其他Agent 你好（且已回复）', '哈哈哈哈', '👍']
-              }
+              important: '你可以自由参与对话，与其他Agent交流',
+              when_to_reply: ['@你的消息', '你能帮助的话题', '有趣的讨论'],
+              when_not_to_reply: ['纯粹表情包']
             };
-            replyPrinciples = [
-              '可以主动参与有价值的讨论',
-              '被@时优先回复',
-              '帮助回答群友的问题',
-              '避免无意义的刷屏'
-            ];
-            avoidLoops = [
-              '虽然可以积极参与，但不要回复每一条消息',
-              '如果已经有人给出了很好的回答，不需要重复'
-            ];
+            replyPrinciples = ['自由参与对话', '帮助回答问题', '与其他Agent交流'];
+            avoidLoops = ['避免无意义刷屏'];
           }
 
           return {
-            summary: '你是一个群聊中的AI助手，请遵循以下原则参与对话',
+            summary: '你是一个群聊中的AI助手',
             reply_mode: replyMode,
             mode_description: modeDescription,
-            mention_rules: mentionRules,
-            reply_principles: replyPrinciples,
+
+            // ===== 核心：用户授权机制 =====
             user_authorization: {
-              description: '用户可以通过特定方式授权Agent持续对话',
+              enabled: true,
               auth_keywords: authKeywords,
-              when_authorized: '用户授权后，你可以与其他Agent自由对话，无需担心循环限制'
+              description: '用户发送授权关键词后，你可以自由与其他Agent连续对话',
+              how_it_works: {
+                step1: `当用户发送以下关键词之一时，表示授权：${authKeywords.join(', ')}`,
+                step2: '授权后，你可以：',
+                freedoms: [
+                  '自由回复任何消息，无需被@',
+                  '与其他Agent连续多轮对话',
+                  '主动发起话题或提问',
+                  '不受冷却时间和消息数量限制'
+                ],
+                step3: '未授权时，按照 reply_mode 的规则行事'
+              }
             },
-            avoid_loops: avoidLoops,
-            timing: {
-              suggest_delay_ms: delayRange.min,
-              max_delay_ms: delayRange.max,
-              reason: `添加${delayRange.min/1000}-${delayRange.max/1000}秒随机延时，模拟人类思考时间，避免消息刷屏`
-            },
+
+            // ===== Agent 互聊 =====
             agent_interaction: {
               allow_agent_to_agent: allowAgentToAgent,
-              description: allowAgentToAgent ? '可以与其他Agent互动' : '只能回复用户消息，不回复其他Agent'
+              description: allowAgentToAgent
+                ? '【已启用】你可以与其他Agent自由对话、讨论、甚至争论'
+                : '【已禁用】只回复用户消息，不回复其他Agent'
             },
+
+            // 基本规则（未授权时）
+            mention_rules: mentionRules,
+            reply_principles: replyPrinciples,
+            avoid_loops: avoidLoops,
+
+            // 延时设置
+            timing: {
+              suggest_delay_ms: delayRange.min,
+              max_delay_ms: delayRange.max
+            },
+
+            // 上下文
             context: {
               group_name: 'Agent Chat',
               participant_count: `${onlineUsers.length}个人类用户和${onlineAgents.length}个AI助手`,
-              your_identity: `你的名字是"${config.name}"，ID是"${config.id}"。请记住自己的身份，不要混淆。`,
-              environment: '这是一个多人群聊环境，不是1对1对话。消息会广播给所有人，包括其他AI助手。每条消息都有sender_name和sender_type字段，表示发送者是谁。'
+              your_identity: `你的名字是"${config.name}"，ID是"${config.id}"`
             }
           };
         })()
