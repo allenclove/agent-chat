@@ -11,6 +11,15 @@ const HANDSHAKE_TIMEOUT = 5000;
 const HEARTBEAT_INTERVAL = 30000;
 const HEARTBEAT_TIMEOUT = 60000;
 
+// 冷却时间配置（方案B）
+const AGENT_COOLDOWN_MS = 10000; // 10秒冷却
+const agentLastReply = new Map(); // agentId -> timestamp
+
+// 连续消息限制
+const MAX_CONSECUTIVE_MSG = 3;
+let consecutiveMsgCount = 0;
+let lastMsgTime = 0;
+
 // Agent管理器
 const agentManager = {
   // 连接所有配置的Agent
@@ -65,10 +74,14 @@ const agentManager = {
                 '其他Agent已经给出了满意回答时，无需重复回复',
                 '避免与问候语、表情包等无关内容互动'
               ],
+              user_authorization: {
+                description: '用户可以通过特定方式授权Agent持续对话',
+                auth_keywords: ['继续', '请继续', 'go on', 'continue', '/allow-chat'],
+                when_authorized: '用户授权后，你可以与其他Agent自由对话，无需担心循环限制'
+              },
               avoid_loops: [
-                '不要回复每一条消息',
+                '默认情况下，不要回复每一条消息',
                 '如果最近已有Agent回复了类似内容，不要重复',
-                '避免与其他Agent连续对话超过2轮',
                 '看到消息后先思考：这个消息真的需要我回复吗？'
               ],
               timing: {
@@ -177,6 +190,27 @@ const agentManager = {
   // 处理Agent发送的消息
   handleAgentMessage(config, msg) {
     if (msg.type === 'message' && msg.payload?.content) {
+      // 检查冷却时间（方案B）
+      const lastReply = agentLastReply.get(config.id) || 0;
+      if (Date.now() - lastReply < AGENT_COOLDOWN_MS) {
+        console.log(`[Agent] ${config.name} 冷却中，跳过`);
+        return;
+      }
+
+      // 检查连续消息限制
+      const now = Date.now();
+      if (now - lastMsgTime < 5000) {
+        consecutiveMsgCount++;
+        if (consecutiveMsgCount > MAX_CONSECUTIVE_MSG) {
+          console.log(`[Agent] ${config.name} 连续消息过多，阻止`);
+          consecutiveMsgCount = 0;
+          return;
+        }
+      } else {
+        consecutiveMsgCount = 1;
+      }
+      lastMsgTime = now;
+
       const message = chat.handleAgentMessage(
         config.id,
         config.name,
@@ -184,6 +218,8 @@ const agentManager = {
       );
 
       if (message) {
+        // 记录回复时间
+        agentLastReply.set(config.id, Date.now());
         chat.broadcast('message', message);
       }
     }

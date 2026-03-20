@@ -4,6 +4,10 @@ const db = require('./database');
 // Map<sessionId, { ws, user }>
 const clients = new Map();
 
+// 用户授权记录 - 记录哪些Agent被用户授权可以持续对话
+// Map<"agentId:userId", { authorizedAt, authorizedBy }>
+const agentAuthorizations = new Map();
+
 // 聊天引擎
 const chat = {
   // 添加客户端
@@ -56,6 +60,14 @@ const chat = {
     const client = clients.get(sessionId);
     if (!client) return null;
 
+    // 检查是否是用户授权命令
+    const authMatch = content.match(/\/allow-chat\s+(\S+)/i);
+    if (authMatch) {
+      const agentName = authMatch[1].trim();
+      this.authorizeAgent(agentName, client.user.id);
+      return null; // 不保存授权命令到聊天记录
+    }
+
     const message = db.createMessage(
       client.user.id,
       client.user.display_name,
@@ -81,6 +93,22 @@ const chat = {
   // 获取历史消息
   getHistory(limit = 50) {
     return db.getRecentMessages(limit);
+  },
+
+  // 授权Agent持续对话
+  authorizeAgent(agentName, userId) {
+    const key = `${agentName}:${userId}`;
+    agentAuthorizations.set(key, {
+      authorizedAt: Date.now(),
+      authorizedBy: userId
+    });
+    console.log(`[Auth] Agent "${agentName}" 已被用户 ${userId} 授权持续对话`);
+  },
+
+  // 检查Agent是否被授权
+  isAgentAuthorized(agentName, userId) {
+    const key = `${agentName}:${userId}`;
+    return agentAuthorizations.has(key);
   }
 };
 
