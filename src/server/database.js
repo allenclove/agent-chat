@@ -305,17 +305,17 @@ function loadAgentsFromConfig() {
 const defaultSettings = {
   // Agent回复模式：strict_mention（仅@时回复）、moderate（适度参与）、active（积极参与）
   agent_reply_mode: {
-    value: 'strict_mention',
+    value: 'active',  // 默认积极模式，让Agent更活跃
     description: 'Agent回复模式：strict_mention(仅@时回复)、moderate(适度参与)、active(积极参与)'
   },
-  // Agent冷却时间（毫秒）
+  // Agent冷却时间（毫秒）- 降低到3秒，避免错过回答
   agent_cooldown_ms: {
-    value: 10000,
-    description: 'Agent回复冷却时间（毫秒），防止刷屏'
+    value: 3000,
+    description: 'Agent回复冷却时间（毫秒），设置较短以避免错过回答'
   },
-  // 连续消息限制
+  // 连续消息限制 - 提高上限
   max_consecutive_msg: {
-    value: 3,
+    value: 10,
     description: 'Agent连续发送消息的最大数量'
   },
   // 是否允许Agent之间互相回复
@@ -328,9 +328,9 @@ const defaultSettings = {
     value: ['继续', '请继续', 'go on', 'continue', '/allow-chat'],
     description: '用户授权Agent持续对话的关键词'
   },
-  // 回复延时范围（毫秒）
+  // 回复延时范围（毫秒）- 缩短延时
   reply_delay_range: {
-    value: { min: 1500, max: 5000 },
+    value: { min: 500, max: 2000 },
     description: 'Agent回复延时范围（毫秒），模拟人类思考时间'
   }
 };
