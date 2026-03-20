@@ -213,6 +213,46 @@ const agentManager = {
         // 记录回复时间
         agentLastReply.set(config.id, Date.now());
         chat.broadcast('message', message);
+
+        // 转发给其他Agent（排除自己）
+        for (const [agentId, agent] of connectedAgents) {
+          if (agentId === config.id) continue;  // 不转发给自己
+          if (!agent.connected || agent.ws.readyState !== 1) continue;
+
+          const agentConfig = agent.config;
+          let shouldForward = false;
+
+          switch (agentConfig.message_filter) {
+            case 'all':
+              shouldForward = true;
+              break;
+
+            case 'mention':
+              const mentionPattern = new RegExp(`@${agentConfig.name}`, 'i');
+              shouldForward = mentionPattern.test(message.content);
+              break;
+
+            case 'keywords':
+              if (agentConfig.keywords) {
+                try {
+                  const keywords = JSON.parse(agentConfig.keywords);
+                  shouldForward = keywords.some(kw =>
+                    message.content.toLowerCase().includes(kw.toLowerCase())
+                  );
+                } catch (e) {
+                  console.error(`[Agent] 解析关键词失败:`, e.message);
+                }
+              }
+              break;
+          }
+
+          if (shouldForward) {
+            agent.ws.send(JSON.stringify({
+              type: 'message',
+              payload: message
+            }));
+          }
+        }
       }
     }
   },
