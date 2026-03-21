@@ -50,8 +50,16 @@ function setupWebSocket(server) {
       ws.isAlive = true;
     });
 
+    let isDebug = false;  // 调试模式标记
+
     function handleMessage(ws, msg) {
       const { type, payload } = msg;
+
+      // 处理调试连接
+      if (type === 'debug_join') {
+        handleDebugJoin(ws, payload);
+        return;
+      }
 
       // 处理Agent消息
       if (type === 'agent_join') {
@@ -76,6 +84,22 @@ function setupWebSocket(server) {
         return;
       }
 
+      // 调试模式下只允许只读操作
+      if (isDebug) {
+        switch (type) {
+          case 'ping':
+            ws.send(JSON.stringify({ type: 'pong' }));
+            break;
+          case 'message':
+            // 调试面板可以发送测试消息
+            handleDebugMessage(ws, payload);
+            break;
+          default:
+            sendError(ws, `调试模式不支持: ${type}`);
+        }
+        return;
+      }
+
       // 处理人类用户消息
       switch (type) {
         case 'join':
@@ -93,6 +117,69 @@ function setupWebSocket(server) {
         default:
           sendError(ws, `未知的消息类型: ${type}`);
       }
+    }
+
+    function handleDebugJoin(ws, payload) {
+      isDebug = true;
+      console.log('[WS] 调试面板已连接');
+
+      // 发送确认
+      ws.send(JSON.stringify({
+        type: 'debug_join_ack',
+        payload: {
+          message: '调试面板已连接',
+          server_time: new Date().toISOString()
+        }
+      }));
+
+      // 发送Agent状态
+      ws.send(JSON.stringify({
+        type: 'agent_list',
+        payload: { agents: agentManager.getAgentStatus() }
+      }));
+
+      // 发送历史消息
+      const history = chat.getHistory(20);
+      ws.send(JSON.stringify({
+        type: 'history',
+        payload: { messages: history }
+      }));
+
+      // 发送在线用户
+      ws.send(JSON.stringify({
+        type: 'user_list',
+        payload: { users: chat.getOnlineUsers() }
+      }));
+    }
+
+    function handleDebugMessage(ws, payload) {
+      const { content } = payload;
+      if (!content || !content.trim()) {
+        sendError(ws, '消息内容为空');
+        return;
+      }
+
+      // 调试面板发送的消息使用特殊标识
+      const message = {
+        id: Date.now(),
+        sender_id: 'debug',
+        sender_name: '🔧 调试面板',
+        sender_type: 'system',
+        content: content.trim(),
+        created_at: new Date().toISOString()
+      };
+
+      // 广播给所有用户
+      chat.broadcast('message', message);
+
+      // 转发给Agent
+      agentManager.forwardToAgents(message);
+
+      // 确认发送成功
+      ws.send(JSON.stringify({
+        type: 'debug_message_sent',
+        payload: { success: true, message }
+      }));
     }
 
     function handleJoin(ws, payload) {

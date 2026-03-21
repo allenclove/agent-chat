@@ -13,6 +13,13 @@
     .log-error { color: #ef4444; }
     .log-agent { color: #8b5cf6; }
     .log-message { color: #06b6d4; }
+    .log-ws { color: #f472b6; }
+    .log-detail { color: #9ca3af; font-size: 11px; }
+    .pulse { animation: pulse 2s infinite; }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
   </style>
 </head>
 <body class="bg-gray-900 text-white min-h-screen">
@@ -22,8 +29,24 @@
       <h1 class="text-xl font-bold">🔧 Agent Chat 调试面板</h1>
       <div class="space-x-2">
         <button id="clearBtn" class="px-3 py-1 bg-gray-700 rounded hover:bg-gray-600">清空日志</button>
-        <button id="testBtn" class="px-3 py-1 bg-blue-600 rounded hover:bg-blue-500">发送测试消息</button>
         <a href="/chat.html" class="px-3 py-1 bg-gray-700 rounded hover:bg-gray-600">返回聊天</a>
+      </div>
+    </div>
+
+    <!-- 连接状态条 -->
+    <div id="connectionBar" class="mb-4 p-3 bg-gray-800 rounded-lg flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <span id="wsIndicator" class="w-3 h-3 rounded-full bg-gray-500"></span>
+        <span id="wsStatusText" class="text-sm">未连接</span>
+        <span id="wsUrl" class="text-xs text-gray-500"></span>
+      </div>
+      <div class="flex items-center space-x-2">
+        <button id="reconnectBtn" class="px-3 py-1 bg-green-600 rounded hover:bg-green-500 text-sm">
+          重新连接
+        </button>
+        <button id="toggleAutoReconnect" class="px-3 py-1 bg-gray-700 rounded hover:bg-gray-600 text-sm">
+          自动重连: <span id="autoReconnectStatus">开</span>
+        </button>
       </div>
     </div>
 
@@ -32,22 +55,25 @@
       <div class="bg-gray-800 rounded-lg p-4">
         <h2 class="font-semibold mb-3 flex items-center">
           <span class="mr-2">🤖</span> Agent 状态
+          <button id="refreshAgentsBtn" class="ml-auto text-xs px-2 py-1 bg-gray-700 rounded hover:bg-gray-600">刷新</button>
         </h2>
         <div id="agentList" class="space-y-2">
           <p class="text-gray-500">加载中...</p>
         </div>
       </div>
 
-      <!-- 连接信息 -->
+      <!-- 统计信息 -->
       <div class="bg-gray-800 rounded-lg p-4">
         <h2 class="font-semibold mb-3 flex items-center">
-          <span class="mr-2">📡</span> 连接信息
+          <span class="mr-2">📊</span> 统计信息
         </h2>
-        <div id="connectionInfo" class="text-sm space-y-1">
-          <p>状态: <span id="wsStatus" class="text-yellow-500">未连接</span></p>
-          <p>在线用户: <span id="userCount">0</span></p>
-          <p>在线Agent: <span id="agentCount">0</span></p>
-          <p>消息总数: <span id="msgCount">0</span></p>
+        <div id="statsInfo" class="text-sm space-y-2">
+          <div class="flex justify-between"><span class="text-gray-400">在线用户:</span><span id="userCount">0</span></div>
+          <div class="flex justify-between"><span class="text-gray-400">在线Agent:</span><span id="agentOnlineCount">0</span></div>
+          <div class="flex justify-between"><span class="text-gray-400">收到的消息:</span><span id="msgReceived">0</span></div>
+          <div class="flex justify-between"><span class="text-gray-400">发送的消息:</span><span id="msgSent">0</span></div>
+          <div class="flex justify-between"><span class="text-gray-400">WebSocket事件:</span><span id="wsEvents">0</span></div>
+          <div class="flex justify-between"><span class="text-gray-400">连接时长:</span><span id="connectionTime">-</span></div>
         </div>
       </div>
 
@@ -57,17 +83,19 @@
           <span class="mr-2">⚡</span> 快速操作
         </h2>
         <div class="space-y-2">
-          <button id="reconnectBtn" class="w-full px-3 py-2 bg-green-600 rounded hover:bg-green-500">
-            重新连接 WebSocket
-          </button>
-          <button id="refreshAgentsBtn" class="w-full px-3 py-2 bg-purple-600 rounded hover:bg-purple-500">
-            刷新 Agent 状态
-          </button>
-          <div class="mt-3">
-            <input id="testMessage" type="text" placeholder="测试消息内容"
-              class="w-full px-3 py-2 bg-gray-700 rounded text-white mb-2">
-            <button id="sendTestBtn" class="w-full px-3 py-2 bg-blue-600 rounded hover:bg-blue-500">
-              发送消息
+          <div>
+            <input id="testMessage" type="text" placeholder="输入测试消息..."
+              class="w-full px-3 py-2 bg-gray-700 rounded text-white text-sm mb-2">
+            <button id="sendTestBtn" class="w-full px-3 py-2 bg-blue-600 rounded hover:bg-blue-500 text-sm">
+              📤 发送消息
+            </button>
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <button id="testHelloBtn" class="px-2 py-1 bg-purple-600 rounded hover:bg-purple-500 text-xs">
+              "你好"
+            </button>
+            <button id="testMentionBtn" class="px-2 py-1 bg-purple-600 rounded hover:bg-purple-500 text-xs">
+              "@Agent 你好"
             </button>
           </div>
         </div>
@@ -79,34 +107,40 @@
       <div class="flex justify-between items-center mb-3">
         <h2 class="font-semibold flex items-center">
           <span class="mr-2">📋</span> 实时日志
+          <span id="logCount" class="text-xs text-gray-500 ml-2">(0条)</span>
         </h2>
-        <div class="flex items-center space-x-2 text-sm">
-          <label class="flex items-center">
-            <input type="checkbox" id="filterAgent" checked class="mr-1"> Agent
-          </label>
-          <label class="flex items-center">
-            <input type="checkbox" id="filterMessage" checked class="mr-1"> 消息
-          </label>
-          <label class="flex items-center">
-            <input type="checkbox" id="filterError" checked class="mr-1"> 错误
-          </label>
-          <label class="flex items-center">
-            <input type="checkbox" id="filterWs" checked class="mr-1"> WebSocket
-          </label>
+        <div class="flex items-center space-x-2 text-xs">
+          <label class="flex items-center"><input type="checkbox" id="filterWs" checked class="mr-1"> WS</label>
+          <label class="flex items-center"><input type="checkbox" id="filterAgent" checked class="mr-1"> Agent</label>
+          <label class="flex items-center"><input type="checkbox" id="filterMessage" checked class="mr-1"> 消息</label>
+          <label class="flex items-center"><input type="checkbox" id="filterError" checked class="mr-1"> 错误</label>
         </div>
       </div>
-      <div id="logPanel" class="bg-gray-900 rounded p-3 h-96 overflow-y-auto text-sm">
+      <div id="logPanel" class="bg-gray-900 rounded p-3 h-80 overflow-y-auto text-sm">
         <p class="text-gray-500">等待日志...</p>
       </div>
     </div>
 
     <!-- 消息详情 -->
     <div class="mt-4 bg-gray-800 rounded-lg p-4">
-      <h2 class="font-semibold mb-3 flex items-center">
-        <span class="mr-2">📨</span> 最近消息（原始数据）
-      </h2>
+      <div class="flex justify-between items-center mb-3">
+        <h2 class="font-semibold flex items-center">
+          <span class="mr-2">📨</span> 最近消息（原始数据）
+        </h2>
+        <button id="clearMessagesBtn" class="text-xs px-2 py-1 bg-gray-700 rounded hover:bg-gray-600">清空</button>
+      </div>
       <div id="messagePanel" class="bg-gray-900 rounded p-3 h-48 overflow-y-auto text-xs font-mono">
         <p class="text-gray-500">等待消息...</p>
+      </div>
+    </div>
+
+    <!-- Agent 不回复分析 -->
+    <div class="mt-4 bg-gray-800 rounded-lg p-4">
+      <h2 class="font-semibold mb-3 flex items-center">
+        <span class="mr-2">🔍</span> Agent 不回复分析
+      </h2>
+      <div id="analysisPanel" class="text-sm space-y-2">
+        <div class="text-gray-400">等待分析数据...</div>
       </div>
     </div>
   </div>
@@ -115,86 +149,190 @@
     const logPanel = document.getElementById('logPanel');
     const messagePanel = document.getElementById('messagePanel');
     const agentListEl = document.getElementById('agentList');
-    const wsStatusEl = document.getElementById('wsStatus');
-    const userCountEl = document.getElementById('userCount');
-    const agentCountEl = document.getElementById('agentCount');
-    const msgCountEl = document.getElementById('msgCount');
+    const wsIndicator = document.getElementById('wsIndicator');
+    const wsStatusText = document.getElementById('wsStatusText');
+    const wsUrlEl = document.getElementById('wsUrl');
+    const analysisPanel = document.getElementById('analysisPanel');
 
     let ws = null;
-    let msgCount = 0;
-    let logs = [];
+    let autoReconnect = true;
+    let reconnectTimer = null;
+    let connectionStartTime = null;
+    let connectionTimer = null;
 
-    // 日志函数
+    // 统计数据
+    const stats = {
+      msgReceived: 0,
+      msgSent: 0,
+      wsEvents: 0,
+      agentMessages: {},
+      lastMessageTime: null,
+      lastAgentMessageTime: null
+    };
+
+    // 日志函数（增强版）
     function log(type, message, data = null) {
-      const time = new Date().toLocaleTimeString();
-      const entry = { time, type, message, data };
-      logs.push(entry);
+      const time = new Date().toLocaleTimeString('zh-CN', { hour12: false });
+      const ms = Date.now() % 1000;
+      const timestamp = `${time}.${ms.toString().padStart(3, '0')}`;
 
-      const typeClass = {
+      stats.wsEvents++;
+
+      const typeColors = {
         'info': 'log-info',
         'success': 'log-success',
         'warning': 'log-warning',
         'error': 'log-error',
         'agent': 'log-agent',
         'message': 'log-message',
-        'ws': 'log-info'
-      }[type] || 'log-info';
+        'ws': 'log-ws'
+      };
+
+      const typeClass = typeColors[type] || 'log-info';
 
       const div = document.createElement('div');
       div.className = `log-entry ${typeClass} mb-1`;
-      div.innerHTML = `<span class="text-gray-500">[${time}]</span> <span class="font-semibold">[${type.toUpperCase()}]</span> ${message}`;
+      div.dataset.type = type;
+
+      let content = `<span class="text-gray-500">[${timestamp}]</span> <span class="font-semibold">[${type.toUpperCase().padEnd(7)}]</span> ${message}`;
+
       if (data) {
-        div.innerHTML += `<br><span class="text-gray-400 ml-4">${JSON.stringify(data)}</span>`;
+        const dataStr = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
+        content += `<br><pre class="log-detail ml-4 whitespace-pre-wrap overflow-x-auto">${escapeHtml(dataStr)}</pre>`;
       }
 
+      div.innerHTML = content;
       logPanel.appendChild(div);
       logPanel.scrollTop = logPanel.scrollHeight;
+
+      // 更新日志计数
+      document.getElementById('logCount').textContent = `(${logPanel.children.length}条)`;
 
       // 保持最近500条
       while (logPanel.children.length > 500) {
         logPanel.removeChild(logPanel.firstChild);
       }
+
+      applyLogFilters();
+    }
+
+    // HTML转义
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    // 应用日志过滤
+    function applyLogFilters() {
+      const filters = {
+        'ws': document.getElementById('filterWs').checked,
+        'agent': document.getElementById('filterAgent').checked,
+        'message': document.getElementById('filterMessage').checked,
+        'error': document.getElementById('filterError').checked
+      };
+
+      logPanel.querySelectorAll('.log-entry').forEach(entry => {
+        const type = entry.dataset.type;
+        const shouldShow = filters[type] !== false;
+        entry.style.display = shouldShow ? 'block' : 'none';
+      });
+    }
+
+    // 更新连接状态UI
+    function updateConnectionUI(status, url = '') {
+      wsStatusText.textContent = status;
+      wsUrlEl.textContent = url;
+
+      if (status === '已连接') {
+        wsIndicator.className = 'w-3 h-3 rounded-full bg-green-500';
+        wsIndicator.classList.add('pulse');
+      } else if (status === '连接中...') {
+        wsIndicator.className = 'w-3 h-3 rounded-full bg-yellow-500 pulse';
+      } else {
+        wsIndicator.className = 'w-3 h-3 rounded-full bg-red-500';
+      }
+    }
+
+    // 更新统计信息
+    function updateStats() {
+      document.getElementById('msgReceived').textContent = stats.msgReceived;
+      document.getElementById('msgSent').textContent = stats.msgSent;
+      document.getElementById('wsEvents').textContent = stats.wsEvents;
+    }
+
+    // 更新连接时长
+    function updateConnectionTime() {
+      if (!connectionStartTime) {
+        document.getElementById('connectionTime').textContent = '-';
+        return;
+      }
+      const elapsed = Math.floor((Date.now() - connectionStartTime) / 1000);
+      const mins = Math.floor(elapsed / 60);
+      const secs = elapsed % 60;
+      document.getElementById('connectionTime').textContent = `${mins}分${secs}秒`;
     }
 
     // 连接 WebSocket
     function connect() {
+      if (ws && ws.readyState === 1) {
+        log('warning', '已经连接，先断开再重连');
+        return;
+      }
+
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
       const url = `${protocol}//${window.location.host}`;
 
-      log('info', `正在连接: ${url}`);
+      updateConnectionUI('连接中...', url);
+      log('ws', `正在连接: ${url}`);
 
       ws = new WebSocket(url);
 
       ws.onopen = () => {
+        updateConnectionUI('已连接', url);
         log('success', 'WebSocket 已连接');
-        wsStatusEl.textContent = '已连接';
-        wsStatusEl.className = 'text-green-500';
 
-        // 注册为调试客户端（使用特殊 session）
-        const debugSession = 'debug-' + Date.now();
+        connectionStartTime = Date.now();
+        connectionTimer = setInterval(updateConnectionTime, 1000);
+
+        // 发送调试连接请求
+        log('ws', '发送 debug_join 请求');
         ws.send(JSON.stringify({
-          type: 'join',
-          payload: { session_id: debugSession }
+          type: 'debug_join',
+          payload: {}
         }));
       };
 
       ws.onmessage = (event) => {
+        stats.wsEvents++;
         try {
           const data = JSON.parse(event.data);
           handleMessage(data);
         } catch (e) {
           log('error', '解析消息失败', event.data);
         }
+        updateStats();
       };
 
       ws.onclose = (event) => {
-        log('warning', `WebSocket 断开 code=${event.code} reason=${event.reason}`);
-        wsStatusEl.textContent = '已断开';
-        wsStatusEl.className = 'text-red-500';
+        updateConnectionUI('已断开');
+        log('warning', `WebSocket 断开 code=${event.code} reason="${event.reason || '无原因'}" wasClean=${event.wasClean}`);
+
+        if (connectionTimer) {
+          clearInterval(connectionTimer);
+          connectionTimer = null;
+        }
+        connectionStartTime = null;
+
+        // 自动重连
+        if (autoReconnect) {
+          log('info', '3秒后自动重连...');
+          reconnectTimer = setTimeout(connect, 3000);
+        }
       };
 
       ws.onerror = (err) => {
-        log('error', 'WebSocket 错误', err);
+        log('error', 'WebSocket 错误', '检查服务器是否运行');
       };
     }
 
@@ -206,32 +344,58 @@
       addRawMessage(data);
 
       switch (type) {
+        case 'debug_join_ack':
+          log('success', '调试模式已连接', payload);
+          break;
+
         case 'history':
           log('info', `收到历史消息: ${payload.messages?.length || 0} 条`);
           break;
 
         case 'message':
-          msgCount++;
-          msgCountEl.textContent = msgCount;
+          stats.msgReceived++;
+          stats.lastMessageTime = Date.now();
+
           const senderType = payload.sender_type === 'agent' ? '🤖' : '👤';
-          log('message', `${senderType} ${payload.sender_name}: ${payload.content?.substring(0, 50)}...`);
+          const contentPreview = payload.content?.substring(0, 100) + (payload.content?.length > 100 ? '...' : '');
+          log('message', `${senderType} ${payload.sender_name}: ${contentPreview}`, {
+            sender_id: payload.sender_id,
+            sender_type: payload.sender_type,
+            full_content: payload.content
+          });
+
+          // 记录Agent消息
+          if (payload.sender_type === 'agent') {
+            stats.lastAgentMessageTime = Date.now();
+            if (!stats.agentMessages[payload.sender_name]) {
+              stats.agentMessages[payload.sender_name] = 0;
+            }
+            stats.agentMessages[payload.sender_name]++;
+          }
+
+          analyzeAgentBehavior();
           break;
 
         case 'user_list':
-          userCountEl.textContent = payload.users?.length || 0;
+          document.getElementById('userCount').textContent = payload.users?.length || 0;
           log('info', `用户列表更新: ${payload.users?.length || 0} 人`);
           break;
 
         case 'agent_list':
-          agentCountEl.textContent = payload.agents?.filter(a => a.status === 'online').length || 0;
+          const onlineAgents = payload.agents?.filter(a => a.status === 'online') || [];
+          document.getElementById('agentOnlineCount').textContent = onlineAgents.length;
           renderAgentList(payload.agents);
-          log('agent', `Agent列表更新: ${payload.agents?.length || 0} 个`);
+          log('agent', `Agent列表更新: ${onlineAgents.length} 在线 / ${payload.agents?.length || 0} 总数`, payload.agents);
+          analyzeAgentBehavior();
           break;
 
         case 'agent_status':
           const statusIcon = payload.status === 'online' ? '🟢' : '🔴';
           log('agent', `${statusIcon} ${payload.name} ${payload.status}`);
-          refreshAgentList();
+          break;
+
+        case 'debug_message_sent':
+          log('success', '消息已发送到服务器');
           break;
 
         case 'error':
@@ -239,15 +403,17 @@
           break;
 
         default:
-          log('info', `收到消息类型: ${type}`);
+          log('info', `收到消息类型: ${type}`, payload);
       }
+
+      updateStats();
     }
 
     // 添加原始消息
     function addRawMessage(data) {
       const div = document.createElement('div');
-      div.className = 'mb-2 text-gray-300';
-      div.innerHTML = `<span class="text-gray-500">${new Date().toLocaleTimeString()}</span> ${JSON.stringify(data, null, 2)}`;
+      div.className = 'mb-2 text-gray-300 border-b border-gray-800 pb-2';
+      div.innerHTML = `<span class="text-gray-500">${new Date().toLocaleTimeString()}</span> <span class="text-cyan-400">${data.type}</span>\n${JSON.stringify(data.payload, null, 2)}`;
       messagePanel.appendChild(div);
       messagePanel.scrollTop = messagePanel.scrollHeight;
 
@@ -259,37 +425,86 @@
     // 渲染 Agent 列表
     function renderAgentList(agents) {
       if (!agents || agents.length === 0) {
-        agentListEl.innerHTML = '<p class="text-gray-500">暂无 Agent</p>';
+        agentListEl.innerHTML = '<p class="text-gray-500">暂无 Agent 配置</p>';
         return;
       }
 
-      agentListEl.innerHTML = agents.map(agent => `
-        <div class="flex items-center justify-between p-2 bg-gray-700 rounded">
-          <div class="flex items-center">
-            <span class="w-2 h-2 rounded-full ${agent.status === 'online' ? 'bg-green-500' : 'bg-gray-500'} mr-2"></span>
-            <span>${agent.name}</span>
+      agentListEl.innerHTML = agents.map(agent => {
+        const isOnline = agent.status === 'online';
+        const msgCount = stats.agentMessages[agent.name] || 0;
+        return `
+          <div class="flex items-center justify-between p-2 bg-gray-700 rounded">
+            <div class="flex items-center">
+              <span class="w-2 h-2 rounded-full ${isOnline ? 'bg-green-500' : 'bg-gray-500'} mr-2"></span>
+              <span>${agent.name}</span>
+            </div>
+            <div class="text-xs text-gray-400">
+              ${isOnline ? '在线' : '离线'}
+              ${msgCount > 0 ? ` · ${msgCount}条消息` : ''}
+            </div>
           </div>
-          <span class="text-xs ${agent.status === 'online' ? 'text-green-400' : 'text-gray-500'}">${agent.status}</span>
-        </div>
-      `).join('');
+        `;
+      }).join('');
     }
 
-    // 刷新 Agent 列表
-    function refreshAgentList() {
-      fetch('/api/agents')
-        .then(r => r.json())
-        .then(data => {
-          if (data.agents) {
-            renderAgentList(data.agents);
-            agentCountEl.textContent = data.agents.filter(a => a.status === 'online').length;
-          }
-        })
-        .catch(e => log('error', '获取 Agent 列表失败', e.message));
+    // 分析 Agent 行为
+    function analyzeAgentBehavior() {
+      const agents = document.querySelectorAll('#agentList .bg-green-500');
+      const onlineCount = agents.length;
+
+      let analysis = [];
+
+      if (onlineCount === 0) {
+        analysis.push({
+          type: 'error',
+          text: '❌ 没有在线的 Agent！请检查 Agent 是否已连接到服务器。'
+        });
+      } else {
+        analysis.push({
+          type: 'success',
+          text: `✅ 有 ${onlineCount} 个 Agent 在线`
+        });
+      }
+
+      if (stats.msgReceived > 0 && stats.lastAgentMessageTime === null) {
+        analysis.push({
+          type: 'warning',
+          text: '⚠️ 收到了消息但没有 Agent 回复。Agent 可能没有正确处理消息。'
+        });
+      }
+
+      if (stats.lastAgentMessageTime) {
+        const timeSinceLastAgentMsg = Date.now() - stats.lastAgentMessageTime;
+        if (timeSinceLastAgentMsg > 60000) {
+          analysis.push({
+            type: 'warning',
+            text: `⚠️ Agent 已经 ${Math.floor(timeSinceLastAgentMsg / 1000)} 秒没有回复了`
+          });
+        } else {
+          analysis.push({
+            type: 'info',
+            text: `ℹ️ Agent 最近回复: ${Math.floor(timeSinceLastAgentMsg / 1000)} 秒前`
+          });
+        }
+      }
+
+      analysisPanel.innerHTML = analysis.map(item => {
+        const colors = {
+          'error': 'text-red-400',
+          'warning': 'text-yellow-400',
+          'success': 'text-green-400',
+          'info': 'text-blue-400'
+        };
+        return `<div class="${colors[item.type]}">${item.text}</div>`;
+      }).join('');
     }
 
     // 发送测试消息
-    function sendTestMessage() {
-      const content = document.getElementById('testMessage').value.trim();
+    function sendTestMessage(content) {
+      if (!content) {
+        content = document.getElementById('testMessage').value.trim();
+      }
+
       if (!content) {
         log('warning', '请输入消息内容');
         return;
@@ -300,34 +515,85 @@
         return;
       }
 
+      log('ws', `发送消息: ${content}`);
       ws.send(JSON.stringify({
         type: 'message',
         payload: { content }
       }));
 
-      log('success', `已发送: ${content}`);
+      stats.msgSent++;
+      updateStats();
       document.getElementById('testMessage').value = '';
+    }
+
+    // 刷新 Agent 列表
+    function refreshAgentList() {
+      fetch('/api/agents')
+        .then(r => r.json())
+        .then(data => {
+          if (data.agents) {
+            renderAgentList(data.agents);
+            document.getElementById('agentOnlineCount').textContent = data.agents.filter(a => a.status === 'online').length;
+            analyzeAgentBehavior();
+          }
+        })
+        .catch(e => log('error', '获取 Agent 列表失败', e.message));
     }
 
     // 事件绑定
     document.getElementById('clearBtn').onclick = () => {
       logPanel.innerHTML = '<p class="text-gray-500">日志已清空</p>';
-      logs = [];
+      document.getElementById('logCount').textContent = '(0条)';
     };
 
-    document.getElementById('testBtn').onclick = () => {
-      document.getElementById('testMessage').value = '测试消息 ' + Date.now();
-      sendTestMessage();
+    document.getElementById('clearMessagesBtn').onclick = () => {
+      messagePanel.innerHTML = '<p class="text-gray-500">等待消息...</p>';
     };
 
-    document.getElementById('sendTestBtn').onclick = sendTestMessage;
+    document.getElementById('sendTestBtn').onclick = () => sendTestMessage();
+
+    document.getElementById('testHelloBtn').onclick = () => sendTestMessage('你好');
+
+    document.getElementById('testMentionBtn').onclick = () => {
+      // 获取第一个在线Agent的名字
+      const firstOnlineAgent = document.querySelector('#agentList .bg-green-500');
+      if (firstOnlineAgent) {
+        const agentName = firstOnlineAgent.closest('.flex').querySelector('span:nth-child(2)').textContent;
+        sendTestMessage(`@${agentName} 你好`);
+      } else {
+        sendTestMessage('@Agent 你好');
+      }
+    };
 
     document.getElementById('reconnectBtn').onclick = () => {
-      if (ws) ws.close();
-      connect();
+      if (ws) {
+        ws.close();
+        if (reconnectTimer) {
+          clearTimeout(reconnectTimer);
+          reconnectTimer = null;
+        }
+      }
+      setTimeout(connect, 500);
+    };
+
+    document.getElementById('toggleAutoReconnect').onclick = () => {
+      autoReconnect = !autoReconnect;
+      document.getElementById('autoReconnectStatus').textContent = autoReconnect ? '开' : '关';
     };
 
     document.getElementById('refreshAgentsBtn').onclick = refreshAgentList;
+
+    // 日志过滤
+    ['filterWs', 'filterAgent', 'filterMessage', 'filterError'].forEach(id => {
+      document.getElementById(id).onchange = applyLogFilters;
+    });
+
+    // 回车发送
+    document.getElementById('testMessage').addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        sendTestMessage();
+      }
+    });
 
     // 启动
     log('info', '调试面板已启动');
@@ -336,6 +602,7 @@
 
     // 定时刷新
     setInterval(refreshAgentList, 10000);
+    setInterval(analyzeAgentBehavior, 5000);
   </script>
 </body>
 </html>
