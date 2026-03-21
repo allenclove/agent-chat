@@ -193,6 +193,23 @@ async function start() {
       return true;
     }
 
+    // 获取消息统计（调试用）
+    if (req.url === '/api/messages/stats' && req.method === 'GET') {
+      const stats = db.getMessageStats();
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: true, stats }));
+      return true;
+    }
+
+    // 清空所有消息（调试用）
+    if (req.url === '/api/messages/clear' && req.method === 'POST') {
+      db.clearMessages();
+      console.log('[API] 消息已清空');
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: true, message: '所有消息已清空' }));
+      return true;
+    }
+
     return false;
   };
 

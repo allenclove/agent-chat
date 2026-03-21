@@ -3,336 +3,363 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Agent Chat - 调试面板</title>
+  <title>Agent Chat - 调试面板 v2</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    .log-entry { font-family: monospace; font-size: 12px; }
-    .log-info { color: #3b82f6; }
-    .log-success { color: #22c55e; }
-    .log-warning { color: #f59e0b; }
-    .log-error { color: #ef4444; }
-    .log-agent { color: #8b5cf6; }
-    .log-message { color: #06b6d4; }
-    .log-ws { color: #f472b6; }
-    .log-detail { color: #9ca3af; font-size: 11px; }
+    .log-entry { font-family: 'Consolas', 'Monaco', monospace; font-size: 12px; line-height: 1.5; }
+    .log-info { color: #60a5fa; }
+    .log-success { color: #4ade80; }
+    .log-warning { color: #fbbf24; }
+    .log-error { color: #f87171; }
+    .log-agent { color: #c084fc; }
+    .log-user { color: #38bdf8; }
+    .log-ws { color: #fb7185; }
+    .log-system { color: #94a3b8; }
+    .message-bubble { max-width: 100%; word-break: break-word; }
     .pulse { animation: pulse 2s infinite; }
-    @keyframes pulse {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.5; }
-    }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    .timeline-item { border-left: 2px solid #4b5563; padding-left: 12px; margin-left: 8px; }
+    .timeline-dot { width: 8px; height: 8px; border-radius: 50%; position: absolute; left: -5px; }
+    pre { white-space: pre-wrap; word-break: break-all; margin: 0; }
   </style>
 </head>
 <body class="bg-gray-900 text-white min-h-screen">
-  <div class="container mx-auto p-4">
+  <div class="container mx-auto p-4 max-w-7xl">
     <!-- Header -->
     <div class="flex justify-between items-center mb-4">
-      <h1 class="text-xl font-bold">🔧 Agent Chat 调试面板</h1>
-      <div class="space-x-2">
-        <button id="clearBtn" class="px-3 py-1 bg-gray-700 rounded hover:bg-gray-600">清空日志</button>
-        <a href="/chat.html" class="px-3 py-1 bg-gray-700 rounded hover:bg-gray-600">返回聊天</a>
-      </div>
-    </div>
-
-    <!-- 连接状态条 -->
-    <div id="connectionBar" class="mb-4 p-3 bg-gray-800 rounded-lg flex items-center justify-between">
-      <div class="flex items-center space-x-3">
-        <span id="wsIndicator" class="w-3 h-3 rounded-full bg-gray-500"></span>
-        <span id="wsStatusText" class="text-sm">未连接</span>
-        <span id="wsUrl" class="text-xs text-gray-500"></span>
+      <div>
+        <h1 class="text-xl font-bold">🔧 Agent Chat 调试面板</h1>
+        <p class="text-xs text-gray-500">实时监控 Agent 连接和消息流</p>
       </div>
       <div class="flex items-center space-x-2">
-        <button id="reconnectBtn" class="px-3 py-1 bg-green-600 rounded hover:bg-green-500 text-sm">
-          重新连接
-        </button>
-        <button id="toggleAutoReconnect" class="px-3 py-1 bg-gray-700 rounded hover:bg-gray-600 text-sm">
-          自动重连: <span id="autoReconnectStatus">开</span>
-        </button>
+        <span id="connectionIndicator" class="flex items-center text-sm">
+          <span class="w-2 h-2 rounded-full bg-gray-500 mr-2"></span>
+          <span id="connectionText">未连接</span>
+        </span>
+        <a href="/chat.html" class="px-3 py-1 bg-gray-700 rounded hover:bg-gray-600 text-sm">返回聊天</a>
       </div>
     </div>
 
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
-      <!-- Agent 状态 -->
-      <div class="bg-gray-800 rounded-lg p-4">
-        <h2 class="font-semibold mb-3 flex items-center">
-          <span class="mr-2">🤖</span> Agent 状态
-          <button id="refreshAgentsBtn" class="ml-auto text-xs px-2 py-1 bg-gray-700 rounded hover:bg-gray-600">刷新</button>
-        </h2>
-        <div id="agentList" class="space-y-2">
-          <p class="text-gray-500">加载中...</p>
-        </div>
-      </div>
-
-      <!-- 统计信息 -->
-      <div class="bg-gray-800 rounded-lg p-4">
-        <h2 class="font-semibold mb-3 flex items-center">
-          <span class="mr-2">📊</span> 统计信息
-        </h2>
-        <div id="statsInfo" class="text-sm space-y-2">
-          <div class="flex justify-between"><span class="text-gray-400">在线用户:</span><span id="userCount">0</span></div>
-          <div class="flex justify-between"><span class="text-gray-400">在线Agent:</span><span id="agentOnlineCount">0</span></div>
-          <div class="flex justify-between"><span class="text-gray-400">收到的消息:</span><span id="msgReceived">0</span></div>
-          <div class="flex justify-between"><span class="text-gray-400">发送的消息:</span><span id="msgSent">0</span></div>
-          <div class="flex justify-between"><span class="text-gray-400">WebSocket事件:</span><span id="wsEvents">0</span></div>
-          <div class="flex justify-between"><span class="text-gray-400">连接时长:</span><span id="connectionTime">-</span></div>
-        </div>
-      </div>
-
-      <!-- 快速操作 -->
-      <div class="bg-gray-800 rounded-lg p-4">
-        <h2 class="font-semibold mb-3 flex items-center">
-          <span class="mr-2">⚡</span> 快速操作
-        </h2>
-        <div class="space-y-2">
-          <div>
-            <input id="testMessage" type="text" placeholder="输入测试消息..."
-              class="w-full px-3 py-2 bg-gray-700 rounded text-white text-sm mb-2">
-            <button id="sendTestBtn" class="w-full px-3 py-2 bg-blue-600 rounded hover:bg-blue-500 text-sm">
-              📤 发送消息
-            </button>
-          </div>
-          <div class="grid grid-cols-2 gap-2">
-            <button id="testHelloBtn" class="px-2 py-1 bg-purple-600 rounded hover:bg-purple-500 text-xs">
-              "你好"
-            </button>
-            <button id="testMentionBtn" class="px-2 py-1 bg-purple-600 rounded hover:bg-purple-500 text-xs">
-              "@Agent 你好"
-            </button>
+    <!-- 主布局 -->
+    <div class="grid grid-cols-1 lg:grid-cols-4 gap-4">
+      <!-- 左侧：Agent 状态 + 操作 -->
+      <div class="lg:col-span-1 space-y-4">
+        <!-- Agent 状态卡片 -->
+        <div class="bg-gray-800 rounded-lg p-4">
+          <h2 class="font-semibold mb-3 flex items-center justify-between">
+            <span>🤖 Agent 状态</span>
+            <button id="refreshAgents" class="text-xs px-2 py-1 bg-gray-700 rounded hover:bg-gray-600">刷新</button>
+          </h2>
+          <div id="agentList" class="space-y-2 text-sm">
+            <p class="text-gray-500">加载中...</p>
           </div>
         </div>
-      </div>
-    </div>
 
-    <!-- 日志面板 -->
-    <div class="mt-4 bg-gray-800 rounded-lg p-4">
-      <div class="flex justify-between items-center mb-3">
-        <h2 class="font-semibold flex items-center">
-          <span class="mr-2">📋</span> 实时日志
-          <span id="logCount" class="text-xs text-gray-500 ml-2">(0条)</span>
-        </h2>
-        <div class="flex items-center space-x-2 text-xs">
-          <label class="flex items-center"><input type="checkbox" id="filterWs" checked class="mr-1"> WS</label>
-          <label class="flex items-center"><input type="checkbox" id="filterAgent" checked class="mr-1"> Agent</label>
-          <label class="flex items-center"><input type="checkbox" id="filterMessage" checked class="mr-1"> 消息</label>
-          <label class="flex items-center"><input type="checkbox" id="filterError" checked class="mr-1"> 错误</label>
+        <!-- 统计信息 -->
+        <div class="bg-gray-800 rounded-lg p-4">
+          <h2 class="font-semibold mb-3">📊 统计</h2>
+          <div class="space-y-1 text-sm">
+            <div class="flex justify-between"><span class="text-gray-400">在线用户:</span><span id="userCount">0</span></div>
+            <div class="flex justify-between"><span class="text-gray-400">总消息:</span><span id="totalMsgCount">0</span></div>
+            <div class="flex justify-between"><span class="text-gray-400">用户消息:</span><span id="humanMsgCount">0</span></div>
+            <div class="flex justify-between"><span class="text-gray-400">Agent消息:</span><span id="agentMsgCount">0</span></div>
+            <div class="flex justify-between"><span class="text-gray-400">本次会话消息:</span><span id="sessionMsgCount">0</span></div>
+          </div>
+        </div>
+
+        <!-- 快速操作 -->
+        <div class="bg-gray-800 rounded-lg p-4">
+          <h2 class="font-semibold mb-3">⚡ 操作</h2>
+          <div class="space-y-2">
+            <input id="testInput" type="text" placeholder="输入测试消息..."
+              class="w-full px-3 py-2 bg-gray-700 rounded text-sm" autocomplete="off">
+            <button id="sendTest" class="w-full px-3 py-2 bg-blue-600 rounded hover:bg-blue-500 text-sm">
+              📤 发送测试消息
+            </button>
+            <div class="grid grid-cols-2 gap-2 text-xs">
+              <button id="testHello" class="px-2 py-1 bg-gray-700 rounded hover:bg-gray-600">"你好"</button>
+              <button id="testPing" class="px-2 py-1 bg-gray-700 rounded hover:bg-gray-600">"ping"</button>
+            </div>
+            <hr class="border-gray-700">
+            <button id="clearHistory" class="w-full px-3 py-2 bg-red-600 rounded hover:bg-red-500 text-sm">
+              🗑️ 清空聊天记录
+            </button>
+            <button id="reconnect" class="w-full px-3 py-2 bg-gray-700 rounded hover:bg-gray-600 text-sm">
+              🔄 重新连接
+            </button>
+          </div>
         </div>
       </div>
-      <div id="logPanel" class="bg-gray-900 rounded p-3 h-80 overflow-y-auto text-sm">
-        <p class="text-gray-500">等待日志...</p>
+
+      <!-- 中间：消息时间线 -->
+      <div class="lg:col-span-2 bg-gray-800 rounded-lg p-4">
+        <div class="flex justify-between items-center mb-3">
+          <h2 class="font-semibold">📨 消息时间线</h2>
+          <div class="flex items-center space-x-2">
+            <label class="text-xs flex items-center">
+              <input type="checkbox" id="showRaw" class="mr-1"> 显示原始数据
+            </label>
+            <button id="clearTimeline" class="text-xs px-2 py-1 bg-gray-700 rounded hover:bg-gray-600">清空</button>
+          </div>
+        </div>
+        <div id="timeline" class="space-y-3 h-[600px] overflow-y-auto pr-2">
+          <p class="text-gray-500 text-center py-8">等待消息...</p>
+        </div>
+      </div>
+
+      <!-- 右侧：系统日志 -->
+      <div class="lg:col-span-1 bg-gray-800 rounded-lg p-4">
+        <div class="flex justify-between items-center mb-3">
+          <h2 class="font-semibold">📋 系统日志</h2>
+          <button id="clearLogs" class="text-xs px-2 py-1 bg-gray-700 rounded hover:bg-gray-600">清空</button>
+        </div>
+        <div class="flex flex-wrap gap-1 mb-2 text-xs">
+          <label class="flex items-center bg-gray-700 px-2 py-1 rounded"><input type="checkbox" id="filterWs" checked class="mr-1">WS</label>
+          <label class="flex items-center bg-gray-700 px-2 py-1 rounded"><input type="checkbox" id="filterMsg" checked class="mr-1">消息</label>
+          <label class="flex items-center bg-gray-700 px-2 py-1 rounded"><input type="checkbox" id="filterErr" checked class="mr-1">错误</label>
+          <label class="flex items-center bg-gray-700 px-2 py-1 rounded"><input type="checkbox" id="filterSys" checked class="mr-1">系统</label>
+        </div>
+        <div id="logPanel" class="h-[560px] overflow-y-auto text-xs space-y-1 pr-2">
+          <p class="text-gray-500">等待日志...</p>
+        </div>
       </div>
     </div>
 
-    <!-- 消息详情 -->
+    <!-- 分析面板 -->
     <div class="mt-4 bg-gray-800 rounded-lg p-4">
-      <div class="flex justify-between items-center mb-3">
-        <h2 class="font-semibold flex items-center">
-          <span class="mr-2">📨</span> 最近消息（原始数据）
-        </h2>
-        <button id="clearMessagesBtn" class="text-xs px-2 py-1 bg-gray-700 rounded hover:bg-gray-600">清空</button>
-      </div>
-      <div id="messagePanel" class="bg-gray-900 rounded p-3 h-48 overflow-y-auto text-xs font-mono">
-        <p class="text-gray-500">等待消息...</p>
-      </div>
-    </div>
-
-    <!-- Agent 不回复分析 -->
-    <div class="mt-4 bg-gray-800 rounded-lg p-4">
-      <h2 class="font-semibold mb-3 flex items-center">
-        <span class="mr-2">🔍</span> Agent 不回复分析
-      </h2>
-      <div id="analysisPanel" class="text-sm space-y-2">
-        <div class="text-gray-400">等待分析数据...</div>
+      <h2 class="font-semibold mb-3">🔍 问题分析</h2>
+      <div id="analysis" class="text-sm grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="text-gray-500">等待数据...</div>
       </div>
     </div>
   </div>
 
   <script>
+    // DOM 元素
+    const timeline = document.getElementById('timeline');
     const logPanel = document.getElementById('logPanel');
-    const messagePanel = document.getElementById('messagePanel');
-    const agentListEl = document.getElementById('agentList');
-    const wsIndicator = document.getElementById('wsIndicator');
-    const wsStatusText = document.getElementById('wsStatusText');
-    const wsUrlEl = document.getElementById('wsUrl');
-    const analysisPanel = document.getElementById('analysisPanel');
+    const agentList = document.getElementById('agentList');
+    const analysis = document.getElementById('analysis');
 
+    // 状态
     let ws = null;
-    let autoReconnect = true;
-    let reconnectTimer = null;
-    let connectionStartTime = null;
-    let connectionTimer = null;
+    let sessionMsgCount = 0;
+    let agents = {};
+    let messages = [];
+    let logs = [];
 
-    // 统计数据
-    const stats = {
-      msgReceived: 0,
-      msgSent: 0,
-      wsEvents: 0,
-      agentMessages: {},
-      lastMessageTime: null,
-      lastAgentMessageTime: null
-    };
-
-    // 日志函数（增强版）
-    function log(type, message, data = null) {
+    // 日志函数
+    function log(type, message, detail = null) {
       const time = new Date().toLocaleTimeString('zh-CN', { hour12: false });
-      const ms = Date.now() % 1000;
-      const timestamp = `${time}.${ms.toString().padStart(3, '0')}`;
+      const ms = String(Date.now() % 1000).padStart(3, '0');
 
-      stats.wsEvents++;
+      const entry = {
+        type,
+        message,
+        detail,
+        time: `${time}.${ms}`
+      };
+      logs.push(entry);
+      if (logs.length > 200) logs.shift();
 
-      const typeColors = {
-        'info': 'log-info',
-        'success': 'log-success',
-        'warning': 'log-warning',
-        'error': 'log-error',
-        'agent': 'log-agent',
-        'message': 'log-message',
-        'ws': 'log-ws'
+      const colors = {
+        info: 'log-info', success: 'log-success', warning: 'log-warning',
+        error: 'log-error', agent: 'log-agent', user: 'log-user',
+        ws: 'log-ws', system: 'log-system'
       };
 
-      const typeClass = typeColors[type] || 'log-info';
-
       const div = document.createElement('div');
-      div.className = `log-entry ${typeClass} mb-1`;
+      div.className = `log-entry ${colors[type] || 'log-info'}`;
       div.dataset.type = type;
-
-      let content = `<span class="text-gray-500">[${timestamp}]</span> <span class="font-semibold">[${type.toUpperCase().padEnd(7)}]</span> ${message}`;
-
-      if (data) {
-        const dataStr = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
-        content += `<br><pre class="log-detail ml-4 whitespace-pre-wrap overflow-x-auto">${escapeHtml(dataStr)}</pre>`;
+      div.innerHTML = `<span class="text-gray-500">[${entry.time}]</span> ${message}`;
+      if (detail) {
+        div.innerHTML += `<br><pre class="text-gray-500 ml-4 text-xs">${escapeHtml(typeof detail === 'string' ? detail : JSON.stringify(detail, null, 2))}</pre>`;
       }
 
-      div.innerHTML = content;
       logPanel.appendChild(div);
       logPanel.scrollTop = logPanel.scrollHeight;
 
-      // 更新日志计数
-      document.getElementById('logCount').textContent = `(${logPanel.children.length}条)`;
-
-      // 保持最近500条
-      while (logPanel.children.length > 500) {
+      while (logPanel.children.length > 200) {
         logPanel.removeChild(logPanel.firstChild);
       }
 
-      applyLogFilters();
+      applyFilters();
     }
 
-    // HTML转义
     function escapeHtml(text) {
       const div = document.createElement('div');
       div.textContent = text;
       return div.innerHTML;
     }
 
-    // 应用日志过滤
-    function applyLogFilters() {
+    function applyFilters() {
       const filters = {
-        'ws': document.getElementById('filterWs').checked,
-        'agent': document.getElementById('filterAgent').checked,
-        'message': document.getElementById('filterMessage').checked,
-        'error': document.getElementById('filterError').checked
+        ws: document.getElementById('filterWs').checked,
+        msg: document.getElementById('filterMsg').checked,
+        err: document.getElementById('filterErr').checked,
+        sys: document.getElementById('filterSys').checked
       };
-
-      logPanel.querySelectorAll('.log-entry').forEach(entry => {
-        const type = entry.dataset.type;
-        const shouldShow = filters[type] !== false;
-        entry.style.display = shouldShow ? 'block' : 'none';
+      const typeMap = { ws: 'ws', agent: 'msg', user: 'msg', error: 'err', system: 'sys', info: 'sys', success: 'sys', warning: 'err' };
+      logPanel.querySelectorAll('.log-entry').forEach(el => {
+        const type = el.dataset.type;
+        const category = typeMap[type] || 'sys';
+        el.style.display = filters[category] ? 'block' : 'none';
       });
     }
 
-    // 更新连接状态UI
-    function updateConnectionUI(status, url = '') {
-      wsStatusText.textContent = status;
-      wsUrlEl.textContent = url;
+    // 更新连接状态
+    function updateConnection(status, connected = false) {
+      const indicator = document.querySelector('#connectionIndicator span:first-child');
+      const text = document.getElementById('connectionText');
+      text.textContent = status;
+      indicator.className = `w-2 h-2 rounded-full mr-2 ${connected ? 'bg-green-500 pulse' : 'bg-red-500'}`;
+    }
 
-      if (status === '已连接') {
-        wsIndicator.className = 'w-3 h-3 rounded-full bg-green-500';
-        wsIndicator.classList.add('pulse');
-      } else if (status === '连接中...') {
-        wsIndicator.className = 'w-3 h-3 rounded-full bg-yellow-500 pulse';
+    // 添加消息到时间线
+    function addMessage(msg, isHistory = false) {
+      if (timeline.querySelector('.text-gray-500')) {
+        timeline.innerHTML = '';
+      }
+
+      const isAgent = msg.sender_type === 'agent';
+      const isSystem = msg.sender_type === 'system';
+      const time = new Date(msg.created_at || Date.now()).toLocaleTimeString('zh-CN', { hour12: false });
+
+      const div = document.createElement('div');
+      div.className = 'timeline-item relative py-2';
+
+      let dotColor = isAgent ? 'bg-purple-500' : isSystem ? 'bg-gray-500' : 'bg-blue-500';
+      let icon = isAgent ? '🤖' : isSystem ? '🔧' : '👤';
+      let typeLabel = isAgent ? 'Agent' : isSystem ? '系统' : '用户';
+
+      div.innerHTML = `
+        <div class="timeline-dot ${dotColor} top-3"></div>
+        <div class="flex items-start justify-between">
+          <div class="flex items-center space-x-2">
+            <span>${icon}</span>
+            <span class="font-medium">${escapeHtml(msg.sender_name)}</span>
+            <span class="text-xs text-gray-500">${typeLabel}</span>
+          </div>
+          <span class="text-xs text-gray-500">${time}</span>
+        </div>
+        <div class="message-bubble mt-1 text-gray-300 text-sm">${escapeHtml(msg.content)}</div>
+        ${document.getElementById('showRaw').checked ? `<details class="mt-2"><summary class="text-xs text-gray-500 cursor-pointer">原始数据</summary><pre class="text-xs text-gray-500 mt-1">${escapeHtml(JSON.stringify(msg, null, 2))}</pre></details>` : ''}
+      `;
+
+      timeline.appendChild(div);
+      timeline.scrollTop = timeline.scrollHeight;
+
+      // 记录到本地消息列表
+      messages.push(msg);
+      if (messages.length > 100) messages.shift();
+
+      // 更新统计
+      sessionMsgCount++;
+      document.getElementById('sessionMsgCount').textContent = sessionMsgCount;
+    }
+
+    // 更新 Agent 列表
+    function updateAgentList(agentData) {
+      if (!agentData || agentData.length === 0) {
+        agentList.innerHTML = '<p class="text-gray-500">暂无配置的 Agent</p>';
+        return;
+      }
+
+      agentList.innerHTML = agentData.map(a => {
+        const isOnline = a.status === 'online';
+        return `
+          <div class="flex items-center justify-between p-2 bg-gray-700 rounded">
+            <div class="flex items-center space-x-2">
+              <span class="w-2 h-2 rounded-full ${isOnline ? 'bg-green-500' : 'bg-gray-500'}"></span>
+              <span>${escapeHtml(a.name)}</span>
+            </div>
+            <span class="text-xs ${isOnline ? 'text-green-400' : 'text-gray-500'}">${isOnline ? '在线' : '离线'}</span>
+          </div>
+        `;
+      }).join('');
+
+      // 更新在线数量
+      const onlineCount = agentData.filter(a => a.status === 'online').length;
+      document.getElementById('agentOnlineCount') && (document.getElementById('agentOnlineCount').textContent = onlineCount);
+    }
+
+    // 更新分析
+    function updateAnalysis() {
+      const onlineAgents = Object.values(agents).filter(a => a.status === 'online').length;
+      const hasUserMsg = messages.some(m => m.sender_type === 'human');
+      const hasAgentMsg = messages.some(m => m.sender_type === 'agent');
+
+      let items = [];
+
+      // Agent 状态
+      if (onlineAgents === 0) {
+        items.push({ icon: '❌', title: 'Agent 状态', text: '没有在线的 Agent！请检查 Agent 是否已启动并连接到服务器。', color: 'text-red-400' });
       } else {
-        wsIndicator.className = 'w-3 h-3 rounded-full bg-red-500';
+        items.push({ icon: '✅', title: 'Agent 状态', text: `${onlineAgents} 个 Agent 在线`, color: 'text-green-400' });
       }
-    }
 
-    // 更新统计信息
-    function updateStats() {
-      document.getElementById('msgReceived').textContent = stats.msgReceived;
-      document.getElementById('msgSent').textContent = stats.msgSent;
-      document.getElementById('wsEvents').textContent = stats.wsEvents;
-    }
-
-    // 更新连接时长
-    function updateConnectionTime() {
-      if (!connectionStartTime) {
-        document.getElementById('connectionTime').textContent = '-';
-        return;
+      // 消息流
+      if (hasUserMsg && !hasAgentMsg) {
+        items.push({ icon: '⚠️', title: '消息流', text: '用户已发送消息，但 Agent 没有回复。检查 Agent 的消息处理逻辑。', color: 'text-yellow-400' });
+      } else if (hasAgentMsg) {
+        items.push({ icon: '✅', title: '消息流', text: 'Agent 已有回复', color: 'text-green-400' });
+      } else {
+        items.push({ icon: 'ℹ️', title: '消息流', text: '等待消息...', color: 'text-blue-400' });
       }
-      const elapsed = Math.floor((Date.now() - connectionStartTime) / 1000);
-      const mins = Math.floor(elapsed / 60);
-      const secs = elapsed % 60;
-      document.getElementById('connectionTime').textContent = `${mins}分${secs}秒`;
+
+      // 建议
+      if (onlineAgents > 0 && hasUserMsg && !hasAgentMsg) {
+        items.push({ icon: '💡', title: '建议', text: '检查 Agent 端是否正确处理了收到的消息，是否调用了 LLM 生成回复。', color: 'text-purple-400' });
+      } else {
+        items.push({ icon: '💡', title: '建议', text: '发送一条测试消息，观察 Agent 的响应。', color: 'text-gray-400' });
+      }
+
+      analysis.innerHTML = items.map(item => `
+        <div class="bg-gray-700 p-3 rounded">
+          <div class="flex items-center space-x-2 mb-1">
+            <span>${item.icon}</span>
+            <span class="font-medium">${item.title}</span>
+          </div>
+          <p class="${item.color} text-xs">${item.text}</p>
+        </div>
+      `).join('');
     }
 
-    // 连接 WebSocket
+    // WebSocket 连接
     function connect() {
-      if (ws && ws.readyState === 1) {
-        log('warning', '已经连接，先断开再重连');
-        return;
-      }
-
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
       const url = `${protocol}//${window.location.host}`;
 
-      updateConnectionUI('连接中...', url);
-      log('ws', `正在连接: ${url}`);
+      log('ws', `连接到 ${url}`);
+      updateConnection('连接中...', false);
 
       ws = new WebSocket(url);
 
       ws.onopen = () => {
-        updateConnectionUI('已连接', url);
         log('success', 'WebSocket 已连接');
+        updateConnection('已连接', true);
 
-        connectionStartTime = Date.now();
-        connectionTimer = setInterval(updateConnectionTime, 1000);
-
-        // 发送调试连接请求
-        log('ws', '发送 debug_join 请求');
-        ws.send(JSON.stringify({
-          type: 'debug_join',
-          payload: {}
-        }));
+        ws.send(JSON.stringify({ type: 'debug_join', payload: {} }));
+        log('ws', '发送 debug_join');
       };
 
       ws.onmessage = (event) => {
-        stats.wsEvents++;
         try {
           const data = JSON.parse(event.data);
           handleMessage(data);
         } catch (e) {
           log('error', '解析消息失败', event.data);
         }
-        updateStats();
       };
 
-      ws.onclose = (event) => {
-        updateConnectionUI('已断开');
-        log('warning', `WebSocket 断开 code=${event.code} reason="${event.reason || '无原因'}" wasClean=${event.wasClean}`);
-
-        if (connectionTimer) {
-          clearInterval(connectionTimer);
-          connectionTimer = null;
-        }
-        connectionStartTime = null;
-
-        // 自动重连
-        if (autoReconnect) {
-          log('info', '3秒后自动重连...');
-          reconnectTimer = setTimeout(connect, 3000);
-        }
+      ws.onclose = (e) => {
+        log('warning', `连接断开 code=${e.code} reason="${e.reason || '无'}"`);
+        updateConnection('已断开', false);
       };
 
-      ws.onerror = (err) => {
-        log('error', 'WebSocket 错误', '检查服务器是否运行');
+      ws.onerror = () => {
+        log('error', 'WebSocket 错误');
+        updateConnection('错误', false);
       };
     }
 
@@ -340,62 +367,39 @@
     function handleMessage(data) {
       const { type, payload } = data;
 
-      // 记录原始消息
-      addRawMessage(data);
-
       switch (type) {
         case 'debug_join_ack':
           log('success', '调试模式已连接', payload);
           break;
 
         case 'history':
-          log('info', `收到历史消息: ${payload.messages?.length || 0} 条`);
+          log('info', `历史消息: ${payload.messages?.length || 0} 条`);
+          if (payload.messages) {
+            payload.messages.forEach(m => addMessage(m, true));
+          }
+          updateAnalysis();
           break;
 
         case 'message':
-          stats.msgReceived++;
-          stats.lastMessageTime = Date.now();
+          const icon = payload.sender_type === 'agent' ? '🤖' : payload.sender_type === 'system' ? '🔧' : '👤';
+          log(payload.sender_type === 'agent' ? 'agent' : 'user', `${icon} ${payload.sender_name}: ${payload.content}`);
+          addMessage(payload);
+          updateAnalysis();
+          break;
 
-          const senderType = payload.sender_type === 'agent' ? '🤖' : '👤';
-          const contentPreview = payload.content?.substring(0, 100) + (payload.content?.length > 100 ? '...' : '');
-          log('message', `${senderType} ${payload.sender_name}: ${contentPreview}`, {
-            sender_id: payload.sender_id,
-            sender_type: payload.sender_type,
-            full_content: payload.content
-          });
+        case 'agent_list':
+          agents = {};
+          payload.agents?.forEach(a => agents[a.id] = a);
+          updateAgentList(payload.agents);
+          updateAnalysis();
+          break;
 
-          // 记录Agent消息
-          if (payload.sender_type === 'agent') {
-            stats.lastAgentMessageTime = Date.now();
-            if (!stats.agentMessages[payload.sender_name]) {
-              stats.agentMessages[payload.sender_name] = 0;
-            }
-            stats.agentMessages[payload.sender_name]++;
-          }
-
-          analyzeAgentBehavior();
+        case 'agent_status':
+          log('agent', `${payload.status === 'online' ? '🟢' : '🔴'} ${payload.name} ${payload.status}`);
           break;
 
         case 'user_list':
           document.getElementById('userCount').textContent = payload.users?.length || 0;
-          log('info', `用户列表更新: ${payload.users?.length || 0} 人`);
-          break;
-
-        case 'agent_list':
-          const onlineAgents = payload.agents?.filter(a => a.status === 'online') || [];
-          document.getElementById('agentOnlineCount').textContent = onlineAgents.length;
-          renderAgentList(payload.agents);
-          log('agent', `Agent列表更新: ${onlineAgents.length} 在线 / ${payload.agents?.length || 0} 总数`, payload.agents);
-          analyzeAgentBehavior();
-          break;
-
-        case 'agent_status':
-          const statusIcon = payload.status === 'online' ? '🟢' : '🔴';
-          log('agent', `${statusIcon} ${payload.name} ${payload.status}`);
-          break;
-
-        case 'debug_message_sent':
-          log('success', '消息已发送到服务器');
           break;
 
         case 'error':
@@ -403,206 +407,116 @@
           break;
 
         default:
-          log('info', `收到消息类型: ${type}`, payload);
+          log('system', `收到: ${type}`, payload);
       }
-
-      updateStats();
-    }
-
-    // 添加原始消息
-    function addRawMessage(data) {
-      const div = document.createElement('div');
-      div.className = 'mb-2 text-gray-300 border-b border-gray-800 pb-2';
-      div.innerHTML = `<span class="text-gray-500">${new Date().toLocaleTimeString()}</span> <span class="text-cyan-400">${data.type}</span>\n${JSON.stringify(data.payload, null, 2)}`;
-      messagePanel.appendChild(div);
-      messagePanel.scrollTop = messagePanel.scrollHeight;
-
-      while (messagePanel.children.length > 50) {
-        messagePanel.removeChild(messagePanel.firstChild);
-      }
-    }
-
-    // 渲染 Agent 列表
-    function renderAgentList(agents) {
-      if (!agents || agents.length === 0) {
-        agentListEl.innerHTML = '<p class="text-gray-500">暂无 Agent 配置</p>';
-        return;
-      }
-
-      agentListEl.innerHTML = agents.map(agent => {
-        const isOnline = agent.status === 'online';
-        const msgCount = stats.agentMessages[agent.name] || 0;
-        return `
-          <div class="flex items-center justify-between p-2 bg-gray-700 rounded">
-            <div class="flex items-center">
-              <span class="w-2 h-2 rounded-full ${isOnline ? 'bg-green-500' : 'bg-gray-500'} mr-2"></span>
-              <span>${agent.name}</span>
-            </div>
-            <div class="text-xs text-gray-400">
-              ${isOnline ? '在线' : '离线'}
-              ${msgCount > 0 ? ` · ${msgCount}条消息` : ''}
-            </div>
-          </div>
-        `;
-      }).join('');
-    }
-
-    // 分析 Agent 行为
-    function analyzeAgentBehavior() {
-      const agents = document.querySelectorAll('#agentList .bg-green-500');
-      const onlineCount = agents.length;
-
-      let analysis = [];
-
-      if (onlineCount === 0) {
-        analysis.push({
-          type: 'error',
-          text: '❌ 没有在线的 Agent！请检查 Agent 是否已连接到服务器。'
-        });
-      } else {
-        analysis.push({
-          type: 'success',
-          text: `✅ 有 ${onlineCount} 个 Agent 在线`
-        });
-      }
-
-      if (stats.msgReceived > 0 && stats.lastAgentMessageTime === null) {
-        analysis.push({
-          type: 'warning',
-          text: '⚠️ 收到了消息但没有 Agent 回复。Agent 可能没有正确处理消息。'
-        });
-      }
-
-      if (stats.lastAgentMessageTime) {
-        const timeSinceLastAgentMsg = Date.now() - stats.lastAgentMessageTime;
-        if (timeSinceLastAgentMsg > 60000) {
-          analysis.push({
-            type: 'warning',
-            text: `⚠️ Agent 已经 ${Math.floor(timeSinceLastAgentMsg / 1000)} 秒没有回复了`
-          });
-        } else {
-          analysis.push({
-            type: 'info',
-            text: `ℹ️ Agent 最近回复: ${Math.floor(timeSinceLastAgentMsg / 1000)} 秒前`
-          });
-        }
-      }
-
-      analysisPanel.innerHTML = analysis.map(item => {
-        const colors = {
-          'error': 'text-red-400',
-          'warning': 'text-yellow-400',
-          'success': 'text-green-400',
-          'info': 'text-blue-400'
-        };
-        return `<div class="${colors[item.type]}">${item.text}</div>`;
-      }).join('');
     }
 
     // 发送测试消息
-    function sendTestMessage(content) {
+    function sendTest(content) {
       if (!content) {
-        content = document.getElementById('testMessage').value.trim();
+        content = document.getElementById('testInput').value.trim();
       }
+      if (!content) return log('warning', '请输入消息内容');
+      if (!ws || ws.readyState !== 1) return log('error', 'WebSocket 未连接');
 
-      if (!content) {
-        log('warning', '请输入消息内容');
-        return;
-      }
-
-      if (!ws || ws.readyState !== 1) {
-        log('error', 'WebSocket 未连接');
-        return;
-      }
-
-      log('ws', `发送消息: ${content}`);
-      ws.send(JSON.stringify({
-        type: 'message',
-        payload: { content }
-      }));
-
-      stats.msgSent++;
-      updateStats();
-      document.getElementById('testMessage').value = '';
+      ws.send(JSON.stringify({ type: 'message', payload: { content } }));
+      log('ws', `发送: ${content}`);
+      document.getElementById('testInput').value = '';
     }
 
-    // 刷新 Agent 列表
-    function refreshAgentList() {
-      fetch('/api/agents')
-        .then(r => r.json())
-        .then(data => {
-          if (data.agents) {
-            renderAgentList(data.agents);
-            document.getElementById('agentOnlineCount').textContent = data.agents.filter(a => a.status === 'online').length;
-            analyzeAgentBehavior();
-          }
-        })
-        .catch(e => log('error', '获取 Agent 列表失败', e.message));
+    // 清空聊天记录
+    async function clearHistory() {
+      if (!confirm('确定要清空所有聊天记录吗？此操作不可恢复！')) return;
+
+      try {
+        const res = await fetch('/api/messages/clear', { method: 'POST' });
+        const data = await res.json();
+        if (data.success) {
+          log('success', '聊天记录已清空');
+          timeline.innerHTML = '<p class="text-gray-500 text-center py-8">消息已清空</p>';
+          messages = [];
+          sessionMsgCount = 0;
+          document.getElementById('sessionMsgCount').textContent = '0';
+          updateAnalysis();
+          // 刷新统计数据
+          loadStats();
+        }
+      } catch (e) {
+        log('error', '清空失败', e.message);
+      }
+    }
+
+    // 加载统计
+    async function loadStats() {
+      try {
+        const res = await fetch('/api/messages/stats');
+        const data = await res.json();
+        if (data.stats) {
+          document.getElementById('totalMsgCount').textContent = data.stats.total || 0;
+          document.getElementById('humanMsgCount').textContent = data.stats.byType?.human || 0;
+          document.getElementById('agentMsgCount').textContent = data.stats.byType?.agent || 0;
+        }
+      } catch (e) {
+        // 静默失败
+      }
+    }
+
+    // 加载 Agent 列表
+    async function loadAgents() {
+      try {
+        const res = await fetch('/api/agents');
+        const data = await res.json();
+        if (data.agents) {
+          updateAgentList(data.agents);
+          data.agents.forEach(a => agents[a.id] = a);
+          updateAnalysis();
+        }
+      } catch (e) {
+        log('error', '获取 Agent 列表失败');
+      }
     }
 
     // 事件绑定
-    document.getElementById('clearBtn').onclick = () => {
+    document.getElementById('sendTest').onclick = () => sendTest();
+    document.getElementById('testInput').onkeypress = (e) => e.key === 'Enter' && sendTest();
+    document.getElementById('testHello').onclick = () => sendTest('你好');
+    document.getElementById('testPing').onclick = () => sendTest('ping');
+    document.getElementById('clearHistory').onclick = clearHistory;
+    document.getElementById('reconnect').onclick = () => { if (ws) ws.close(); setTimeout(connect, 500); };
+    document.getElementById('refreshAgents').onclick = loadAgents;
+    document.getElementById('clearTimeline').onclick = () => {
+      timeline.innerHTML = '<p class="text-gray-500 text-center py-8">已清空</p>';
+      messages = [];
+    };
+    document.getElementById('clearLogs').onclick = () => {
       logPanel.innerHTML = '<p class="text-gray-500">日志已清空</p>';
-      document.getElementById('logCount').textContent = '(0条)';
+      logs = [];
     };
-
-    document.getElementById('clearMessagesBtn').onclick = () => {
-      messagePanel.innerHTML = '<p class="text-gray-500">等待消息...</p>';
-    };
-
-    document.getElementById('sendTestBtn').onclick = () => sendTestMessage();
-
-    document.getElementById('testHelloBtn').onclick = () => sendTestMessage('你好');
-
-    document.getElementById('testMentionBtn').onclick = () => {
-      // 获取第一个在线Agent的名字
-      const firstOnlineAgent = document.querySelector('#agentList .bg-green-500');
-      if (firstOnlineAgent) {
-        const agentName = firstOnlineAgent.closest('.flex').querySelector('span:nth-child(2)').textContent;
-        sendTestMessage(`@${agentName} 你好`);
+    document.getElementById('showRaw').onchange = () => {
+      // 重新渲染消息以显示/隐藏原始数据
+      const msgs = [...messages];
+      timeline.innerHTML = '';
+      if (msgs.length === 0) {
+        timeline.innerHTML = '<p class="text-gray-500 text-center py-8">等待消息...</p>';
       } else {
-        sendTestMessage('@Agent 你好');
+        msgs.forEach(m => addMessage(m, true));
       }
     };
 
-    document.getElementById('reconnectBtn').onclick = () => {
-      if (ws) {
-        ws.close();
-        if (reconnectTimer) {
-          clearTimeout(reconnectTimer);
-          reconnectTimer = null;
-        }
-      }
-      setTimeout(connect, 500);
-    };
-
-    document.getElementById('toggleAutoReconnect').onclick = () => {
-      autoReconnect = !autoReconnect;
-      document.getElementById('autoReconnectStatus').textContent = autoReconnect ? '开' : '关';
-    };
-
-    document.getElementById('refreshAgentsBtn').onclick = refreshAgentList;
-
-    // 日志过滤
-    ['filterWs', 'filterAgent', 'filterMessage', 'filterError'].forEach(id => {
-      document.getElementById(id).onchange = applyLogFilters;
-    });
-
-    // 回车发送
-    document.getElementById('testMessage').addEventListener('keypress', (e) => {
-      if (e.key === 'Enter') {
-        sendTestMessage();
-      }
+    // 过滤器
+    ['filterWs', 'filterMsg', 'filterErr', 'filterSys'].forEach(id => {
+      document.getElementById(id).onchange = applyFilters;
     });
 
     // 启动
-    log('info', '调试面板已启动');
+    log('system', '调试面板已启动');
     connect();
-    refreshAgentList();
+    loadAgents();
+    loadStats();
 
     // 定时刷新
-    setInterval(refreshAgentList, 10000);
-    setInterval(analyzeAgentBehavior, 5000);
+    setInterval(loadAgents, 10000);
+    setInterval(loadStats, 5000);
   </script>
 </body>
 </html>

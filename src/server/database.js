@@ -209,6 +209,30 @@ function getRecentMessages(limit = 50) {
   return messages;
 }
 
+// 清空所有消息
+function clearMessages() {
+  db.run('DELETE FROM messages');
+  save();
+  console.log('[DB] 所有消息已清空');
+  return true;
+}
+
+// 获取消息统计
+function getMessageStats() {
+  const totalResult = db.exec('SELECT COUNT(*) FROM messages');
+  const total = totalResult.length > 0 ? totalResult[0].values[0][0] : 0;
+
+  const byTypeResult = db.exec('SELECT sender_type, COUNT(*) FROM messages GROUP BY sender_type');
+  const byType = {};
+  if (byTypeResult.length > 0) {
+    byTypeResult[0].values.forEach(row => {
+      byType[row[0]] = row[1];
+    });
+  }
+
+  return { total, byType };
+}
+
 // Agent配置相关操作
 function getAllAgents() {
   const result = db.exec('SELECT * FROM agent_configs WHERE enabled = 1');
@@ -427,6 +451,8 @@ module.exports = {
   // 消息
   createMessage,
   getRecentMessages,
+  clearMessages,
+  getMessageStats,
   // Agent
   getAllAgents,
   getAgentById,
