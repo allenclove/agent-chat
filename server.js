@@ -148,6 +148,14 @@ async function start() {
       return true;
     }
 
+    // 获取Agent列表（用于调试面板）
+    if (req.url === '/api/agents' && req.method === 'GET') {
+      const agents = agentManager.getAgentStatus();
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: true, agents }));
+      return true;
+    }
+
     // 获取系统设置
     if (req.url === '/api/settings' && req.method === 'GET') {
       const settings = db.getAllSettings();
