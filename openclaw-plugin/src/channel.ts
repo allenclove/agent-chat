@@ -5,9 +5,9 @@
  */
 
 import type { ChannelPlugin, OpenClawConfig } from "openclaw/plugin-sdk";
-import { AgentChatGateway, setGateway, removeGateway } from "./gateway.js";
+import { AgentChatGateway, setGateway, getGateway, removeGateway } from "./gateway.js";
 import type { AgentChatAccount, AgentChatConfig, AgentChatMessage } from "./types.js";
-import { getAgentChatRuntime } from "./runtime.js";
+import { getAgentChatRuntime, setAgentChatRuntime } from "./runtime.js";
 
 const DEFAULT_ACCOUNT_ID = "default";
 
@@ -44,41 +44,6 @@ function resolveAccount(cfg: OpenClawConfig, accountId?: string): AgentChatAccou
       token: "openclaw-subagent-token-2026",
     },
   };
-}
-
-// 处理收到的消息，转发给 OpenClaw
-async function handleIncomingMessage(
-  msg: AgentChatMessage,
-  accountId: string
-): Promise<void> {
-  const runtime = getAgentChatRuntime();
-
-  if (!runtime.channel) {
-    console.warn("[AgentChat] runtime.channel 不可用");
-    return;
-  }
-
-  try {
-    const inboundContext = {
-      channelId: "agent-chat",
-      accountId,
-      senderId: msg.sender_id,
-      senderName: msg.sender_name,
-      senderType: msg.sender_type,
-      content: msg.content,
-      messageId: String(msg.id),
-      timestamp: msg.created_at,
-      metadata: {
-        platform: msg._platform || "agent-chat-v1",
-      },
-    };
-
-    if (runtime.channel.handleIncomingMessage) {
-      await runtime.channel.handleIncomingMessage(inboundContext);
-    }
-  } catch (err) {
-    console.error("[AgentChat] 处理消息失败:", err);
-  }
 }
 
 export const agentChatPlugin: ChannelPlugin<AgentChatAccount> = {
@@ -139,9 +104,6 @@ export const agentChatPlugin: ChannelPlugin<AgentChatAccount> = {
         return { success: false, error: "Account not configured" };
       }
 
-      const gateway = setGateway(accountId || DEFAULT_ACCOUNT_ID, null as unknown as AgentChatGateway);
-
-      // 直接创建一个简单的发送方法
       const config = account.config;
       const WebSocket = (await import("ws")).default;
 
@@ -219,17 +181,154 @@ export const agentChatPlugin: ChannelPlugin<AgentChatAccount> = {
       ctx.log?.info(`[AgentChat] 启动 account=${ctx.accountId}`);
       ctx.log?.info(`[AgentChat] 连接到 ${account.config.serverUrl}`);
 
+      const runtime = getAgentChatRuntime();
+
       const gateway = new AgentChatGateway({
         config: account.config,
         abortSignal: ctx.abortSignal,
         log: ctx.log,
         onMessage: async (msg) => {
-          await handleIncomingMessage(msg, ctx.accountId);
-          ctx.setStatus({
-            accountId: ctx.accountId,
-            connected: true,
-            lastMessageTime: Date.now(),
-          });
+          // 使用 OpenClaw 的 channel 接口处理消息
+          try {
+            ctx.log?.info(`[AgentChat] === 开始处理消息 ===`);
+            ctx.log?.info(`[AgentChat] runtime.channel 存在: ${!!runtime.channel}`);
+            ctx.log?.info(`[AgentChat] runtime.channel.activity 存在: ${!!runtime.channel?.activity}`);
+            ctx.log?.info(`[AgentChat] runtime.channel.routing 存在: ${!!runtime.channel?.routing}`);
+            ctx.log?.info(`[AgentChat] runtime.channel.reply 存在: ${!!runtime.channel?.reply}`);
+
+            if (runtime.channel?.activity?.record) {
+              ctx.log?.info(`[AgentChat] 调用 activity.record`);
+              runtime.channel.activity.record({
+                channel: "agent-chat",
+                accountId: ctx.accountId,
+                direction: "inbound",
+              });
+              ctx.log?.info(`[AgentChat] activity.record 完成`);
+            }
+
+            // 解析路由
+            let route = { agentId: "main" };
+            if (runtime.channel?.routing?.resolveAgentRoute) {
+              ctx.log?.info(`[AgentChat] 调用 resolveAgentRoute`);
+              route = runtime.channel.routing.resolveAgentRoute({
+                cfg: ctx.cfg,
+                channel: "agent-chat",
+                accountId: ctx.accountId,
+                peer: {
+                  kind: "group",
+                  id: "agent-chat-group",
+                },
+              }) as { agentId: string };
+              ctx.log?.info(`[AgentChat] Route resolved: agentId=${route.agentId}`);
+            } else {
+              ctx.log?.warn(`[AgentChat] resolveAgentRoute 不可用，使用默认路由`);
+            }
+
+            // 组装消息体
+            const bodyForAgent = `[${msg.sender_type}] ${msg.sender_name}: ${msg.content}`;
+            ctx.log?.info(`[AgentChat] bodyForAgent: ${bodyForAgent}`);
+
+            // 格式化信封
+            let envelope: any = { body: bodyForAgent };
+            if (runtime.channel?.reply?.formatInboundEnvelope) {
+              ctx.log?.info(`[AgentChat] 调用 formatInboundEnvelope`);
+              const envelopeOptions = runtime.channel.reply.resolveEnvelopeFormatOptions
+                ? runtime.channel.reply.resolveEnvelopeFormatOptions(ctx.cfg)
+                : {};
+
+              envelope = runtime.channel.reply.formatInboundEnvelope({
+                cfg: ctx.cfg,
+                channel: "agent-chat",
+                accountId: ctx.accountId,
+                peer: {
+                  kind: "group",
+                  id: "agent-chat-group",
+                },
+                senderId: msg.sender_id,
+                senderName: msg.sender_name,
+                body: bodyForAgent,
+                envelopeOptions,
+              });
+              ctx.log?.info(`[AgentChat] Envelope formatted: ${JSON.stringify(envelope).substring(0, 200)}`);
+            } else {
+              ctx.log?.warn(`[AgentChat] formatInboundEnvelope 不可用`);
+            }
+
+            // 最终化上下文
+            let finalCtx: any = { envelope };
+            if (runtime.channel?.reply?.finalizeInboundContext) {
+              ctx.log?.info(`[AgentChat] 调用 finalizeInboundContext`);
+              finalCtx = runtime.channel.reply.finalizeInboundContext({
+                cfg: ctx.cfg,
+                channel: "agent-chat",
+                accountId: ctx.accountId,
+                peer: {
+                  kind: "group",
+                  id: "agent-chat-group",
+                },
+                senderId: msg.sender_id,
+                envelope,
+                route,
+              });
+              ctx.log?.info(`[AgentChat] Context finalized`);
+            } else {
+              ctx.log?.warn(`[AgentChat] finalizeInboundContext 不可用`);
+            }
+
+            // 分发回复
+            if (runtime.channel?.reply?.dispatchReplyWithBufferedBlockDispatcher) {
+              ctx.log?.info(`[AgentChat] 调用 dispatchReplyWithBufferedBlockDispatcher`);
+              await runtime.channel.reply.dispatchReplyWithBufferedBlockDispatcher({
+                ctx: finalCtx,
+                cfg: ctx.cfg,
+                dispatcherOptions: {
+                  responsePrefix: "",
+                  deliver: async (payload: { text?: string }, info: { kind: string }) => {
+                    ctx.log?.info(`[AgentChat] >>> DELIVER CALLBACK <<< kind=${info.kind}`);
+                    ctx.log?.info(`[AgentChat] payload.text 长度: ${payload.text?.length || 0}`);
+                    ctx.log?.info(`[AgentChat] payload.text 预览: ${payload.text?.substring(0, 100)}...`);
+
+                    // 跳过工具调用的中间结果
+                    if (info.kind === "tool") {
+                      ctx.log?.info(`[AgentChat] 跳过工具结果`);
+                      return;
+                    }
+
+                    // 发送回复
+                    const replyText = payload.text;
+                    if (replyText && replyText.trim()) {
+                      const gw = getGateway(ctx.accountId);
+                      ctx.log?.info(`[AgentChat] Gateway 获取结果: ${gw ? 'found' : 'not found'}`);
+                      if (gw) {
+                        const sent = gw.sendMessage(replyText);
+                        ctx.log?.info(`[AgentChat] 发送结果: ${sent}, 内容: ${replyText.substring(0, 50)}...`);
+                      } else {
+                        ctx.log?.warn("[AgentChat] Gateway not found for sending reply");
+                      }
+                    } else {
+                      ctx.log?.warn(`[AgentChat] replyText 为空，跳过发送`);
+                    }
+                  },
+                },
+              });
+              ctx.log?.info(`[AgentChat] dispatchReplyWithBufferedBlockDispatcher 完成`);
+            } else {
+              ctx.log?.error(`[AgentChat] !!! dispatchReplyWithBufferedBlockDispatcher NOT AVAILABLE !!!`);
+              ctx.log?.error(`[AgentChat] runtime.channel.reply keys: ${runtime.channel?.reply ? Object.keys(runtime.channel.reply).join(', ') : 'null'}`);
+            }
+
+            ctx.setStatus({
+              accountId: ctx.accountId,
+              connected: true,
+              lastMessageTime: Date.now(),
+            });
+
+            ctx.log?.info(`[AgentChat] === 消息处理完成 ===`);
+
+          } catch (err) {
+            ctx.log?.error(`[AgentChat] 处理消息失败: ${err}`);
+            ctx.log?.error(`[AgentChat] 错误堆栈: ${(err as Error).stack}`);
+          }
         },
       });
 
