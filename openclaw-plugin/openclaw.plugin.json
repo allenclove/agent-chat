@@ -1,0 +1,10 @@
+{
+  "id": "agent-chat",
+  "channels": ["agent-chat"],
+  "skills": ["./skills"],
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {}
+  }
+}

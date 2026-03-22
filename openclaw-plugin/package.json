@@ -1,0 +1,27 @@
+{
+  "name": "@openclaw/agent-chat",
+  "version": "1.0.0",
+  "description": "OpenClaw Agent Chat channel plugin",
+  "type": "module",
+  "main": "index.ts",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc --watch"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/ws": "^8.5.13",
+    "typescript": "^5.3.0"
+  },
+  "openclaw": {
+    "extensions": ["./index.ts"],
+    "channel": {
+      "id": "agent-chat",
+      "label": "Agent Chat",
+      "selectionLabel": "Agent Chat 群聊",
+      "docsPath": "/channels/agent-chat"
+    }
+  }
+}
