@@ -224,6 +224,28 @@ const agentManager = {
   // 热更新（极简版）
   notifySettingsChanged() {
     console.log('[Agent] 设置已更新');
+  },
+
+  // 广播成员列表更新给所有Agent
+  broadcastParticipantsUpdate() {
+    const onlineUsers = chat.getOnlineUsers();
+    const allAgents = db.getAllAgents().map(a => ({
+      id: a.id,
+      name: a.name,
+      type: 'agent'
+    }));
+
+    for (const [, agent] of connectedAgents) {
+      if (agent.ws.readyState !== 1) continue;
+
+      agent.ws.send(JSON.stringify({
+        type: 'participants_update',
+        payload: {
+          users: onlineUsers.map(u => ({ name: u.display_name || u.username, type: 'human' })),
+          agents: allAgents
+        }
+      }));
+    }
   }
 };
 
