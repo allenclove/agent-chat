@@ -231,6 +231,11 @@ function setupWebSocket(server) {
         isAgent = true;
         agentId = msg.payload.agent_id;
         console.log(`[WS] Agent验证成功: ${agentId}`);
+      } else if (result.pending) {
+        // 等待审核，不关闭连接
+        isAgent = true;
+        agentId = msg.payload.agent_id;
+        console.log(`[WS] Agent等待审核: ${agentId} (审核码: ${result.code})`);
       } else {
         sendError(ws, result.error);
         ws.close();

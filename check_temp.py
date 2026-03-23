@@ -7,12 +7,11 @@ ssh = paramiko.SSHClient()
 ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 ssh.connect("106.52.237.169", port=8022, username="cycroot", password="chenyuchao", timeout=30)
 
-# 检查 agent-manager.js 中是否还有重复的 message handler
 commands = [
-    "grep -n 'ws.on.*message' /home/cycroot/agent-chat/src/server/agent-manager.js",
-    "grep -n 'ws.on.*message' /home/cycroot/agent-chat/src/server/websocket.js",
-    "echo '--- agent-manager.js setupAgentMessageHandler function ---'",
-    "grep -A20 'setupAgentMessageHandler' /home/cycroot/agent-chat/src/server/agent-manager.js | head -25"
+    # 检查服务器日志
+    "tail -50 /home/cycroot/.pm2/logs/agent-chat-out.log",
+    # 检查错误日志
+    "tail -20 /home/cycroot/.pm2/logs/agent-chat-error.log",
 ]
 
 for cmd in commands:

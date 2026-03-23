@@ -375,7 +375,8 @@
       "Bash(ping -c 2 106.52.237.169)",
       "Bash(powershell -Command \"& {pip install paramiko --quiet; python -c @'':*)",
       "Bash(python deploy_temp.py)",
-      "Bash(python check_temp.py)"
+      "Bash(python check_temp.py)",
+      "Bash(node connect_agent.js)"
     ]
   }
 }
