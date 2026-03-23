@@ -376,7 +376,16 @@
       "Bash(powershell -Command \"& {pip install paramiko --quiet; python -c @'':*)",
       "Bash(python deploy_temp.py)",
       "Bash(python check_temp.py)",
-      "Bash(node connect_agent.js)"
+      "Bash(node connect_agent.js)",
+      "Bash(node accept_agent.js)",
+      "Bash(node test_message.js)",
+      "Bash(timeout 30 node connect_agent_persistent.js)",
+      "Bash(node auto_approve.mjs)",
+      "Bash(node -e \":*)",
+      "Bash(timeout 8 node connect_agent_persistent.js)",
+      "Bash(timeout 8 node -e \":*)",
+      "Bash(python -c \":*)",
+      "Bash(node connect_agent_persistent.js)"
     ]
   }
 }
