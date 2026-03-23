@@ -5,7 +5,7 @@ const db = require('./src/server/database');
 const { setupWebSocket } = require('./src/server/websocket');
 const agentManager = require('./src/server/agent-manager');
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 8080;
 
 // 主启动函数
 async function start() {
