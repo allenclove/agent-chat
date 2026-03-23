@@ -1,30 +1,83 @@
 const db = require('./database');
 const chat = require('./chat');
+const crypto = require('crypto');
 
 // 存储已连接的Agent
 const connectedAgents = new Map();
 
+// 待审核的Agent请求 { agentId: { ws, name, token, code, timestamp } }
+const pendingAgents = new Map();
+
 // 心跳超时
 const HEARTBEAT_TIMEOUT = 60000;
+
+// 审核码有效期（5分钟）
+const PENDING_TIMEOUT = 5 * 60 * 1000;
 
 // Agent管理器（极简版本）
 const agentManager = {
   // 处理Agent连接
   handleAgentConnection(ws, initialMsg) {
-    const { agent_id, token } = initialMsg.payload || {};
+    const { agent_id, token, name } = initialMsg.payload || {};
 
     if (!agent_id || !token) {
       return { success: false, error: '缺少agent_id或token' };
     }
 
+    // 先检查是否是已注册的Agent
     const agentConfig = db.getAgentByToken(token);
-    if (!agentConfig) {
-      return { success: false, error: '无效的token' };
+    if (agentConfig) {
+      if (agentConfig.id !== agent_id) {
+        return { success: false, error: 'agent_id与token不匹配' };
+      }
+      return this.approveAgentConnection(ws, agentConfig);
     }
 
-    if (agentConfig.id !== agent_id) {
-      return { success: false, error: 'agent_id与token不匹配' };
+    // 未注册的Agent - 进入快速匹配流程
+    // 检查是否已有待审核的请求
+    const existing = pendingAgents.get(agent_id);
+    if (existing && existing.ws === ws) {
+      return { success: false, error: '等待审核中', pending: true };
     }
+
+    // 生成审核码（4位数字）
+    const code = crypto.randomInt(1000, 9999).toString();
+    const agentName = name || agent_id;
+
+    // 存储待审核请求
+    pendingAgents.set(agent_id, {
+      ws,
+      name: agentName,
+      token,
+      code,
+      timestamp: Date.now()
+    });
+
+    console.log(`[Agent] 新Agent请求接入: ${agentName} (审核码: ${code})`);
+
+    // 通知所有用户有新Agent请求接入
+    chat.broadcast('agent_join_request', {
+      agent_id,
+      name: agentName,
+      code,
+      message: `🤖 新Agent "${agentName}" 请求加入群聊\n在聊天框输入 /accept ${code} 批准接入`
+    });
+
+    // 发送等待消息给Agent
+    ws.send(JSON.stringify({
+      type: 'agent_join_pending',
+      payload: {
+        message: '等待管理员审核...请在群聊中发送审核码',
+        code
+      }
+    }));
+
+    return { success: false, error: '等待审核', pending: true, code };
+  },
+
+  // 批准Agent连接
+  approveAgentConnection(ws, agentConfig) {
+    const agent_id = agentConfig.id;
 
     // 断开旧连接
     if (connectedAgents.has(agent_id)) {
@@ -57,6 +110,81 @@ const agentManager = {
     this.setupAgentMessageHandler(ws, agentConfig);
 
     return { success: true, agentConfig };
+  },
+
+  // 通过审核码批准Agent
+  approveAgentByCode(code) {
+    for (const [agentId, pending] of pendingAgents) {
+      if (pending.code === code) {
+        // 检查连接是否还活着
+        if (pending.ws.readyState !== 1) {
+          pendingAgents.delete(agentId);
+          return { success: false, error: 'Agent连接已断开，请重新连接' };
+        }
+
+        // 注册Agent到数据库
+        const agentConfig = {
+          id: agentId,
+          name: pending.name,
+          token: pending.token
+        };
+        db.addAgent(agentConfig);
+
+        // 从待审核列表移除
+        pendingAgents.delete(agentId);
+
+        // 批准连接
+        const result = this.approveAgentConnection(pending.ws, {
+          id: agentId,
+          name: pending.name,
+          token: pending.token
+        });
+
+        // 通知所有用户
+        chat.broadcast('system', {
+          type: 'agent_approved',
+          message: `✅ Agent "${pending.name}" 已成功加入群聊`
+        });
+
+        // 通知在线Agent更新成员列表
+        this.broadcastParticipantsUpdate();
+
+        return { success: true, agentName: pending.name };
+      }
+    }
+    return { success: false, error: '无效的审核码' };
+  },
+
+  // 获取待审核的Agent列表
+  getPendingAgents() {
+    const list = [];
+    for (const [agentId, pending] of pendingAgents) {
+      list.push({
+        agent_id: agentId,
+        name: pending.name,
+        code: pending.code,
+        timestamp: pending.timestamp
+      });
+    }
+    return list;
+  },
+
+  // 清理过期的待审核请求
+  cleanExpiredPending() {
+    const now = Date.now();
+    for (const [agentId, pending] of pendingAgents) {
+      if (now - pending.timestamp > PENDING_TIMEOUT) {
+        if (pending.ws.readyState === 1) {
+          pending.ws.send(JSON.stringify({
+            type: 'agent_join_error',
+            payload: { error: '审核超时，请重新连接' }
+          }));
+          pending.ws.close();
+        }
+        pendingAgents.delete(agentId);
+        console.log(`[Agent] 待审核请求已过期: ${pending.name}`);
+      }
+    }
   },
 
   // 发送欢迎消息（极简版）
@@ -195,6 +323,9 @@ const agentManager = {
 
   // 心跳
   pingAllAgents() {
+    // 清理过期的待审核请求
+    this.cleanExpiredPending();
+
     for (const [agentId, agent] of connectedAgents) {
       if (agent.ws.readyState !== 1) continue;
 

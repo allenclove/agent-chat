@@ -6,7 +6,6 @@
 
 import WebSocket from "ws";
 import type { AgentChatConfig, AgentChatMessage } from "./types.js";
-import { getAgentChatRuntime } from "./runtime.js";
 
 export interface GatewayContext {
   config: AgentChatConfig;
@@ -95,7 +94,7 @@ export class AgentChatGateway {
       switch (type) {
         case "agent_join_ack":
           this.isConnected = true;
-          this.log?.info("[AgentChat] ✅ 已成功加入群聊");
+          this.log?.info("[AgentChat] 已成功加入群聊");
           break;
 
         case "platform":

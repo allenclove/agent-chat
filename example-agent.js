@@ -1,24 +1,29 @@
 /**
- * 示例Agent - 用于测试Agent Chat系统（反向连接模式）
+ * 示例 Agent - Agent Chat 群聊系统接入示例
  *
  * 使用方法:
- * 1. 修改下方的 SERVER_URL 和 TOKEN
- * 2. 确保在 config/agents.json 中配置了相同的 agent_id 和 token
- * 3. 运行: node example-agent.js
- * 4. Agent会主动连接到Agent Chat服务器
+ * 1. 修改下方的配置（或通过环境变量传入）
+ * 2. 运行: node example-agent.js
+ * 3. 等待获取审核码
+ * 4. 让人类在聊天框输入: /accept 审核码
+ *
+ * 注意: 无需预先配置，连接后获取审核码即可接入
  */
 
 const WebSocket = require('ws');
+const crypto = require('crypto');
 
 // ========== 配置 ==========
 const AGENT_ID = process.env.AGENT_ID || 'example-bot';
-const AGENT_NAME = '示例机器人';
-const AGENT_TOKEN = process.env.AGENT_TOKEN || 'your-secret-token-here';
-const SERVER_URL = process.env.SERVER_URL || 'ws://localhost:3000';
+const AGENT_NAME = process.env.AGENT_NAME || '示例机器人';
+// 自己生成一个随机 token（如果是首次接入）
+const AGENT_TOKEN = process.env.AGENT_TOKEN || crypto.randomBytes(16).toString('hex');
+const SERVER_URL = process.env.SERVER_URL || 'ws://localhost:8080';
 
 // ========== 连接 ==========
 console.log(`[Agent] ${AGENT_NAME}`);
 console.log(`[Agent] Agent ID: ${AGENT_ID}`);
+console.log(`[Agent] Token: ${AGENT_TOKEN}`);
 console.log(`[Agent] 连接到: ${SERVER_URL}`);
 
 let ws = null;
@@ -35,7 +40,8 @@ function connect() {
       type: 'agent_join',
       payload: {
         agent_id: AGENT_ID,
-        token: AGENT_TOKEN
+        token: AGENT_TOKEN,
+        name: AGENT_NAME
       }
     }));
   });
@@ -67,7 +73,18 @@ async function handleMessage(ws, msg) {
   switch (type) {
     case 'agent_join_ack':
       isConnected = true;
-      console.log('[注册] ✅ 成功加入群聊');
+      console.log('[注册] ✅ 成功加入群聊！');
+      break;
+
+    case 'agent_join_pending':
+      // 新Agent等待审核
+      console.log('');
+      console.log('═══════════════════════════════════════════');
+      console.log('⏳ 等待审核...');
+      console.log(`   审核码: ${payload.code}`);
+      console.log('   请让人类在聊天框输入: /accept ' + payload.code);
+      console.log('═══════════════════════════════════════════');
+      console.log('');
       break;
 
     case 'agent_join_error':
@@ -77,9 +94,6 @@ async function handleMessage(ws, msg) {
 
     case 'platform':
       console.log('[平台] 收到平台信息');
-      if (payload.behavior_guide) {
-        console.log('[平台] 行为指南:', payload.behavior_guide.summary);
-      }
       break;
 
     case 'history':
@@ -96,7 +110,7 @@ async function handleMessage(ws, msg) {
       break;
 
     default:
-      console.log(`[Agent] 未知消息类型: ${type}`);
+      console.log(`[Agent] 收到: ${type}`);
   }
 }
 

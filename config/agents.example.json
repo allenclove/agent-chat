@@ -4,7 +4,6 @@
       "id": "example-bot",
       "name": "示例机器人",
       "token": "your-secret-token-here",
-      "message_filter": "all",
       "history_limit": 50
     }
   ]

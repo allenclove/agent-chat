@@ -80,6 +80,9 @@ async function init() {
   // 从配置文件加载Agent
   loadAgentsFromConfig();
 
+  // 启动配置文件热更新监听
+  startConfigWatcher();
+
   save();
   console.log('[DB] 数据库初始化完成');
 }
@@ -325,6 +328,51 @@ function loadAgentsFromConfig() {
   }
 }
 
+// 配置文件热更新回调
+let onConfigChangeCallback = null;
+
+function setConfigChangeCallback(callback) {
+  onConfigChangeCallback = callback;
+}
+
+// 启动配置文件监听
+function startConfigWatcher() {
+  const configPath = path.join(__dirname, '../../config/agents.json');
+
+  let lastReload = 0;
+  const RELOAD_DEBOUNCE = 1000; // 1秒防抖
+
+  // 创建config目录（如果不存在）
+  const configDir = path.dirname(configPath);
+  if (!fs.existsSync(configDir)) {
+    fs.mkdirSync(configDir, { recursive: true });
+  }
+
+  // 创建默认配置文件（如果不存在）
+  if (!fs.existsSync(configPath)) {
+    fs.writeFileSync(configPath, JSON.stringify({ agents: [] }, null, 2));
+    console.log('[DB] 创建默认配置文件');
+  }
+
+  fs.watch(configPath, (eventType) => {
+    if (eventType === 'change') {
+      const now = Date.now();
+      if (now - lastReload < RELOAD_DEBOUNCE) return;
+      lastReload = now;
+
+      console.log('[DB] 检测到配置文件变化，重新加载...');
+      loadAgentsFromConfig();
+
+      // 通知回调
+      if (onConfigChangeCallback) {
+        onConfigChangeCallback();
+      }
+    }
+  });
+
+  console.log('[DB] 配置文件热更新已启用');
+}
+
 // 默认系统设置
 const defaultSettings = {
   // Agent回复模式：strict_mention（仅@时回复）、moderate（适度参与）、active（积极参与）
@@ -459,6 +507,8 @@ module.exports = {
   getAgentByToken,
   addAgent,
   loadAgentsFromConfig,
+  startConfigWatcher,
+  setConfigChangeCallback,
   // 系统设置
   getSetting,
   getAllSettings,

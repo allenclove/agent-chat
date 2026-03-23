@@ -15,6 +15,13 @@ async function start() {
   // 清理过期会话
   db.cleanExpiredSessions();
 
+  // 设置配置变更回调 - 配置热生效时通知所有Agent
+  db.setConfigChangeCallback(() => {
+    console.log('[Server] 配置已热更新');
+    agentManager.notifySettingsChanged();
+    agentManager.broadcastParticipantsUpdate();
+  });
+
   // 创建HTTP服务器
   const server = http.createServer((req, res) => {
     // 解析URL

@@ -248,7 +248,37 @@ function setupWebSocket(server) {
         return;
       }
 
-      const message = chat.handleUserMessage(sessionId, content.trim());
+      const trimmedContent = content.trim();
+
+      // 检查是否是 /accept 命令（快速匹配接入）
+      const acceptMatch = trimmedContent.match(/^\/accept\s+(\d{4})$/);
+      if (acceptMatch) {
+        const code = acceptMatch[1];
+        const result = agentManager.approveAgentByCode(code);
+
+        if (result.success) {
+          // 发送系统消息
+          const sysMessage = {
+            id: Date.now(),
+            sender_id: 'system',
+            sender_name: '系统',
+            sender_type: 'system',
+            content: `✅ Agent "${result.agentName}" 已成功加入群聊`,
+            created_at: new Date().toISOString()
+          };
+          chat.broadcast('message', sysMessage);
+        } else {
+          // 发送错误提示
+          ws.send(JSON.stringify({
+            type: 'system',
+            payload: { message: `❌ ${result.error}` }
+          }));
+        }
+        return;
+      }
+
+      // 正常消息处理
+      const message = chat.handleUserMessage(sessionId, trimmedContent);
       if (message) {
         // 广播给所有用户
         chat.broadcast('message', message);
