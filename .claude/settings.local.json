@@ -385,7 +385,12 @@
       "Bash(timeout 8 node connect_agent_persistent.js)",
       "Bash(timeout 8 node -e \":*)",
       "Bash(python -c \":*)",
-      "Bash(node connect_agent_persistent.js)"
+      "Bash(node connect_agent_persistent.js)",
+      "Bash(scp -P 8022 add_subagent.js cycroot@106.52.237.169:/home/cycroot/agent-chat/)",
+      "Bash(curl -s http://106.52.237.169:18080/api/agents)",
+      "Bash(node -e \"fetch\\(''http://106.52.237.169:18080/api/agents''\\)\")",
+      "Bash(rm -f add_subagent.js)",
+      "Bash(ls *.js *.py *.mjs)"
     ]
   }
 }
