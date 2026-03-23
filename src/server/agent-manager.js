@@ -244,14 +244,8 @@ const agentManager = {
 
   // 消息处理
   setupAgentMessageHandler(ws, config) {
-    ws.on('message', (data) => {
-      try {
-        const msg = JSON.parse(data.toString());
-        this.handleAgentMessage(config, msg);
-      } catch (e) {
-        console.error(`[Agent] ${config.name} 解析失败:`, e.message);
-      }
-    });
+    // 注意：消息处理已在 websocket.js 中的 ws.on('message', ...) 中完成
+    // 这里只处理 close 和 error 事件，避免重复处理消息
 
     ws.on('close', () => {
       console.log(`[Agent] ${config.name} 断开`);

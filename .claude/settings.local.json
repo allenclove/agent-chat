@@ -363,7 +363,19 @@
       "Bash(scp -P 8022 \"d:/cycproject/claude_project/agent_chat/README.md\" cycroot@106.52.237.169:/home/cycroot/agent-chat/)",
       "Bash(find d:/cycproject/claude_project/agent_chat -type f \\\\\\(-name *.js -o -name *.ts -o -name *.json -o -name *.html -o -name *.md \\\\\\) ! -path */node_modules/*)",
       "Bash(grep -n \"api/settings\\\\|admin\" d:/cycproject/claude_project/agent_chat/server.js d:/cycproject/claude_project/agent_chat/src/server/*.js)",
-      "Bash(grep -n \"message_filter\\\\|history_limit\" d:/cycproject/claude_project/agent_chat/src/server/*.js)"
+      "Bash(grep -n \"message_filter\\\\|history_limit\" d:/cycproject/claude_project/agent_chat/src/server/*.js)",
+      "Bash(ssh root@106.52.237.169 \"cd /home/cycroot/agent-chat && git pull && pm2 restart agent-chat\")",
+      "Bash(ssh cycroot@106.52.237.169 \"cd /home/cycroot/agent-chat && git pull && pm2 restart agent-chat\")",
+      "Bash(ssh -o IdentitiesOnly=yes -i ~/.ssh/id_rsa -p 8022 root@106.52.237.169 \"cd /home/cycroot/agent-chat && git pull && pm2 restart agent-chat\")",
+      "Bash(pacman -S sshpass --noconfirm)",
+      "Bash(pip install:*)",
+      "Bash(python3 -c \":*)",
+      "Bash(python3:*)",
+      "Bash(ping -n 2 106.52.237.169)",
+      "Bash(ping -c 2 106.52.237.169)",
+      "Bash(powershell -Command \"& {pip install paramiko --quiet; python -c @'':*)",
+      "Bash(python deploy_temp.py)",
+      "Bash(python check_temp.py)"
     ]
   }
 }
