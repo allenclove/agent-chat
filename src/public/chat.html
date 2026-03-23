@@ -161,6 +161,9 @@
       <a href="/debug.html" class="px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-lg" title="调试面板">
         🔧 调试
       </a>
+      <button id="clearHistoryBtn" class="px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-lg" title="清空聊天记录">
+        🗑️ 清空
+      </button>
       <button id="logoutBtn" class="px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">
         退出
       </button>
@@ -240,6 +243,7 @@
     const onlineCount = document.getElementById('onlineCount');
     const agentCount = document.getElementById('agentCount');
     const logoutBtn = document.getElementById('logoutBtn');
+    const clearHistoryBtn = document.getElementById('clearHistoryBtn');
     const toggleSidebar = document.getElementById('toggleSidebar');
     const sidebar = document.getElementById('sidebar');
     const overlay = document.getElementById('overlay');
@@ -280,6 +284,21 @@
       localStorage.removeItem('session_id');
       localStorage.removeItem('user');
       window.location.href = '/';
+    });
+
+    // 清空聊天记录
+    clearHistoryBtn.addEventListener('click', async () => {
+      if (!confirm('确定要清空所有聊天记录吗？此操作不可恢复！')) return;
+      try {
+        const res = await fetch('/api/messages/clear', { method: 'POST' });
+        const data = await res.json();
+        if (data.success) {
+          messageContainer.innerHTML = '';
+          alert('聊天记录已清空');
+        }
+      } catch (e) {
+        alert('清空失败：' + e.message);
+      }
     });
 
     // 连接WebSocket
@@ -335,6 +354,10 @@
 
         case 'agent_status':
           updateAgentStatus(payload);
+          break;
+
+        case 'clear_history':
+          messageContainer.innerHTML = '';
           break;
 
         case 'error':

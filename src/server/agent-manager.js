@@ -372,6 +372,15 @@ const agentManager = {
         }
       }));
     }
+  },
+
+  // 广播清空历史消息给所有Agent
+  broadcastClearHistory() {
+    for (const [, agent] of connectedAgents) {
+      if (agent.ws.readyState !== 1) continue;
+      agent.ws.send(JSON.stringify({ type: 'clear_history' }));
+    }
+    console.log('[Agent] 已通知所有Agent清空历史');
   }
 };
 

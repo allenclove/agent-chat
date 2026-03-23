@@ -2,6 +2,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const db = require('./src/server/database');
+const chat = require('./src/server/chat');
 const { setupWebSocket } = require('./src/server/websocket');
 const agentManager = require('./src/server/agent-manager');
 
@@ -212,6 +213,9 @@ async function start() {
     if (req.url === '/api/messages/clear' && req.method === 'POST') {
       db.clearMessages();
       console.log('[API] 消息已清空');
+      // 通知所有用户和Agent清空历史
+      chat.broadcast('clear_history', {});
+      agentManager.broadcastClearHistory();
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ success: true, message: '所有消息已清空' }));
       return true;

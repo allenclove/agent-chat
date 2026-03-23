@@ -105,6 +105,10 @@ export class AgentChatGateway {
           this.log?.info(`[AgentChat] 收到 ${payload?.messages?.length || 0} 条历史消息`);
           break;
 
+        case "clear_history":
+          this.log?.info("[AgentChat] 收到清空历史指令");
+          break;
+
         case "ping":
           this.ws?.send(JSON.stringify({ type: "pong" }));
           break;
