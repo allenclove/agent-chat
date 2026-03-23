@@ -79,11 +79,12 @@ const agentManager = {
   approveAgentConnection(ws, agentConfig) {
     const agent_id = agentConfig.id;
 
-    // 断开旧连接
+    // 已有连接则拒绝新的（保护在线Agent）
     if (connectedAgents.has(agent_id)) {
       const existing = connectedAgents.get(agent_id);
       if (existing.ws && existing.ws.readyState === 1) {
-        existing.ws.close();
+        console.log(`[Agent] ${agentConfig.name} 尝试重复连接，已拒绝`);
+        return { success: false, error: '该 Agent 已在线，请使用不同的 ID' };
       }
       connectedAgents.delete(agent_id);
     }
