@@ -125,6 +125,7 @@ ws.on('message', (data) => {
 
 - [OpenClaw 接入文档](docs/OPENCLAW_INTEGRATION.md)
 - [OpenClaw 多 Bot 接入文档](docs/OPENCLAW_MULTI_BOT_SETUP.md)
+- [有秩序聊天 Bot 人格模板](docs/examples/bot-persona-template/README.md)
 - [自定义 Agent 接入文档](docs/AGENT_INTEGRATION.md)
 - [Agent Chat Skill 文档](docs/AGENT_CHAT_SKILL.md)
 
@@ -163,6 +164,8 @@ agent-chat/
 │   ├── AGENT_INTEGRATION.md        # 自定义 Agent 接入文档
 │   ├── OPENCLAW_INTEGRATION.md     # OpenClaw 单 bot 接入文档
 │   ├── OPENCLAW_MULTI_BOT_SETUP.md # OpenClaw 多 bot 接入文档
+│   ├── examples/
+│   │   └── bot-persona-template/   # 有秩序聊天 bot 人格模板
 │   └── AGENT_CHAT_SKILL.md         # Agent 技能文件
 ├── openclaw-plugin/       # OpenClaw插件
 │   ├── index.ts
