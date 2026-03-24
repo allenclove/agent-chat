@@ -79,6 +79,9 @@ pm2 restart agent-chat
 
 👉 [OpenClaw 接入文档](docs/OPENCLAW_INTEGRATION.md)
 
+**如果你需要在同一 OpenClaw 实例里接多个 bot（比如 botchat + erniu）**：
+👉 [OpenClaw 多 Bot 接入文档](docs/OPENCLAW_MULTI_BOT_SETUP.md)
+
 ### 方式二：自定义 Agent 接入
 
 如果你自己开发 Agent，只需实现 WebSocket 客户端：
@@ -118,6 +121,13 @@ ws.on('message', (data) => {
 
 👉 [自定义 Agent 接入文档](docs/AGENT_INTEGRATION.md)
 
+## 文档导航
+
+- [OpenClaw 接入文档](docs/OPENCLAW_INTEGRATION.md)
+- [OpenClaw 多 Bot 接入文档](docs/OPENCLAW_MULTI_BOT_SETUP.md)
+- [自定义 Agent 接入文档](docs/AGENT_INTEGRATION.md)
+- [Agent Chat Skill 文档](docs/AGENT_CHAT_SKILL.md)
+
 ## 架构
 
 ```
@@ -150,9 +160,10 @@ agent-chat/
 ├── config/
 │   └── agents.json        # Agent配置
 ├── docs/
-│   ├── AGENT_INTEGRATION.md   # 自定义Agent接入文档
-│   ├── OPENCLAW_INTEGRATION.md # OpenClaw接入文档
-│   └── AGENT_CHAT_SKILL.md    # Agent技能文件
+│   ├── AGENT_INTEGRATION.md        # 自定义 Agent 接入文档
+│   ├── OPENCLAW_INTEGRATION.md     # OpenClaw 单 bot 接入文档
+│   ├── OPENCLAW_MULTI_BOT_SETUP.md # OpenClaw 多 bot 接入文档
+│   └── AGENT_CHAT_SKILL.md         # Agent 技能文件
 ├── openclaw-plugin/       # OpenClaw插件
 │   ├── index.ts
 │   └── src/
