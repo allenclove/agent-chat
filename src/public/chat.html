@@ -172,10 +172,19 @@
 
   <div class="flex-1 flex overflow-hidden">
     <!-- 消息区域 -->
-    <main class="flex-1 flex flex-col bg-gray-50">
+    <main class="flex-1 flex flex-col bg-gray-50 relative">
       <div id="messageContainer" class="message-container flex-1 overflow-y-auto p-4 space-y-4">
         <!-- 消息会动态插入这里 -->
       </div>
+      <!-- 新消息提示按钮 -->
+      <button id="newMessageBtn" class="hidden absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-purple-600 text-white px-4 py-2 rounded-full shadow-lg hover:bg-purple-700 transition-all duration-200 flex items-center space-x-1 text-sm font-medium z-10">
+        <span id="newMessageCount">0</span>
+        <span>条新消息</span>
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l7-7m0 0"></path>
+        </svg>
+      </button>
+    </main>
 
       <!-- 输入区域 -->
       <div class="bg-white border-t p-4 relative">
@@ -255,6 +264,9 @@
     let agents = []; // 存储Agent列表
     let mentionStartIndex = -1; // @符号的位置
     let showMentionDropdown = false;
+    let unreadCount = 0; // 未读消息数
+    let isAtBottom = true; // 是否在底部
+    const newMessageBtn = document.getElementById('newMessageBtn');
 
     // 检查登录状态
     if (!sessionId) {
@@ -366,9 +378,22 @@
       }
     }
 
+    // 检查是否在底部
+    function checkIsAtBottom() {
+      const { scrollTop, scrollHeight, clientHeight } = messageContainer;
+      return scrollTop + clientHeight >= scrollHeight - 50;
+    }
+
+    // 检查是否在底部
+    function checkIsAtBottom() {
+      const { scrollTop, scrollHeight, clientHeight } = messageContainer;
+      return scrollTop + clientHeight >= scrollHeight - 50; // 50px 容差
+    }
+
     // 添加消息到界面
     function addMessage(msg, scroll = true) {
       const isAgent = msg.sender_type === 'agent';
+      const wasAtBottom = checkIsAtBottom();
       const isSelf = msg.sender_id === currentUser.id;
       // 时间格式: "2026-03-23 12:00:00" -> "12:00"
       const time = msg.created_at.includes(' ')
@@ -401,8 +426,12 @@
       // 为代码块添加复制按钮
       addCopyButtons(msgId);
 
-      if (scroll) {
+      // 只有在底部时才自动滚动，      if (scroll && isAtBottom) {
         scrollToBottom();
+      } else if (scroll && !isAtBottom) {
+        // 用户不在底部，增加未读计数
+        unreadCount++;
+        updateNewMessageButton();
       }
     }
 
@@ -698,9 +727,35 @@
       }
     });
 
+    // 监听滚动位置
+    messageContainer.addEventListener('scroll', () => {
+      const { scrollTop, scrollHeight, clientHeight } = messageContainer;
+      isAtBottom = scrollTop + clientHeight >= scrollHeight - 50;
+      if (!isAtBottom && unreadCount > 0) {
+        updateNewMessageButton();
+      }
+    });
+
+    // 更新新消息按钮
+    function updateNewMessageButton() {
+      if (unreadCount > 0) {
+        newMessageBtn.textContent = `↓ ${unreadCount} 条新消息`;
+        newMessageBtn.classList.remove('hidden');
+      } else {
+        newMessageBtn.classList.add('hidden');
+      }
+    }
+
+    // 点击新消息按钮，    newMessageBtn.addEventListener('click', () => {
+      scrollToBottom();
+      unreadCount = 0;
+      updateNewMessageButton();
+    });
+
     // 滚动到底部
     function scrollToBottom() {
       messageContainer.scrollTop = messageContainer.scrollHeight;
+      isAtBottom = true;
     }
 
     // HTML转义
