@@ -45,6 +45,6 @@ function showToast(message) {
 // 导出模块
 window.ChatUtils = {
   escapeHtml,
-  fallbackCopy;
+  fallbackCopy,
   showToast
 };
