@@ -164,6 +164,190 @@ async function start() {
       return true;
     }
 
+    // ==================== Agent 配置 API ====================
+
+    // 获取单个 Agent 配置
+    const agentConfigMatch = req.url.match(/^\/api\/agents\/([^/]+)\/config$/);
+    if (agentConfigMatch && req.method === 'GET') {
+      const agentId = agentConfigMatch[1];
+      const config = db.getAgentFullConfig(agentId);
+
+      if (!config) {
+        res.writeHead(404, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Agent 不存在' }));
+        return true;
+      }
+
+      // 移除敏感信息
+      delete config.token;
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: true, config }));
+      return true;
+    }
+
+    // 更新 Agent 配置
+    if (agentConfigMatch && req.method === 'PUT') {
+      const agentId = agentConfigMatch[1];
+      let body = '';
+      req.on('data', chunk => body += chunk);
+      req.on('end', () => {
+        try {
+          const settings = JSON.parse(body);
+
+          // 验证设置字段
+          const allowedFields = ['name', 'persona', 'conversation_mode', 'custom_settings', 'history_limit', 'message_filter', 'keywords'];
+          const filteredSettings = {};
+          for (const key of allowedFields) {
+            if (settings[key] !== undefined) {
+              filteredSettings[key] = settings[key];
+            }
+          }
+
+          const updated = db.updateAgentSettings(agentId, filteredSettings);
+
+          if (!updated) {
+            res.writeHead(404, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Agent 不存在' }));
+            return;
+          }
+
+          console.log(`[API] Agent ${agentId} 配置已更新`);
+
+          // 通知该 Agent 重新加载配置
+          agentManager.notifyAgentConfigChanged(agentId);
+
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: true, config: updated }));
+        } catch (e) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: '无效的请求数据' }));
+        }
+      });
+      return true;
+    }
+
+    // ==================== 平台 API（供 Agent 调用）====================
+
+    // 获取历史消息
+    if (req.url.startsWith('/api/platform/messages') && req.method === 'GET') {
+      const urlObj = new URL(req.url, `http://localhost:${PORT}`);
+      const limit = parseInt(urlObj.searchParams.get('limit')) || 50;
+      const before = urlObj.searchParams.get('before'); // 消息ID
+      const senderType = urlObj.searchParams.get('sender_type'); // human/agent
+
+      const messages = db.getRecentMessages(limit);
+      let result = messages;
+
+      // 过滤发送者类型
+      if (senderType) {
+        result = result.filter(m => m.sender_type === senderType);
+      }
+
+      // 截取某条消息之前的
+      if (before) {
+        const idx = result.findIndex(m => m.id == before);
+        if (idx > 0) {
+          result = result.slice(0, idx);
+        }
+      }
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: true, messages: result }));
+      return true;
+    }
+
+    // 获取群成员列表
+    if (req.url === '/api/platform/participants' && req.method === 'GET') {
+      const onlineUsers = chat.getOnlineUsers();
+      const allAgents = db.getAllAgents();
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        success: true,
+        participants: {
+          users: onlineUsers.map(u => ({
+            id: u.id,
+            name: u.display_name || u.username,
+            type: 'human',
+            online: true
+          })),
+          agents: allAgents.map(a => ({
+            id: a.id,
+            name: a.name,
+            type: 'agent',
+            online: agentManager.getAgentStatus().find(s => s.id === a.id)?.status === 'online'
+          }))
+        }
+      }));
+      return true;
+    }
+
+    // 获取在线状态
+    if (req.url === '/api/platform/online' && req.method === 'GET') {
+      const onlineUsers = chat.getOnlineUsers();
+      const onlineAgents = agentManager.getAgentStatus().filter(a => a.status === 'online');
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        success: true,
+        online: {
+          users: onlineUsers.length,
+          agents: onlineAgents.length,
+          user_list: onlineUsers.map(u => u.display_name || u.username),
+          agent_list: onlineAgents.map(a => a.name)
+        }
+      }));
+      return true;
+    }
+
+    // 获取话题列表
+    if (req.url.startsWith('/api/platform/topics') && req.method === 'GET') {
+      const urlObj = new URL(req.url, `http://localhost:${PORT}`);
+      const limit = parseInt(urlObj.searchParams.get('limit')) || 20;
+
+      const topics = db.getTopics(limit);
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: true, topics }));
+      return true;
+    }
+
+    // 搜索消息
+    if (req.url.startsWith('/api/platform/search') && req.method === 'GET') {
+      const urlObj = new URL(req.url, `http://localhost:${PORT}`);
+      const query = urlObj.searchParams.get('q');
+      const limit = parseInt(urlObj.searchParams.get('limit')) || 20;
+
+      if (!query || query.length < 2) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: '搜索关键词至少2个字符' }));
+        return true;
+      }
+
+      // 简单的内存搜索
+      const messages = db.getRecentMessages(200);
+      const results = messages.filter(m =>
+        m.content.toLowerCase().includes(query.toLowerCase()) ||
+        m.sender_name.toLowerCase().includes(query.toLowerCase())
+      ).slice(0, limit);
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: true, results, query }));
+      return true;
+    }
+
+    // 获取服务器时间
+    if (req.url === '/api/platform/time' && req.method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        success: true,
+        time: db.formatShanghaiTime(new Date()),
+        timestamp: Date.now()
+      }));
+      return true;
+    }
+
     // 获取系统设置
     if (req.url === '/api/settings' && req.method === 'GET') {
       const settings = db.getAllSettings();
@@ -363,6 +547,41 @@ async function start() {
           res.end(JSON.stringify({ error: '保存失败' }));
         }
       });
+      return true;
+    }
+
+    // 请求Agent生成总结
+    const generateSummaryMatch = req.url.match(/^\/api\/topics\/([^/]+)\/generate-summary$/);
+    if (generateSummaryMatch && req.method === 'POST') {
+      const topicId = generateSummaryMatch[1];
+
+      const topic = db.getTopicById(topicId);
+      if (!topic) {
+        res.writeHead(404, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: '话题不存在' }));
+        return true;
+      }
+
+      const messages = db.getTopicMessages(topicId);
+      if (messages.length === 0) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: '话题没有消息' }));
+        return true;
+      }
+
+      // 请求Agent生成总结
+      const result = agentManager.requestTopicSummary(topicId, topic.title, messages);
+
+      if (result.success) {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          success: true,
+          message: `已请求 ${result.agentName} 生成总结，请稍候...`
+        }));
+      } else {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: result.error || '没有可用的Agent' }));
+      }
       return true;
     }
 

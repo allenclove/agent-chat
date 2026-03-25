@@ -84,6 +84,12 @@ function setupWebSocket(server) {
         return;
       }
 
+      // 处理Agent返回的总结响应
+      if (type === 'summary_response' && isAgent) {
+        agentManager.handleSummaryResponse(msg);
+        return;
+      }
+
       // 调试模式下只允许只读操作
       if (isDebug) {
         switch (type) {

@@ -352,6 +352,31 @@ const agentManager = {
     console.log('[Agent] 设置已更新');
   },
 
+  // 通知特定 Agent 配置已更新
+  notifyAgentConfigChanged(agentId) {
+    const agent = connectedAgents.get(agentId);
+    if (agent && agent.ws.readyState === 1) {
+      // 获取最新配置
+      const fullConfig = db.getAgentFullConfig(agentId);
+      if (fullConfig) {
+        agent.ws.send(JSON.stringify({
+          type: 'config_update',
+          payload: {
+            agent_id: agentId,
+            name: fullConfig.name,
+            persona: fullConfig.persona || '',
+            conversation_mode: fullConfig.conversation_mode || 'free',
+            custom_settings: fullConfig.custom_settings || {},
+            history_limit: fullConfig.history_limit || 50,
+            message_filter: fullConfig.message_filter || 'all',
+            keywords: fullConfig.keywords || []
+          }
+        }));
+        console.log(`[Agent] 已通知 ${fullConfig.name} 配置更新`);
+      }
+    }
+  },
+
   // 广播成员列表更新给所有Agent
   broadcastParticipantsUpdate() {
     const onlineUsers = chat.getOnlineUsers();
@@ -381,6 +406,91 @@ const agentManager = {
       agent.ws.send(JSON.stringify({ type: 'clear_history' }));
     }
     console.log('[Agent] 已通知所有Agent清空历史');
+  },
+
+  // ==================== 话题总结相关 ====================
+
+  // 请求Agent生成话题总结
+  requestTopicSummary(topicId, topicTitle, messages) {
+    // 找一个在线的Agent来生成总结
+    let targetAgent = null;
+    for (const [, agent] of connectedAgents) {
+      if (agent.ws.readyState === 1) {
+        targetAgent = agent;
+        break;
+      }
+    }
+
+    if (!targetAgent) {
+      console.log('[Agent] 没有在线的Agent可用于生成总结');
+      return { success: false, error: '没有在线的Agent' };
+    }
+
+    console.log(`[Agent] 请求 ${targetAgent.config.name} 生成话题总结: ${topicTitle}`);
+
+    // 发送总结请求
+    targetAgent.ws.send(JSON.stringify({
+      type: 'summary_request',
+      payload: {
+        topic_id: topicId,
+        topic_title: topicTitle,
+        messages: messages.map(m => ({
+          sender_name: m.sender_name,
+          sender_type: m.sender_type,
+          content: m.content,
+          time: m.original_created_at
+        })),
+        request_type: 'generate_summary',
+        instructions: `请为这个话题生成一个结构化的总结，包括：
+1. narrative: 用自然语言叙述这个讨论的来龙去脉
+2. viewpoints: 每个参与者（人和Agent）的主要观点
+3. consensus: 大家达成的共识（如果有）
+4. open_questions: 还没解决的问题（如果有）
+
+请用JSON格式返回。`
+      }
+    }));
+
+    return { success: true, agentName: targetAgent.config.name };
+  },
+
+  // 处理Agent返回的总结
+  handleSummaryResponse(msg) {
+    const { topic_id, summary } = msg.payload || {};
+
+    if (!topic_id || !summary) {
+      console.log('[Agent] 收到无效的总结响应');
+      return;
+    }
+
+    console.log(`[Agent] 收到话题总结: ${topic_id}`);
+
+    // 保存总结到数据库
+    const saved = db.saveTopicSummary(
+      topic_id,
+      summary.narrative || '',
+      summary.viewpoints || [],
+      summary.consensus || '',
+      summary.open_questions || []
+    );
+
+    // 通知前端总结已生成
+    chat.broadcast('topic_summary_ready', {
+      topic_id,
+      summary: saved
+    });
+
+    return saved;
+  },
+
+  // 获取第一个在线的Agent
+  getFirstOnlineAgent() {
+    for (const [, agent] of connectedAgents) {
+      if (agent.ws.readyState === 1) {
+        return agent;
+      }
+    }
+    return null;
   }
 };
 

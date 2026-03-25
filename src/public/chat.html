@@ -467,6 +467,21 @@
         <label class="block text-sm text-gray-600 mb-1">描述（可选）</label>
         <textarea id="topicDesc" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500" rows="2" placeholder="话题描述..."></textarea>
       </div>
+    </div>
+  </div>
+
+  <!-- Agent 设置弹窗 -->
+  <div id="agentSettingsModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div class="bg-white rounded-lg p-6 w-[480px] max-w-md">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="font-bold text-lg">⚙️ Agent 设置</h3>
+        <button onclick="closeAgentSettings()" class="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
+      </div>
+      <div id="agentSettingsContent">
+        <div class="text-center text-gray-400 py-8">加载中...</div>
+      </div>
+    </div>
+  </div>
       <div class="mb-4 text-sm text-gray-500">
         已选择 <span id="selectedCount">0</span> 条消息
       </div>
@@ -948,9 +963,12 @@
       agentCount.textContent = onlineAgents.length;
 
       agentListEl.innerHTML = agents.map(agent => `
-        <div class="flex items-center space-x-2 p-2 rounded-lg hover:bg-gray-50">
+        <div class="flex items-center space-x-2 p-2 rounded-lg hover:bg-gray-50 group">
           <div class="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center text-sm">🤖</div>
           <span class="text-sm text-gray-700 flex-1">${agent.name}</span>
+          <button onclick="openAgentSettings('${agent.id}')" class="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-purple-600 p-1" title="设置">
+            ⚙️
+          </button>
           <span class="w-2 h-2 rounded-full ${agent.status === 'online' ? 'bg-green-500' : 'bg-gray-300'}"></span>
         </div>
       `).join('');
@@ -1248,6 +1266,169 @@
     topicModal.addEventListener('click', (e) => {
       if (e.target === topicModal) {
         topicModal.classList.add('hidden');
+      }
+    });
+
+    // ==================== Agent 设置功能 ====================
+
+    let currentEditingAgent = null;
+
+    // 打开 Agent 设置弹窗
+    async function openAgentSettings(agentId) {
+      currentEditingAgent = agentId;
+      const modal = document.getElementById('agentSettingsModal');
+      const content = document.getElementById('agentSettingsContent');
+
+      modal.classList.remove('hidden');
+      content.innerHTML = '<div class="text-center text-gray-400 py-8">加载中...</div>';
+
+      try {
+        const res = await fetch(`/api/agents/${agentId}/config`);
+        const data = await res.json();
+
+        if (!data.success) {
+          content.innerHTML = `<div class="text-red-500 text-center py-4">${data.error || '加载失败'}</div>`;
+          return;
+        }
+
+        const config = data.config;
+        const customSettings = config.custom_settings || {};
+
+        content.innerHTML = `
+          <div class="space-y-4">
+            <!-- 基本信息 -->
+            <div>
+              <label class="block text-sm text-gray-600 mb-1">名称</label>
+              <input type="text" id="agentName" value="${config.name || ''}" class="w-full px-3 py-2 border rounded-lg">
+            </div>
+
+            <!-- 人设 -->
+            <div>
+              <label class="block text-sm text-gray-600 mb-1">🎭 人设 / 性格</label>
+              <textarea id="agentPersona" class="w-full px-3 py-2 border rounded-lg" rows="3" placeholder="描述 Agent 的性格特点、说话风格...">${config.persona || ''}</textarea>
+            </div>
+
+            <!-- 对话模式 -->
+            <div>
+              <label class="block text-sm text-gray-600 mb-1">💬 对话模式</label>
+              <select id="agentConversationMode" class="w-full px-3 py-2 border rounded-lg">
+                <option value="free" ${config.conversation_mode === 'free' ? 'selected' : ''}>自由模式 - 随时参与</option>
+                <option value="mention" ${config.conversation_mode === 'mention' ? 'selected' : ''}>提及模式 - 仅在被 @ 时回复</option>
+                <option value="passive" ${config.conversation_mode === 'passive' ? 'selected' : ''}>被动模式 - 仅回答问题</option>
+              </select>
+            </div>
+
+            <!-- 消息过滤 -->
+            <div>
+              <label class="block text-sm text-gray-600 mb-1">📩 消息过滤</label>
+              <select id="agentMessageFilter" class="w-full px-3 py-2 border rounded-lg">
+                <option value="all" ${config.message_filter === 'all' ? 'selected' : ''}>接收所有消息</option>
+                <option value="keywords" ${config.message_filter === 'keywords' ? 'selected' : ''}>仅关键词匹配</option>
+                <option value="mention" ${config.message_filter === 'mention' ? 'selected' : ''}>仅被提及时</option>
+              </select>
+            </div>
+
+            <!-- 历史消息限制 -->
+            <div>
+              <label class="block text-sm text-gray-600 mb-1">📜 历史消息数量</label>
+              <input type="number" id="agentHistoryLimit" value="${config.history_limit || 50}" min="10" max="500" class="w-full px-3 py-2 border rounded-lg">
+            </div>
+
+            <!-- 自定义设置（JSON格式） -->
+            <div>
+              <label class="block text-sm text-gray-600 mb-1">🔧 自定义设置 (JSON)</label>
+              <textarea id="agentCustomSettings" class="w-full px-3 py-2 border rounded-lg font-mono text-sm" rows="3" placeholder='{"key": "value"}'>${JSON.stringify(customSettings, null, 2)}</textarea>
+            </div>
+
+            <!-- 保存按钮 -->
+            <div class="flex space-x-2 pt-2">
+              <button onclick="saveAgentSettings()" class="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">
+                💾 保存设置
+              </button>
+              <button onclick="closeAgentSettings()" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">
+                取消
+              </button>
+            </div>
+          </div>
+        `;
+      } catch (e) {
+        content.innerHTML = `<div class="text-red-500 text-center py-4">加载失败: ${e.message}</div>`;
+      }
+    }
+
+    // 关闭 Agent 设置弹窗
+    function closeAgentSettings() {
+      document.getElementById('agentSettingsModal').classList.add('hidden');
+      currentEditingAgent = null;
+    }
+
+    // 保存 Agent 设置
+    async function saveAgentSettings() {
+      if (!currentEditingAgent) return;
+
+      const name = document.getElementById('agentName').value.trim();
+      const persona = document.getElementById('agentPersona').value.trim();
+      const conversationMode = document.getElementById('agentConversationMode').value;
+      const messageFilter = document.getElementById('agentMessageFilter').value;
+      const historyLimit = parseInt(document.getElementById('agentHistoryLimit').value) || 50;
+      const customSettingsStr = document.getElementById('agentCustomSettings').value.trim();
+
+      let customSettings = {};
+      if (customSettingsStr) {
+        try {
+          customSettings = JSON.parse(customSettingsStr);
+        } catch (e) {
+          alert('自定义设置 JSON 格式错误');
+          return;
+        }
+      }
+
+      const settings = {
+        name,
+        persona,
+        conversation_mode: conversationMode,
+        message_filter: messageFilter,
+        history_limit: historyLimit,
+        custom_settings: customSettings
+      };
+
+      try {
+        const res = await fetch(`/api/agents/${currentEditingAgent}/config`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(settings)
+        });
+        const data = await res.json();
+
+        if (data.success) {
+          closeAgentSettings();
+          // 刷新 Agent 列表
+          if (ws && ws.readyState === 1) {
+            ws.send(JSON.stringify({ type: 'get_agent_list' }));
+          }
+          // 显示成功提示
+          showToast(`✅ Agent "${name}" 设置已保存`);
+        } else {
+          alert(data.error || '保存失败');
+        }
+      } catch (e) {
+        alert('保存失败: ' + e.message);
+      }
+    }
+
+    // 简单的 Toast 提示
+    function showToast(message) {
+      const toast = document.createElement('div');
+      toast.className = 'fixed bottom-4 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white px-4 py-2 rounded-lg shadow-lg z-50';
+      toast.textContent = message;
+      document.body.appendChild(toast);
+      setTimeout(() => toast.remove(), 3000);
+    }
+
+    // 点击弹窗外部关闭
+    document.getElementById('agentSettingsModal').addEventListener('click', (e) => {
+      if (e.target.id === 'agentSettingsModal') {
+        closeAgentSettings();
       }
     });
 

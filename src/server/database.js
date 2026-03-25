@@ -64,6 +64,17 @@ async function init() {
     )
   `);
 
+  // 迁移：添加新的配置字段（如果不存在）
+  try {
+    db.run(`ALTER TABLE agent_configs ADD COLUMN persona TEXT`);
+  } catch (e) { /* 列已存在，忽略 */ }
+  try {
+    db.run(`ALTER TABLE agent_configs ADD COLUMN conversation_mode TEXT DEFAULT 'free'`);
+  } catch (e) { /* 列已存在，忽略 */ }
+  try {
+    db.run(`ALTER TABLE agent_configs ADD COLUMN custom_settings TEXT`);
+  } catch (e) { /* 列已存在，忽略 */ }
+
   // 系统设置表
   db.run(`
     CREATE TABLE IF NOT EXISTS system_settings (
@@ -361,6 +372,73 @@ function getAgentByToken(token) {
   const values = result[0].values[0];
   const agent = {};
   columns.forEach((col, i) => agent[col] = values[i]);
+  return agent;
+}
+
+// 更新 Agent 设置（人设、对话模式等）
+function updateAgentSettings(agentId, settings) {
+  const agent = getAgentById(agentId);
+  if (!agent) return null;
+
+  const updates = [];
+  const values = [];
+
+  if (settings.name !== undefined) {
+    updates.push('name = ?');
+    values.push(settings.name);
+  }
+  if (settings.persona !== undefined) {
+    updates.push('persona = ?');
+    values.push(settings.persona);
+  }
+  if (settings.conversation_mode !== undefined) {
+    updates.push('conversation_mode = ?');
+    values.push(settings.conversation_mode);
+  }
+  if (settings.custom_settings !== undefined) {
+    updates.push('custom_settings = ?');
+    values.push(JSON.stringify(settings.custom_settings));
+  }
+  if (settings.history_limit !== undefined) {
+    updates.push('history_limit = ?');
+    values.push(settings.history_limit);
+  }
+  if (settings.message_filter !== undefined) {
+    updates.push('message_filter = ?');
+    values.push(settings.message_filter);
+  }
+  if (settings.keywords !== undefined) {
+    updates.push('keywords = ?');
+    values.push(JSON.stringify(settings.keywords));
+  }
+
+  if (updates.length === 0) return agent;
+
+  values.push(agentId);
+  db.run(`UPDATE agent_configs SET ${updates.join(', ')} WHERE id = ?`, values);
+  save();
+
+  console.log(`[DB] Agent ${agentId} 设置已更新:`, Object.keys(settings).join(', '));
+  return getAgentById(agentId);
+}
+
+// 获取 Agent 完整配置（包括解析后的 JSON 字段）
+function getAgentFullConfig(agentId) {
+  const agent = getAgentById(agentId);
+  if (!agent) return null;
+
+  // 解析 JSON 字段
+  try {
+    if (agent.keywords) agent.keywords = JSON.parse(agent.keywords);
+  } catch (e) {
+    agent.keywords = [];
+  }
+  try {
+    if (agent.custom_settings) agent.custom_settings = JSON.parse(agent.custom_settings);
+  } catch (e) {
+    agent.custom_settings = {};
+  }
+
   return agent;
 }
 
@@ -808,6 +886,8 @@ module.exports = {
   getAgentById,
   getAgentByToken,
   addAgent,
+  updateAgentSettings,
+  getAgentFullConfig,
   loadAgentsFromConfig,
   startConfigWatcher,
   setConfigChangeCallback,

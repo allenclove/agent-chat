@@ -137,6 +137,13 @@
           <div id="summaryContent" class="bg-white rounded-lg p-4 shadow-sm">
             <!-- 总结内容动态插入 -->
           </div>
+          <!-- 生成总结按钮 -->
+          <div id="generateSummarySection" class="mt-4 text-center">
+            <button id="generateSummaryBtn" class="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed">
+              🤖 请求 Agent 生成总结
+            </button>
+            <p id="summaryStatus" class="text-sm text-gray-500 mt-2 hidden"></p>
+          </div>
         </div>
       </div>
     </main>
@@ -305,17 +312,28 @@
     // 渲染总结视图
     function renderSummaryView(summary) {
       const container = document.getElementById('summaryContent');
+      const generateSection = document.getElementById('generateSummarySection');
+      const generateBtn = document.getElementById('generateSummaryBtn');
+      const statusText = document.getElementById('summaryStatus');
 
       if (!summary) {
         container.innerHTML = `
           <div class="text-center text-gray-400 py-8">
             <div class="text-2xl mb-2">📝</div>
             <p>暂无总结</p>
-            <p class="text-xs mt-1">在聊天中请求 Agent 生成总结</p>
+            <p class="text-xs mt-1">点击下方按钮请求 Agent 生成总结</p>
           </div>
         `;
+        // 显示生成按钮
+        generateSection.classList.remove('hidden');
+        generateBtn.disabled = false;
+        generateBtn.textContent = '🤖 请求 Agent 生成总结';
+        statusText.classList.add('hidden');
         return;
       }
+
+      // 有总结时隐藏生成按钮
+      generateSection.classList.add('hidden');
 
       let html = '';
 
@@ -464,8 +482,97 @@
       }
     });
 
+    // 生成总结功能
+    let ws = null;
+    let summaryGenerating = false;
+
+    // 连接 WebSocket
+    function connectWebSocket() {
+      const wsProtocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+      ws = new WebSocket(`${wsProtocol}//${location.host}`);
+
+      ws.onopen = () => {
+        console.log('[Topics] WebSocket 已连接');
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const msg = JSON.parse(event.data);
+          if (msg.type === 'topic_summary_ready' && msg.payload?.topic_id === currentTopicId) {
+            // 收到总结完成通知
+            summaryGenerating = false;
+            const statusText = document.getElementById('summaryStatus');
+            statusText.textContent = '✅ 总结已生成！';
+            statusText.classList.remove('hidden');
+            statusText.classList.remove('text-yellow-600');
+            statusText.classList.add('text-green-600');
+
+            // 重新加载话题详情
+            setTimeout(() => {
+              loadTopicDetail(currentTopicId);
+            }, 500);
+          }
+        } catch (e) {
+          console.error('[Topics] 解析消息失败:', e);
+        }
+      };
+
+      ws.onclose = () => {
+        console.log('[Topics] WebSocket 断开，5秒后重连');
+        setTimeout(connectWebSocket, 5000);
+      };
+
+      ws.onerror = (err) => {
+        console.error('[Topics] WebSocket 错误:', err);
+      };
+    }
+
+    // 请求生成总结
+    async function requestGenerateSummary() {
+      if (!currentTopicId || summaryGenerating) return;
+
+      const btn = document.getElementById('generateSummaryBtn');
+      const statusText = document.getElementById('summaryStatus');
+
+      btn.disabled = true;
+      btn.textContent = '⏳ 生成中...';
+      summaryGenerating = true;
+      statusText.textContent = '正在请求 Agent 生成总结，请稍候...';
+      statusText.classList.remove('hidden');
+      statusText.classList.remove('text-green-600');
+      statusText.classList.add('text-yellow-600');
+
+      try {
+        const res = await fetch(`/api/topics/${currentTopicId}/generate-summary`, {
+          method: 'POST'
+        });
+        const data = await res.json();
+
+        if (data.success) {
+          statusText.textContent = data.message || '已发送请求，等待 Agent 响应...';
+        } else {
+          summaryGenerating = false;
+          btn.disabled = false;
+          btn.textContent = '🤖 请求 Agent 生成总结';
+          statusText.textContent = `❌ ${data.error || '请求失败'}`;
+          statusText.classList.remove('text-yellow-600');
+          statusText.classList.add('text-red-600');
+        }
+      } catch (e) {
+        summaryGenerating = false;
+        btn.disabled = false;
+        btn.textContent = '🤖 请求 Agent 生成总结';
+        statusText.textContent = '❌ 请求失败，请检查网络连接';
+        statusText.classList.remove('text-yellow-600');
+        statusText.classList.add('text-red-600');
+      }
+    }
+
+    document.getElementById('generateSummaryBtn').addEventListener('click', requestGenerateSummary);
+
     // 启动
     loadTopics();
+    connectWebSocket();
   </script>
 </body>
 </html>
