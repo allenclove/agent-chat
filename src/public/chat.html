@@ -827,14 +827,14 @@
   }
 
   // 更新选择计数
-  function updateSelectionCount() {
-    document.getElementById('selectionCount').textContent = selectedMessages.size;
-    if (selectedMessages.size === 0) {
-      selectionToolbar.classList.add('hidden');
-    } else {
-      selectionToolbar.classList.remove('hidden');
+    function updateSelectionCount() {
+      document.getElementById('selectionCount').textContent = selectedMessages.size;
+      if (selectedMessages.size === 0) {
+        selectionToolbar.classList.add('hidden');
+      } else {
+        selectionToolbar.classList.remove('hidden');
+      }
     }
-  }
 
     // 降级复制方案
     function fallbackCopy(text) {
@@ -855,11 +855,10 @@
 
     // 初始化 markdown-it
     const md = window.markdownit({
-      html: false,         // 不允许HTML标签
-      xhtmlOut: false,     // 不使用XHTML自闭合标签
-      breaks: true,        // 换行转<br>
-      linkify: true,       // 自动识别链接
-      typographer: true,   // 启用排版替换
+      html: false,
+      breaks: true,
+      linkify: true,
+      typographer: true,
       highlight: function(code, lang) {
         if (lang && hljs.getLanguage(lang)) {
           try {
@@ -872,8 +871,6 @@
 
     // 渲染消息内容（Markdown + @提及高亮）
     function renderContent(content, isSelf) {
-      // 先处理@提及，用临时占位符保护
-      // 使用随机字符串作为占位符前缀，避免与用户内容冲突
       const placeholderPrefix = 'MNTN' + Math.random().toString(36).slice(2, 8) + 'X';
       const mentionPlaceholders = [];
       let processedContent = content;
@@ -886,14 +883,12 @@
           const highlightClass = isSelf
             ? 'bg-purple-500 text-white px-1 rounded'
             : 'bg-purple-200 text-purple-800 px-1 rounded';
-          // 使用随机前缀+数字作为占位符，确保不会被Markdown解析
           const placeholder = placeholderPrefix + mentionPlaceholders.length;
           processedContent = processedContent.replace(regex, placeholder);
           mentionPlaceholders.push(`<span class="${highlightClass}">@${escapeHtml(agent.name)}</span>`);
         }
       }
 
-      // 使用 markdown-it 渲染
       let html;
       try {
         html = md.render(processedContent);
@@ -901,12 +896,9 @@
         html = escapeHtml(processedContent).replace(/\n/g, '<br>');
       }
 
-      // 恢复@提及
       mentionPlaceholders.forEach((mention, i) => {
-        // 处理原始占位符和可能的HTML编码版本
         const placeholder = placeholderPrefix + i;
         html = html.split(placeholder).join(mention);
-        // 处理可能被markdown-it包裹在p标签中的情况
         const pWrapped = '<p>' + placeholder;
         if (html.includes(pWrapped)) {
           html = html.split(pWrapped).join('<p>' + mention);
@@ -923,29 +915,24 @@
 
       const preBlocks = container.querySelectorAll('pre');
       preBlocks.forEach((pre, index) => {
-        // 获取语言
         const code = pre.querySelector('code');
         const langClass = code?.className.match(/language-(\w+)/);
         const lang = langClass ? langClass[1] : 'code';
 
-        // 创建包装器
         const wrapper = document.createElement('div');
         wrapper.className = 'code-block-wrapper';
         pre.parentNode.insertBefore(wrapper, pre);
 
-        // 创建头部
         const header = document.createElement('div');
         header.className = 'code-block-header';
-        header.innerHTML = `
-          <span>${lang}</span>
-          <button class="copy-btn" data-index="${index}">复制</button>
-        `;
+        header.innerHTML = \`
+          <span>\${lang}</span>
+          <button class="copy-btn" data-index="\${index}">复制</button>
+        \`;
 
-        // 移动pre到wrapper
         wrapper.appendChild(header);
         wrapper.appendChild(pre);
 
-        // 绑定复制事件
         const copyBtn = header.querySelector('.copy-btn');
         copyBtn.addEventListener('click', async () => {
           const codeText = code?.textContent || pre.textContent;
@@ -970,36 +957,35 @@
     // 渲染用户列表
     function renderUserList(users) {
       onlineCount.textContent = users.length;
-      userList.innerHTML = users.map(user => `
+      userList.innerHTML = users.map(user => \`
         <div class="flex items-center space-x-2 p-2 rounded-lg hover:bg-gray-50">
           <div class="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-sm">👤</div>
-          <span class="text-sm text-gray-700">${user.display_name || user.username}</span>
+          <span class="text-sm text-gray-700">\${user.display_name || user.username}</span>
         </div>
-      `).join('');
+      \`).join('');
     }
 
     // 渲染Agent列表
     function renderAgentList(agentList) {
-      agents = agentList; // 存储到全局变量
+      agents = agentList;
       const onlineAgents = agents.filter(a => a.status === 'online');
       agentCount.textContent = onlineAgents.length;
 
-      agentListEl.innerHTML = agents.map(agent => `
+      agentListEl.innerHTML = agents.map(agent => \`
         <div class="flex items-center space-x-2 p-2 rounded-lg hover:bg-gray-50 group">
           <div class="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center text-sm">🤖</div>
-          <span class="text-sm text-gray-700 flex-1">${agent.name}</span>
-          <button onclick="openAgentSettings('${agent.id}')" class="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-purple-600 p-1" title="设置">
+          <span class="text-sm text-gray-700 flex-1">\${agent.name}</span>
+          <button onclick="openAgentSettings('\${agent.id}')" class="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-purple-600 p-1" title="设置">
             ⚙️
           </button>
-          <span class="w-2 h-2 rounded-full ${agent.status === 'online' ? 'bg-green-500' : 'bg-gray-300'}"></span>
+          <span class="w-2 h-2 rounded-full \${agent.status === 'online' ? 'bg-green-500' : 'bg-gray-300'}"></span>
         </div>
-      `).join('');
+      \`).join('');
     }
 
     // 更新Agent状态
     function updateAgentStatus(data) {
       // 重新请求Agent列表
-      // 这里简化处理，实际可以局部更新
     }
 
     // 发送消息
