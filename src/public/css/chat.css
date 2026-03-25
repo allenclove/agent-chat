@@ -1,0 +1,319 @@
+/* 消息容器滚动条 */
+.message-container {
+  scroll-behavior: smooth;
+}
+.message-container::-webkit-scrollbar {
+  width: 6px;
+}
+.message-container::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+.message-container::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 3px;
+}
+
+/* 侧边栏 */
+.sidebar {
+  transition: transform 0.3s ease;
+}
+.sidebar.hidden-mobile {
+  transform: translateX(100%);
+}
+@media (min-width: 768px) {
+  .sidebar.hidden-mobile {
+    transform: translateX(0);
+  }
+}
+
+/* Markdown样式 */
+.markdown-content {
+  line-height: 1.6;
+}
+.markdown-content p {
+  margin: 0.5em 0;
+}
+.markdown-content p:first-child {
+  margin-top: 0;
+}
+.markdown-content p:last-child {
+  margin-bottom: 0;
+}
+.markdown-content code:not(pre code) {
+  background: rgba(0,0,0,0.1);
+  padding: 0.1em 0.3em;
+  border-radius: 3px;
+  font-size: 0.9em;
+}
+.markdown-content pre {
+  margin: 0.5em 0;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.markdown-content pre code {
+  display: block;
+  padding: 1em;
+  overflow-x: auto;
+  font-size: 0.85em;
+}
+.markdown-content ul, .markdown-content ol {
+  margin: 0.5em 0;
+  padding-left: 1.5em;
+}
+.markdown-content li {
+  margin: 0.25em 0;
+}
+.markdown-content blockquote {
+  border-left: 3px solid rgba(0,0,0,0.2);
+  padding-left: 0.75em;
+  margin: 0.5em 0;
+  opacity: 0.85;
+}
+.markdown-content h1, .markdown-content h2, .markdown-content h3 {
+  margin: 0.5em 0 0.25em;
+  font-weight: 600;
+}
+.markdown-content a {
+  color: inherit;
+  text-decoration: underline;
+}
+
+/* 自我消息的markdown调整 */
+.markdown-content.self-message code:not(pre code) {
+  background: rgba(255,255,255,0.2);
+}
+.markdown-content.self-message blockquote {
+  border-left-color: rgba(255,255,255,0.3);
+}
+
+/* 代码块容器 */
+.code-block-wrapper {
+  position: relative;
+  margin: 0.5em 0;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.code-block-wrapper pre {
+  margin: 0;
+}
+.code-block-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.25em 0.75em;
+  background: #2d2d2d;
+  color: #888;
+  font-size: 0.75em;
+}
+.copy-btn {
+  background: transparent;
+  border: 1px solid #555;
+  color: #aaa;
+  padding: 0.2em 0.5em;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9em;
+  transition: all 0.2s;
+}
+.copy-btn:hover {
+  background: #444;
+  color: #fff;
+}
+.copy-btn.copied {
+  background: #22c55e;
+  border-color: #22c55e;
+  color: #fff;
+}
+
+/* 消息复制按钮 */
+.message-wrapper {
+  position: relative;
+}
+.message-copy-btn {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  opacity: 0;
+  transition: opacity 0.2s;
+  background: rgba(0,0,0,0.6);
+  color: white;
+  border: none;
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  z-index: 5;
+}
+.message-wrapper:hover .message-copy-btn {
+  opacity: 1;
+}
+.message-copy-btn.left {
+  right: 100%;
+  margin-right: 8px;
+}
+.message-copy-btn.right {
+  left: 100%;
+  margin-left: 8px;
+}
+.message-copy-btn:active {
+  background: rgba(0,0,0,0.8);
+}
+.message-copy-btn.copied {
+  background: #22c55e;
+}
+
+/* 移动端隐藏悬浮复制按钮，使用长按 */
+@media (max-width: 768px) {
+  .message-copy-btn {
+    display: none;
+  }
+}
+
+/* 消息选择模式 */
+.message-item {
+  position: relative;
+}
+.message-item.selected {
+  background: rgba(139, 92, 246, 0.1);
+}
+.message-checkbox {
+  position: absolute;
+  left: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid #d1d5db;
+  background: white;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+.message-item:hover .message-checkbox {
+  opacity: 1;
+}
+.message-checkbox.checked {
+  background: #8b5cf6;
+  border-color: #8b5cf6;
+}
+.message-checkbox.checked::after {
+  content: '✓';
+  color: white;
+  font-size: 12px;
+  line-height: 16px;
+  text-align: center;
+}
+
+/* 选择工具栏 */
+.selection-toolbar {
+  position: fixed;
+  bottom: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: white;
+  padding: 8px 16px;
+  border-radius: 24px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  z-index: 20;
+}
+.selection-toolbar.hidden {
+  display: none;
+}
+
+/* 话题创建弹窗 */
+.topic-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+}
+.topic-modal.hidden {
+  display: none;
+}
+.topic-modal-content {
+  background: white;
+  border-radius: 12px;
+  padding: 24px;
+  width: 90%;
+  max-width: 480px;
+}
+.topic-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+.topic-modal-header h3 {
+  font-size: 18px;
+  font-weight: 600;
+}
+.topic-modal-close {
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  color: #666;
+}
+.topic-modal-close:hover {
+  color: #333;
+}
+.topic-modal-body input,
+.topic-modal-body textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  margin-bottom: 12px;
+}
+.topic-modal-body textarea {
+  min-height: 80px;
+  resize: none;
+}
+.topic-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+}
+.topic-modal-footer button {
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.btn-cancel {
+  background: #f3f4f6;
+  color: #666;
+}
+.btn-cancel:hover {
+  background: #e5e7eb;
+}
+.btn-create {
+  background: #8b5cf6;
+  color: white;
+}
+.btn-create:hover {
+  background: #7c3aed;
+}
+
+/* Toast 提示 */
+.toast-message {
+  position: fixed;
+  top: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1f2937;
+  color: white;
+  padding: 8px 16px;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  z-index: 50;
+  font-size: 14px;
+}

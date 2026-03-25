@@ -10,1437 +10,236 @@
   <!-- 代码高亮 -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
-  <style>
-    .message-container {
-      scroll-behavior: smooth;
-    }
-    .message-container::-webkit-scrollbar {
-      width: 6px;
-    }
-    .message-container::-webkit-scrollbar-track {
-      background: #f1f1f1;
-    }
-    .message-container::-webkit-scrollbar-thumb {
-      background: #c1c1c1;
-      border-radius: 3px;
-    }
-    .sidebar {
-      transition: transform 0.3s ease;
-    }
-    .sidebar.hidden-mobile {
-      transform: translateX(100%);
-    }
-    @media (min-width: 768px) {
-      .sidebar.hidden-mobile {
-        transform: translateX(0);
-      }
-    }
-    /* Markdown样式 */
-    .markdown-content {
-      line-height: 1.6;
-    }
-    .markdown-content p {
-      margin: 0.5em 0;
-    }
-    .markdown-content p:first-child {
-      margin-top: 0;
-    }
-    .markdown-content p:last-child {
-      margin-bottom: 0;
-    }
-    .markdown-content code:not(pre code) {
-      background: rgba(0,0,0,0.1);
-      padding: 0.1em 0.3em;
-      border-radius: 3px;
-      font-size: 0.9em;
-    }
-    .markdown-content pre {
-      margin: 0.5em 0;
-      border-radius: 8px;
-      overflow: hidden;
-    }
-    .markdown-content pre code {
-      display: block;
-      padding: 1em;
-      overflow-x: auto;
-      font-size: 0.85em;
-    }
-    .markdown-content ul, .markdown-content ol {
-      margin: 0.5em 0;
-      padding-left: 1.5em;
-    }
-    .markdown-content li {
-      margin: 0.25em 0;
-    }
-    .markdown-content blockquote {
-      border-left: 3px solid rgba(0,0,0,0.2);
-      padding-left: 0.75em;
-      margin: 0.5em 0;
-      opacity: 0.85;
-    }
-    .markdown-content h1, .markdown-content h2, .markdown-content h3 {
-      margin: 0.5em 0 0.25em;
-      font-weight: 600;
-    }
-    .markdown-content a {
-      color: inherit;
-      text-decoration: underline;
-    }
-    /* 代码块容器 */
-    .code-block-wrapper {
-      position: relative;
-      margin: 0.5em 0;
-      border-radius: 8px;
-      overflow: hidden;
-    }
-    .code-block-wrapper pre {
-      margin: 0;
-    }
-    .code-block-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 0.25em 0.75em;
-      background: #2d2d2d;
-      color: #888;
-      font-size: 0.75em;
-    }
-    .copy-btn {
-      background: transparent;
-      border: 1px solid #555;
-      color: #aaa;
-      padding: 0.2em 0.5em;
-      border-radius: 4px;
-      cursor: pointer;
-      font-size: 0.9em;
-      transition: all 0.2s;
-    }
-    .copy-btn:hover {
-      background: #444;
-      color: #fff;
-    }
-    .copy-btn.copied {
-      background: #22c55e;
-      border-color: #22c55e;
-      color: #fff;
-    }
-    /* 自我消息的markdown调整 */
-    .markdown-content.self-message code:not(pre code) {
-      background: rgba(255,255,255,0.2);
-    }
-    .markdown-content.self-message blockquote {
-      border-left-color: rgba(255,255,255,0.3);
-    }
-    /* 消息复制按钮 */
-    .message-wrapper {
-      position: relative;
-    }
-    .message-copy-btn {
-      position: absolute;
-      top: 50%;
-      transform: translateY(-50%);
-      opacity: 0;
-      transition: opacity 0.2s;
-      background: rgba(0,0,0,0.6);
-      color: white;
-      border: none;
-      padding: 4px 8px;
-      border-radius: 4px;
-      cursor: pointer;
-      font-size: 12px;
-      z-index: 5;
-    }
-    .message-wrapper:hover .message-copy-btn {
-      opacity: 1;
-    }
-    .message-copy-btn.left {
-      right: 100%;
-      margin-right: 8px;
-    }
-    .message-copy-btn.right {
-      left: 100%;
-      margin-left: 8px;
-    }
-    .message-copy-btn:active {
-      background: rgba(0,0,0,0.8);
-    }
-    .message-copy-btn.copied {
-      background: #22c55e;
-    }
-    /* 移动端隐藏悬浮复制按钮，使用长按 */
-    @media (max-width: 768px) {
-      .message-copy-btn {
-        display: none;
-      }
-    }
-    /* 消息选择模式 */
-    .message-item.selected {
-      background: rgba(139, 92, 246, 0.15);
-    }
-    .message-checkbox {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translateY(-50%);
-      width: 24px;
-      height: 24px;
-      border-radius: 50%;
-      border: 2px solid #8b5cf6;
-      cursor: pointer;
-      z-index: 10;
-      opacity: 0;
-      transition: opacity 0.2s;
-    }
-    .message-item:hover .message-checkbox {
-      opacity: 1;
-    }
-    .selection-toolbar {
-      position: fixed;
-      bottom: 80px;
-      left: 0;
-      right: 0;
-      background: white;
-      padding: 12px 20px;
-      box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      z-index: 20;
-    }
-    .selection-toolbar.hidden {
-      display: none;
-    }
-    /* 话题创建弹窗 */
-    .topic-modal {
-      position: fixed;
-      inset: 0;
-      background: rgba(0,0,0,0.5);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 50;
-    }
-    .topic-modal.hidden {
-      display: none;
-    }
-    .topic-modal-content {
-      background: white;
-      border-radius: 12px;
-      padding: 24px;
-      width: 90%;
-      max-width: 480px;
-    }
-    .topic-modal-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 16px;
-    }
-    .topic-modal-header h3 {
-      font-size: 18px;
-      font-weight: 600;
-    }
-    .topic-modal-close {
-      background: none;
-      border: none;
-      font-size: 24px;
-      cursor: pointer;
-      color: #666;
-    }
-    .topic-modal-close:hover {
-      color: #333;
-    }
-    .topic-modal-body input,
-    .topic-modal-body textarea {
-      width: 100%;
-      padding: 10px 12px;
-      border: 1px solid #e5e7eb;
-      border-radius: 8px;
-      margin-bottom: 12px;
-    }
-    .topic-modal-body textarea {
-      min-height: 80px;
-      resize: none;
-    }
-    .topic-modal-footer {
-      display: flex;
-      justify-content: flex-end;
-      gap: 8px;
-      margin-top: 16px;
-    }
-    .topic-modal-footer button {
-      padding: 8px 16px;
-      border-radius: 8px;
-      font-weight: 500;
-      cursor: pointer;
-    }
-    .btn-cancel {
-      background: #f3f4f4;
-      color: #666;
-    }
-    .btn-cancel:hover {
-      background: #e5e7eb;
-    }
-    .btn-create {
-      background: #8b5cf6;
-      color: white;
-    }
-    .btn-create:hover {
-      background: #7c3d0;
-    }
-    /* 消息选择模式 */
-    .message-item {
-      position: relative;
-    }
-    .message-checkbox {
-      position: absolute;
-      left: 8px;
-      top: 50%;
-      transform: translateY(-50%);
-      width: 20px;
-      height: 20px;
-      border-radius: 50%;
-      border: 2px solid #d1d5db;
-      background: white;
-      cursor: pointer;
-      opacity: 0;
-      transition: opacity 0.2s;
-    }
-    .message-item:hover .message-checkbox {
-      opacity: 1;
-    }
-    .message-checkbox.checked {
-      background: #8b5cf6;
-      border-color: #8b5cf6;
-    }
-    .message-checkbox.checked::after {
-      content: '✓';
-      color: white;
-      font-size: 12px;
-      line-height: 16px;
-      text-align: center;
-    }
-    .message-item.selected {
-      background: rgba(139, 92, 246, 0.1);
-    }
-    .selection-toolbar {
-      position: fixed;
-      bottom: 80px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: white;
-      padding: 8px 16px;
-      border-radius: 24px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      z-index: 20;
-    }
-  </style>
+  <!-- 样式文件 -->
+  <link rel="stylesheet" href="/css/chat.css">
+  <!-- JS模块 -->
+  <script src="/js/utils.js"></script>
+  <script src="/js/api.js"></script>
+  <script src="/js/websocket.js"></script>
+  <script src="/js/render.js"></script>
+  <script src="/js/ui.js"></script>
 </head>
 <body class="h-screen flex flex-col bg-gray-100">
   <!-- Header -->
-  <header class="bg-white shadow-sm px-4 py-3 flex items-center justify-between z-10">
-    <div class="flex items-center space-x-3">
-      <span class="text-2xl">💬</span>
-      <div>
-        <h1 class="font-bold text-gray-800">Agent Chat</h1>
-        <p class="text-xs text-gray-500">
-          在线: <span id="onlineCount">0</span> 人 · <span id="agentCount">0</span> Agent
-        </p>
-      </div>
-    </div>
-    <div class="flex items-center space-x-2">
-      <button id="toggleSidebar" class="md:hidden p-2 hover:bg-gray-100 rounded-lg">
-        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7"/>
-        </svg>
-      </button>
-      <button id="selectModeBtn" class="px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-lg" title="选择消息">
-        ✅ 选择
-      </button>
-      <a href="/topics.html" class="px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-lg" title="话题记录">
-        📚 话题
-      </a>
-      <a href="/debug.html" class="px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-lg" title="调试面板">
-        🔧 调试
-      </a>
-      <button id="clearHistoryBtn" class="px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-lg" title="清空聊天记录">
-        🗑️ 清空
-      </button>
-      <button id="logoutBtn" class="px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">
-        退出
-      </button>
-    </div>
-  </header>
-
-  <div class="flex-1 flex overflow-hidden">
-    <!-- 消息区域 -->
-    <main class="flex-1 flex flex-col bg-gray-50 relative">
-      <div id="messageContainer" class="message-container flex-1 overflow-y-auto p-4 space-y-4">
-        <!-- 消息会动态插入这里 -->
-      </div>
-      <!-- 新消息提示按钮 -->
-      <button id="newMessageBtn" class="hidden absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-purple-600 text-white px-4 py-2 rounded-full shadow-lg hover:bg-purple-700 transition-all duration-200 flex items-center space-x-1 text-sm font-medium z-10">
-        <span id="newMessageCount">0</span>
-        <span>条新消息</span>
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l7-7m0 0"></path>
-        </svg>
-      </button>
-    </main>
-
-      <!-- 输入区域 -->
-      <div class="bg-white border-t p-4 relative">
-        <form id="messageForm" class="flex space-x-3">
-          <div class="flex-1 relative">
-            <input
-              type="text"
-              id="messageInput"
-              placeholder="输入消息... (@提及Agent)"
-              class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none"
-              autocomplete="off"
-            >
-            <!-- @提及下拉菜单 -->
-            <div id="mentionDropdown" class="absolute left-0 bottom-full mb-1 w-full bg-white border rounded-lg shadow-lg hidden z-10 max-h-48 overflow-y-auto">
-              <!-- Agent列表动态插入 -->
+    <header class="bg-white shadow-sm px-4 py-3 flex items-center justify-between z-10">
+        <div class="flex items-center space-x-3">
+            <span class="text-2xl">💬</span>
+            <div>
+                <h1 class="font-bold text-gray-800">Agent Chat</h1>
+                <p class="text-xs text-gray-500">
+                    在线: <span id="onlineCount">0</span> 人 · <span id="agentCount">0</span> Agent
+                </p>
             </div>
-          </div>
-          <button
-            type="submit"
-            class="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition font-medium"
-          >
-            发送
-          </button>
-        </form>
-      </div>
+        </div>
+        <div class="flex items-center space-x-2">
+            <button id="toggleSidebar" class="md:hidden p-2 hover:bg-gray-100 rounded-lg">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7"/>
+                </svg>
+            </button>
+            <button id="selectModeBtn" class="px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-lg" title="选择消息">
+                ✅ 选择
+            </button>
+            <a href="/topics.html" class="px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-lg" title="话题记录">
+                📚 话题
+            </a>
+            <a href="/debug.html" class="px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-lg" title="调试面板">
+                🔧 调试
+            </a>
+            <button id="clearHistoryBtn" class="px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-lg" title="清空聊天记录">
+                🗑️ 清空
+            </button>
+            <button id="logoutBtn" class="px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">
+                退出
+            </button>
+        </div>
+    </header>
+
+    <div class="flex-1 flex overflow-hidden">
+        <!-- 消息区域 -->
+        <main class="flex-1 flex flex-col bg-gray-50 relative">
+            <div id="messageContainer" class="message-container flex-1 overflow-y-auto p-4 space-y-4">
+                <!-- 消息会动态插入这里 -->
+            </div>
+            <!-- 新消息提示按钮 -->
+            <button id="newMessageBtn" class="hidden absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-purple-600 text-white px-4 py-2 rounded-full shadow-lg hover:bg-purple-700 transition-all duration-200 flex items-center space-x-1 text-sm font-medium z-10">
+                <span id="newMessageCount">0</span>
+                <span>条新消息</span>
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0"></path>
+                </svg>
+            </button>
+        </main>
+
+        <!-- 输入区域 -->
+        <div class="bg-white border-t p-4 relative">
+            <form id="messageForm" class="flex space-x-3">
+                <div class="flex-1 relative">
+                    <input
+                        type="text"
+                        id="messageInput"
+                        placeholder="输入消息... (@提及Agent)"
+                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none"
+                        autocomplete="off"
+                    >
+                    <!-- @提及下拉菜单 -->
+                    <div id="mentionDropdown" class="absolute left-0 bottom-full mb-1 w-full bg-white border rounded-lg shadow-lg hidden z-10 max-h-48 overflow-y-auto">
+                        <!-- Agent列表动态插入 -->
+                    </div>
+                </div>
+                <button
+                    type="submit"
+                    class="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition font-medium"
+                >
+                    发送
+                </button>
+            </form>
+        </div>
     </main>
 
     <!-- 侧边栏 -->
     <aside id="sidebar" class="sidebar hidden-mobile fixed md:relative right-0 top-14 md:top-0 h-full md:h-auto w-72 bg-white border-l shadow-lg md:shadow-none z-20 overflow-y-auto">
-      <div class="p-4">
-        <!-- 在线用户 -->
-        <div class="mb-6">
-          <h3 class="text-sm font-semibold text-gray-500 mb-3 flex items-center">
-            <span class="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
-            在线用户
-          </h3>
-          <div id="userList" class="space-y-2">
-            <!-- 用户列表 -->
-          </div>
-        </div>
+        <div class="p-4">
+            <!-- 在线用户 -->
+            <div class="mb-6">
+                <h3 class="text-sm font-semibold text-gray-500 mb-3 flex items-center">
+                    <span class="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
+                    在线用户
+                </h3>
+                <div id="userList" class="space-y-2">
+                    <!-- 用户列表 -->
+                </div>
+            </div>
 
-        <!-- Agent列表 -->
-        <div>
-          <h3 class="text-sm font-semibold text-gray-500 mb-3 flex items-center">
-            <span class="mr-2">🤖</span>
-            Agent
-          </h3>
-          <div id="agentList" class="space-y-2">
             <!-- Agent列表 -->
-          </div>
+            <div>
+                <h3 class="text-sm font-semibold text-gray-500 mb-3 flex items-center">
+                    <span class="mr-2">🤖</span>
+                    Agent
+                </h3>
+                <div id="agentList" class="space-y-2">
+                    <!-- Agent列表 -->
+                </div>
+            </div>
         </div>
-      </div>
     </aside>
-  </div>
+</div>
 
-  <!-- 遮罩层 -->
-  <div id="overlay" class="hidden fixed inset-0 bg-black bg-opacity-50 z-10 md:hidden"></div>
+<!-- 遮罩层 -->
+<div id="overlay" class="hidden fixed inset-0 bg-black bg-opacity-50 z-10 md:hidden"></div>
 
-  <!-- 创建话题弹窗 -->
-  <div id="topicModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+<!-- 创建话题弹窗 -->
+<div id="topicModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
     <div class="bg-white rounded-lg p-6 w-96 max-w-md">
-      <h3 class="font-bold text-lg mb-4">保存为话题</h3>
-      <div class="mb-4">
-        <label class="block text-sm text-gray-600 mb-1">话题标题</label>
-        <input type="text" id="topicTitle" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500" placeholder="输入话题标题...">
-      </div>
-      <div class="mb-4">
-        <label class="block text-sm text-gray-600 mb-1">描述（可选）</label>
-        <textarea id="topicDesc" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500" rows="2" placeholder="话题描述..."></textarea>
-      </div>
-      <div class="mb-4 text-sm text-gray-500">
-        已选择 <span id="selectedCount">0</span> 条消息
-      </div>
-      <div class="flex justify-end space-x-2">
-        <button id="cancelTopicBtn" class="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg">取消</button>
-        <button id="createTopicBtn" class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">创建</button>
-      </div>
+        <h3 class="font-bold text-lg mb-4">保存为话题</h3>
+        <div class="mb-4">
+            <label class="block text-sm text-gray-600 mb-1">话题标题</label>
+            <input type="text" id="topicTitle" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500" placeholder="输入话题标题...">
+        </div>
+        <div class="mb-4">
+            <label class="block text-sm text-gray-600 mb-1">描述（可选）</label>
+            <textarea id="topicDesc" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500" rows="2" placeholder="话题描述..."></textarea>
+        </div>
+        <div class="mb-4 text-sm text-gray-500">
+            已选择 <span id="selectedCount">0</span> 条消息
+        </div>
+        <div class="flex justify-end space-x-2">
+            <button id="cancelTopicBtn" class="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg">取消</button>
+            <button id="createTopicBtn" class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">创建</button>
+        </div>
     </div>
-  </div>
+</div>
 
-  <!-- Agent 设置弹窗 -->
-  <div id="agentSettingsModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+<!-- Agent 设置弹窗 -->
+<div id="agentSettingsModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
     <div class="bg-white rounded-lg p-6 w-[480px] max-w-md">
-      <div class="flex items-center justify-between mb-4">
-        <h3 class="font-bold text-lg">⚙️ Agent 设置</h3>
-        <button onclick="closeAgentSettings()" class="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
-      </div>
-      <div id="agentSettingsContent">
-        <div class="text-center text-gray-400 py-8">加载中...</div>
-      </div>
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="font-bold text-lg">⚙️ Agent 设置</h3>
+            <button onclick="ChatUI.closeAgentSettings()" class="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
+        </div>
+        <div id="agentSettingsContent">
+            <div class="text-center text-gray-400 py-8">加载中...</div>
+        </div>
     </div>
-  </div>
+</div>
 
-  <!-- 选择模式工具栏 -->
-  <div id="selectionToolbar" class="hidden fixed bottom-20 left-1/2 transform -translate-x-1/2 bg-white rounded-full shadow-lg px-4 py-2 flex items-center space-x-3 z-20">
+<!-- 选择模式工具栏 -->
+<div id="selectionToolbar" class="hidden fixed bottom-20 left-1/2 transform -translate-x-1/2 bg-white rounded-full shadow-lg px-4 py-2 flex items-center space-x-3 z-20">
     <span class="text-sm text-gray-600">已选择 <span id="selectionCount">0</span> 条</span>
     <button id="saveAsTopicBtn" class="px-3 py-1 bg-purple-600 text-white text-sm rounded-full hover:bg-purple-700">保存为话题</button>
     <button id="cancelSelectionBtn" class="px-3 py-1 text-gray-600 text-sm hover:bg-gray-100 rounded-full">取消</button>
-  </div>
+</div>
 
-  <script>
-    const messageContainer = document.getElementById('messageContainer');
-    const messageForm = document.getElementById('messageForm');
-    const messageInput = document.getElementById('messageInput');
-    const userList = document.getElementById('userList');
-    const agentListEl = document.getElementById('agentList');
-    const onlineCount = document.getElementById('onlineCount');
-    const agentCount = document.getElementById('agentCount');
-    const logoutBtn = document.getElementById('logoutBtn');
-    const clearHistoryBtn = document.getElementById('clearHistoryBtn');
-    const toggleSidebar = document.getElementById('toggleSidebar');
-    const sidebar = document.getElementById('sidebar');
-    const overlay = document.getElementById('overlay');
-    const mentionDropdown = document.getElementById('mentionDropdown');
-
-    let ws = null;
+<script>
+    // 状态变量
     let sessionId = localStorage.getItem('session_id');
     let currentUser = JSON.parse(localStorage.getItem('user') || '{}');
-    let agents = []; // 存储Agent列表
-    let mentionStartIndex = -1; // @符号的位置
-    let showMentionDropdown = false;
-    let unreadCount = 0; // 未读消息数
-    let isAtBottom = true; // 是否在底部
-    const newMessageBtn = document.getElementById('newMessageBtn');
-
-    // 消息选择模式
-    let selectionMode = false;
-    let selectedMessages = new Set();
-    const selectionToolbar = document.getElementById('selectionToolbar');
 
     // 检查登录状态
     if (!sessionId) {
-      window.location.href = '/';
-    }
-
-    // 验证会话有效性
-    async function validateSession() {
-      try {
-        const res = await fetch(`/api/me?session_id=${sessionId}`);
-        const data = await res.json();
-        if (!data.user) {
-          // 会话无效，跳转登录
-          localStorage.removeItem('session_id');
-          localStorage.removeItem('user');
-          window.location.href = '/';
-        }
-      } catch (e) {
-        console.error('验证会话失败:', e);
-        localStorage.removeItem('session_id');
-        localStorage.removeItem('user');
         window.location.href = '/';
-      }
     }
-    validateSession();
 
-    // 侧边栏切换
-    toggleSidebar.addEventListener('click', () => {
-      sidebar.classList.toggle('hidden-mobile');
-      overlay.classList.toggle('hidden');
-    });
+    // 騡块初始化
+    ChatRender.initMarkdown();
+    ChatUI.initElements();
+    ChatUI.initEvents();
 
-    overlay.addEventListener('click', () => {
-      sidebar.classList.add('hidden-mobile');
-      overlay.classList.add('hidden');
-    });
+    // 鶈息处理回调
+    function onMessage(data) {
+        const { type, payload } = data;
+        const el = ChatUI.elements;
 
-    // 登出
-    logoutBtn.addEventListener('click', async () => {
-      try {
-        await fetch('/api/logout', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ session_id: sessionId })
-        });
-      } catch (e) {}
-      localStorage.removeItem('session_id');
-      localStorage.removeItem('user');
-      window.location.href = '/';
-    });
+        switch (type) {
+            case 'history':
+                el.messageContainer.innerHTML = '';
+                payload.messages.forEach(msg => ChatRender.addMessage(msg, el.messageContainer, false, currentUser));
+                ChatUI.scrollToBottom();
+                break;
 
-    // 清空聊天记录
-    clearHistoryBtn.addEventListener('click', async () => {
-      if (!confirm('确定要清空所有聊天记录吗？此操作不可恢复！')) return;
-      try {
-        const res = await fetch('/api/messages/clear', { method: 'POST' });
-        const data = await res.json();
-        if (data.success) {
-          messageContainer.innerHTML = '';
-          alert('聊天记录已清空');
+            case 'message':
+                ChatRender.addMessage(payload, el.messageContainer, true, currentUser);
+                break;
+
+            case 'user_list':
+                ChatRender.renderUserList(payload.users, el.userList, el.onlineCount);
+                break;
+
+            case 'agent_list':
+                ChatRender.renderAgentList(payload.agents, el.agentListEl, el.agentCount);
+                break;
+
+            case 'agent_status':
+                // 状态更新由重新获取列表处理
+                break;
+
+            case 'clear_history':
+                el.messageContainer.innerHTML = '';
+                break;
+
+            case 'error':
+                console.error('错误:', payload.message);
+                if (payload.message && (
+                    payload.message.includes('session') ||
+                    payload.message.includes('未登录') ||
+                    payload.message.includes('无效') ||
+                    payload.message.includes('过期')
+                )) {
+                    ChatAPI.clearSession();
+                    window.location.href = '/';
+                }
+                break;
         }
-      } catch (e) {
-        alert('清空失败：' + e.message);
-      }
-    });
+    }
 
     // 连接WebSocket
-    function connect() {
-      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      ws = new WebSocket(`${protocol}//${window.location.host}`);
-
-      ws.onopen = () => {
-        console.log('WebSocket已连接');
-        ws.send(JSON.stringify({
-          type: 'join',
-          payload: { session_id: sessionId }
-        }));
-      };
-
-      ws.onmessage = (event) => {
-        const data = JSON.parse(event.data);
-        handleMessage(data);
-      };
-
-      ws.onclose = () => {
-        console.log('WebSocket已断开，3秒后重连...');
-        setTimeout(connect, 3000);
-      };
-
-      ws.onerror = (err) => {
-        console.error('WebSocket错误:', err);
-      };
-    }
-
-    // 处理收到的消息
-    function handleMessage(data) {
-      const { type, payload } = data;
-
-      switch (type) {
-        case 'history':
-          messageContainer.innerHTML = '';
-          payload.messages.forEach(msg => addMessage(msg, false));
-          scrollToBottom();
-          break;
-
-        case 'message':
-          addMessage(payload, true);
-          break;
-
-        case 'user_list':
-          renderUserList(payload.users);
-          break;
-
-        case 'agent_list':
-          renderAgentList(payload.agents);
-          break;
-
-        case 'agent_status':
-          updateAgentStatus(payload);
-          break;
-
-        case 'clear_history':
-          messageContainer.innerHTML = '';
-          break;
-
-        case 'error':
-          console.error('错误:', payload.message);
-          // 会话无效时跳转到登录页
-          if (payload.message && (
-            payload.message.includes('session') ||
-            payload.message.includes('未登录') ||
-            payload.message.includes('无效') ||
-            payload.message.includes('过期')
-          )) {
-            localStorage.removeItem('session_id');
-            localStorage.removeItem('user');
-            window.location.href = '/';
-          }
-          break;
-      }
-    }
-
-    // 检查是否在底部
-    function checkIsAtBottom() {
-      const { scrollTop, scrollHeight, clientHeight } = messageContainer;
-      return scrollTop + clientHeight >= scrollHeight - 50; // 50px 容差
-    }
-
-    // 添加消息到界面
-    function addMessage(msg, scroll = true) {
-      const isAgent = msg.sender_type === 'agent';
-      const wasAtBottom = checkIsAtBottom();
-      const isSelf = msg.sender_id === currentUser.id;
-      // 时间格式: "2026-03-23 12:00:00" -> "12:00"
-      const time = msg.created_at.includes(' ')
-        ? msg.created_at.split(' ')[1].substring(0, 5)
-        : new Date(msg.created_at).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false });
-      const msgId = 'msg-' + msg.id + '-' + Date.now();
-
-      const div = document.createElement('div');
-      div.className = `message-item flex ${isSelf ? 'justify-end' : 'justify-start'}`;
-      div.dataset.messageId = msg.id;
-
-      // 复制按钮的位置：自我消息在左边，其他消息在右边
-      const copyBtnClass = isSelf ? 'left' : 'right';
-
-      div.innerHTML = `
-        <div class="message-checkbox" data-id="${msg.id}"></div>
-        <div class="max-w-xs md:max-w-md lg:max-w-xl ${isSelf ? 'order-2' : ''}">
-          <div class="flex items-end space-x-2 ${isSelf ? 'flex-row-reverse space-x-reverse' : ''}">
-            <div class="w-8 h-8 rounded-full flex items-center justify-center text-sm ${isAgent ? 'bg-purple-100' : 'bg-blue-100'}">
-              ${isAgent ? '🤖' : '👤'}
-            </div>
-            <div class="min-w-0 message-wrapper">
-              <div class="text-xs text-gray-500 mb-1 ${isSelf ? 'text-right' : ''}">${msg.sender_name}</div>
-              <div class="px-4 py-2 rounded-2xl ${isSelf ? 'bg-purple-600 text-white' : isAgent ? 'bg-purple-100 text-purple-900' : 'bg-white text-gray-800'} shadow-sm">
-                <div id="${msgId}" class="markdown-content ${isSelf ? 'self-message' : ''}">${renderContent(msg.content, isSelf)}</div>
-              </div>
-              <button class="message-copy-btn ${copyBtnClass}" title="复制消息" data-content="${escapeHtml(msg.content).replace(/"/g, '&quot;')}">
-                📋
-              </button>
-              <div class="text-xs text-gray-400 mt-1 ${isSelf ? 'text-right' : ''}">${time}</div>
-            </div>
-          </div>
-        </div>
-      `;
-
-      messageContainer.appendChild(div);
-
-      // 为代码块添加复制按钮
-      addCopyButtons(msgId);
-
-      // 为消息添加复制功能（桌面端点击）
-      const copyBtn = div.querySelector('.message-copy-btn');
-      if (copyBtn) {
-        copyBtn.addEventListener('click', async () => {
-          const content = copyBtn.dataset.content.replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&#39;/g, "'");
-          try {
-            await navigator.clipboard.writeText(content);
-            copyBtn.textContent = '✓';
-            copyBtn.classList.add('copied');
-            setTimeout(() => {
-              copyBtn.textContent = '📋';
-              copyBtn.classList.remove('copied');
-            }, 2000);
-          } catch (e) {
-            copyBtn.textContent = '✗';
-            setTimeout(() => {
-              copyBtn.textContent = '📋';
-            }, 2000);
-          }
-        });
-      }
-
-      // 为消息添加长按复制功能（移动端）
-      const messageBubble = div.querySelector('.rounded-2xl');
-      let longPressTimer = null;
-      let touchMoved = false;
-
-      messageBubble.addEventListener('touchstart', (e) => {
-        touchMoved = false;
-        longPressTimer = setTimeout(() => {
-          if (!touchMoved) {
-            // 长按触发复制
-            const content = msg.content;
-            if (navigator.clipboard) {
-              navigator.clipboard.writeText(content).then(() => {
-                showToast('已复制');
-              }).catch(() => {
-                fallbackCopy(content);
-              });
-            } else {
-              fallbackCopy(content);
-            }
-          }
-        }, 500); // 500ms 长按
-      }, { passive: true });
-
-      messageBubble.addEventListener('touchmove', () => {
-        touchMoved = true;
-        if (longPressTimer) {
-          clearTimeout(longPressTimer);
-          longPressTimer = null;
-        }
-      });
-
-      messageBubble.addEventListener('touchend', () => {
-        if (longPressTimer) {
-          clearTimeout(longPressTimer);
-          longPressTimer = null;
-        }
-      });
-
-      // 只有在底部时才自动滚动
-      if (scroll && isAtBottom) {
-        scrollToBottom();
-      } else if (scroll && !isAtBottom) {
-        // 用户不在底部，增加未读计数
-        unreadCount++;
-        updateNewMessageButton();
-      }
-    }
-
-    // Toast 提示
-    function showToast(message) {
-      // 移除已有的toast
-      const existingToast = document.querySelector('.toast-message');
-      if (existingToast) existingToast.remove();
-
-      const toast = document.createElement('div');
-      toast.className = 'toast-message fixed top-20 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white px-4 py-2 rounded-lg shadow-lg z-50 text-sm';
-      toast.textContent = message;
-      document.body.appendChild(toast);
-
-      setTimeout(() => {
-        toast.remove();
-      }, 2000);
-
-    // 消息选择复选框点击
-    div.querySelector('.message-checkbox')?.addEventListener('click', (e) => {
-      e.stopPropagation();
-      toggleMessageSelection(msg.id, div);
-    });
-
-    // 点击消息本身也可以切换选择
-    div.addEventListener('click', () => {
-      if (selectionMode) {
-        toggleMessageSelection(msg.id, div);
-      }
-    });
-  }
-
-  // 切换消息选择状态
-  function toggleMessageSelection(msgId, element) {
-    if (selectedMessages.has(msgId)) {
-      selectedMessages.delete(msgId);
-      element.classList.remove('selected');
-      element.querySelector('.message-checkbox')?.classList.remove('checked');
-    } else {
-      selectedMessages.add(msgId);
-      element.classList.add('selected');
-      element.querySelector('.message-checkbox')?.classList.add('checked');
-    }
-    updateSelectionCount();
-  }
-
-  // 更新选择计数
-  function updateSelectionCount() {
-    document.getElementById('selectionCount').textContent = selectedMessages.size;
-    if (selectedMessages.size === 0) {
-      selectionToolbar.classList.add('hidden');
-    } else {
-      selectionToolbar.classList.remove('hidden');
-    }
-  }
-
-  // 降级复制方案
-  function fallbackCopy(text) {
-    const textarea = document.createElement('textarea');
-    textarea.value = text;
-    textarea.style.position = 'fixed';
-    textarea.style.opacity = '0';
-    document.body.appendChild(textarea);
-    textarea.select();
-    try {
-      document.execCommand('copy');
-      showToast('已复制');
-    } catch (e) {
-      showToast('复制失败');
-    }
-    document.body.removeChild(textarea);
-  }
-
-  // 初始化 markdown-it
-  const md = window.markdownit({
-    html: false,
-    breaks: true,
-    linkify: true,
-    typographer: true,
-    highlight: function(code, lang) {
-      if (lang && hljs.getLanguage(lang)) {
-        try {
-          return hljs.highlight(code, { language: lang }).value;
-        } catch (e) {}
-      }
-      return hljs.highlightAuto(code).value;
-    }
-  });
-
-  // 渲染消息内容（Markdown + @提及高亮）
-  function renderContent(content, isSelf) {
-    const placeholderPrefix = 'MNTN' + Math.random().toString(36).slice(2, 8) + 'X';
-    const mentionPlaceholders = [];
-    let processedContent = content;
-
-    if (agents && agents.length > 0) {
-      const sortedAgents = [...agents].sort((a, b) => b.name.length - a.name.length);
-      for (const agent of sortedAgents) {
-        const escapedName = agent.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        const regex = new RegExp(`@${escapedName}`, 'g');
-        const highlightClass = isSelf
-          ? 'bg-purple-500 text-white px-1 rounded'
-          : 'bg-purple-200 text-purple-800 px-1 rounded';
-        const placeholder = placeholderPrefix + mentionPlaceholders.length;
-        processedContent = processedContent.replace(regex, placeholder);
-        mentionPlaceholders.push(`<span class="${highlightClass}">@${escapeHtml(agent.name)}</span>`);
-      }
-    }
-
-    let html;
-    try {
-      html = md.render(processedContent);
-    } catch (e) {
-      html = escapeHtml(processedContent).replace(/\n/g, '<br>');
-    }
-
-    mentionPlaceholders.forEach((mention, i) => {
-      const placeholder = placeholderPrefix + i;
-      html = html.split(placeholder).join(mention);
-      const pWrapped = '<p>' + placeholder;
-      if (html.includes(pWrapped)) {
-        html = html.split(pWrapped).join('<p>' + mention);
-      }
-    });
-
-    return html;
-  }
-
-  // 为代码块添加复制按钮
-  function addCopyButtons(containerId) {
-    const container = document.getElementById(containerId);
-    if (!container) return;
-
-    const preBlocks = container.querySelectorAll('pre');
-    preBlocks.forEach((pre, index) => {
-      const code = pre.querySelector('code');
-      const langClass = code?.className.match(/language-(\w+)/);
-      const lang = langClass ? langClass[1] : 'code';
-
-      const wrapper = document.createElement('div');
-      wrapper.className = 'code-block-wrapper';
-      pre.parentNode.insertBefore(wrapper, pre);
-
-      const header = document.createElement('div');
-      header.className = 'code-block-header';
-      header.innerHTML = \`
-        <span>\${lang}</span>
-        <button class="copy-btn" data-index="\${index}">复制</button>
-      \`;
-
-      wrapper.appendChild(header);
-      wrapper.appendChild(pre);
-
-      const copyBtn = header.querySelector('.copy-btn');
-      copyBtn.addEventListener('click', async () => {
-        const codeText = code?.textContent || pre.textContent;
-        try {
-          await navigator.clipboard.writeText(codeText);
-          copyBtn.textContent = '已复制';
-          copyBtn.classList.add('copied');
-          setTimeout(() => {
-            copyBtn.textContent = '复制';
-            copyBtn.classList.remove('copied');
-          }, 2000);
-        } catch (e) {
-          copyBtn.textContent = '失败';
-          setTimeout(() => {
-            copyBtn.textContent = '复制';
-          }, 2000);
-        }
-      });
-    });
-  }
-
-  // 渲染用户列表
-  function renderUserList(users) {
-    onlineCount.textContent = users.length;
-    userList.innerHTML = users.map(user => \`
-      <div class="flex items-center space-x-2 p-2 rounded-lg hover:bg-gray-50">
-        <div class="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-sm">👤</div>
-        <span class="text-sm text-gray-700">\${user.display_name || user.username}</span>
-      </div>
-    \`).join('');
-  }
-
-  // 渲染Agent列表
-  function renderAgentList(agentList) {
-    agents = agentList;
-    const onlineAgents = agents.filter(a => a.status === 'online');
-    agentCount.textContent = onlineAgents.length;
-
-    agentListEl.innerHTML = agents.map(agent => \`
-      <div class="flex items-center space-x-2 p-2 rounded-lg hover:bg-gray-50 group">
-        <div class="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center text-sm">🤖</div>
-        <span class="text-sm text-gray-700 flex-1">\${agent.name}</span>
-        <button onclick="openAgentSettings('\${agent.id}')" class="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-purple-600 p-1" title="设置">
-          ⚙️
-        </button>
-        <span class="w-2 h-2 rounded-full \${agent.status === 'online' ? 'bg-green-500' : 'bg-gray-300'}"></span>
-      </div>
-    \`).join('');
-  }
-
-  // 更新Agent状态
-  function updateAgentStatus(data) {
-    // 重新请求Agent列表
-  }
-
-  // 发送消息
-  messageForm.addEventListener('submit', (e) => {
-      e.preventDefault();
-      const content = messageInput.value.trim();
-      if (!content || !ws || ws.readyState !== 1) return;
-
-      ws.send(JSON.stringify({
-        type: 'message',
-        payload: { content }
-      }));
-
-      messageInput.value = '';
-    });
-
-    // 回车发送
-    messageInput.addEventListener('keypress', (e) => {
-      if (e.key === 'Enter' && !e.shiftKey) {
-        if (showMentionDropdown) {
-          e.preventDefault();
-          selectFirstMention();
-        } else {
-          e.preventDefault();
-          messageForm.dispatchEvent(new Event('submit'));
-        }
-      }
-    });
-
-    // @提及功能 - 输入监听
-    messageInput.addEventListener('input', (e) => {
-      const value = messageInput.value;
-      const cursorPos = messageInput.selectionStart;
-
-      // 查找当前光标前最近的@符号
-      const textBeforeCursor = value.substring(0, cursorPos);
-      const lastAtIndex = textBeforeCursor.lastIndexOf('@');
-
-      if (lastAtIndex !== -1) {
-        // 检查@后面是否有空格（如果有空格说明已经结束提及）
-        const textAfterAt = textBeforeCursor.substring(lastAtIndex + 1);
-        if (!textAfterAt.includes(' ')) {
-          mentionStartIndex = lastAtIndex;
-          const searchText = textAfterAt.toLowerCase();
-          showMentionSuggestions(searchText);
-          return;
-        }
-      }
-
-      hideMentionDropdown();
-    });
-
-    // 显示@提及建议
-    function showMentionSuggestions(searchText) {
-      const filteredAgents = agents.filter(agent =>
-        agent.status === 'online' &&
-        agent.name.toLowerCase().includes(searchText)
-      );
-
-      if (filteredAgents.length === 0) {
-        hideMentionDropdown();
-        return;
-      }
-
-      mentionDropdown.innerHTML = filteredAgents.map((agent, index) => `
-        <div class="mention-item px-4 py-2 hover:bg-purple-50 cursor-pointer flex items-center space-x-2 ${index === 0 ? 'bg-purple-50' : ''}"
-             data-agent-name="${escapeHtml(agent.name)}">
-          <span class="text-purple-600">🤖</span>
-          <span>${highlightMatch(agent.name, searchText)}</span>
-        </div>
-      `).join('');
-
-      mentionDropdown.classList.remove('hidden');
-      showMentionDropdown = true;
-
-      // 绑定点击事件
-      mentionDropdown.querySelectorAll('.mention-item').forEach(item => {
-        item.addEventListener('click', () => {
-          insertMention(item.dataset.agentName);
-        });
-      });
-    }
-
-    // 高亮匹配文字
-    function highlightMatch(name, search) {
-      if (!search) return escapeHtml(name);
-      const escapedName = escapeHtml(name);
-      const escapedSearch = escapeHtml(search);
-      const regex = new RegExp(`(${escapedSearch})`, 'gi');
-      return escapedName.replace(regex, '<span class="text-purple-600 font-semibold">$1</span>');
-    }
-
-    // 插入选中的Agent名称
-    function insertMention(agentName) {
-      const value = messageInput.value;
-      const beforeMention = value.substring(0, mentionStartIndex);
-      const afterCursor = value.substring(messageInput.selectionStart);
-
-      messageInput.value = beforeMention + '@' + agentName + ' ' + afterCursor;
-      messageInput.focus();
-
-      // 设置光标位置到插入内容之后
-      const newPos = beforeMention.length + agentName.length + 2;
-      messageInput.setSelectionRange(newPos, newPos);
-
-      hideMentionDropdown();
-    }
-
-    // 选择第一个提及建议
-    function selectFirstMention() {
-      const firstItem = mentionDropdown.querySelector('.mention-item');
-      if (firstItem) {
-        insertMention(firstItem.dataset.agentName);
-      }
-    }
-
-    // 隐藏@提及下拉菜单
-    function hideMentionDropdown() {
-      mentionDropdown.classList.add('hidden');
-      showMentionDropdown = false;
-    }
-
-    // 点击其他地方关闭下拉菜单
-    document.addEventListener('click', (e) => {
-      if (!messageInput.contains(e.target) && !mentionDropdown.contains(e.target)) {
-        hideMentionDropdown();
-      }
-    });
-
-    // 方向键导航@提及列表
-    messageInput.addEventListener('keydown', (e) => {
-      if (!showMentionDropdown) return;
-
-      const items = mentionDropdown.querySelectorAll('.mention-item');
-      const currentIndex = Array.from(items).findIndex(item => item.classList.contains('bg-purple-50'));
-
-      if (e.key === 'ArrowDown') {
-        e.preventDefault();
-        const nextIndex = (currentIndex + 1) % items.length;
-        items[currentIndex]?.classList.remove('bg-purple-50');
-        items[nextIndex]?.classList.add('bg-purple-50');
-      } else if (e.key === 'ArrowUp') {
-        e.preventDefault();
-        const prevIndex = (currentIndex - 1 + items.length) % items.length;
-        items[currentIndex]?.classList.remove('bg-purple-50');
-        items[prevIndex]?.classList.add('bg-purple-50');
-      } else if (e.key === 'Tab' || e.key === 'Enter') {
-        e.preventDefault();
-        const selectedItem = mentionDropdown.querySelector('.mention-item.bg-purple-50');
-        if (selectedItem) {
-          insertMention(selectedItem.dataset.agentName);
-        }
-      } else if (e.key === 'Escape') {
-        hideMentionDropdown();
-      }
-    });
-
-    // 监听滚动位置
-    messageContainer.addEventListener('scroll', () => {
-      const { scrollTop, scrollHeight, clientHeight } = messageContainer;
-      isAtBottom = scrollTop + clientHeight >= scrollHeight - 50;
-      if (!isAtBottom && unreadCount > 0) {
-        updateNewMessageButton();
-      }
-    });
-
-    // 更新新消息按钮
-    function updateNewMessageButton() {
-      if (unreadCount > 0) {
-        newMessageBtn.textContent = `↓ ${unreadCount} 条新消息`;
-        newMessageBtn.classList.remove('hidden');
-      } else {
-        newMessageBtn.classList.add('hidden');
-      }
-    }
-
-    // 点击新消息按钮，    newMessageBtn.addEventListener('click', () => {
-      scrollToBottom();
-      unreadCount = 0;
-      updateNewMessageButton();
-    });
-
-    // 滚动到底部
-    function scrollToBottom() {
-      messageContainer.scrollTop = messageContainer.scrollHeight;
-      isAtBottom = true;
-    }
-
-    // HTML转义
-    function escapeHtml(text) {
-      const div = document.createElement('div');
-      div.textContent = text;
-      return div.innerHTML;
-    }
-
-    // ==================== 消息选择模式 ====================
-    const selectModeBtn = document.getElementById('selectModeBtn');
-    const selectionCountEl = document.getElementById('selectionCount');
-    const topicModal = document.getElementById('topicModal');
-    const topicTitle = document.getElementById('topicTitle');
-    const topicDesc = document.getElementById('topicDesc');
-    const selectedCountEl = document.getElementById('selectedCount');
-    const saveAsTopicBtn = document.getElementById('saveAsTopicBtn');
-    const cancelSelectionBtn = document.getElementById('cancelSelectionBtn');
-    const createTopicBtn = document.getElementById('createTopicBtn');
-    const cancelTopicBtn = document.getElementById('cancelTopicBtn');
-
-    // 切换选择模式
-    selectModeBtn.addEventListener('click', () => {
-      selectionMode = !selectionMode;
-      selectModeBtn.classList.toggle('bg-purple-100', selectionMode);
-      selectModeBtn.classList.toggle('text-purple-600', selectionMode);
-
-      if (!selectionMode) {
-        exitSelectionMode();
-      } else {
-        selectionToolbar.classList.remove('hidden');
-      }
-    });
-
-    function exitSelectionMode() {
-      selectionMode = false;
-      selectedMessages.clear();
-      selectModeBtn.classList.remove('bg-purple-100', 'text-purple-600');
-      selectionToolbar.classList.add('hidden');
-
-      // 移除所有消息的选中状态
-      document.querySelectorAll('.message-item.selected').forEach(el => {
-        el.classList.remove('selected');
-      });
-    }
-
-    // 保存为话题按钮
-    saveAsTopicBtn.addEventListener('click', () => {
-      if (selectedMessages.size === 0) return;
-      selectedCountEl.textContent = selectedMessages.size;
-      topicModal.classList.remove('hidden');
-    });
-
-    // 取消选择
-    cancelSelectionBtn.addEventListener('click', exitSelectionMode);
-
-    // 取消弹窗
-    cancelTopicBtn.addEventListener('click', () => {
-      topicModal.classList.add('hidden');
-    });
-
-    // 创建话题
-    createTopicBtn.addEventListener('click', async () => {
-      const title = topicTitle.value.trim();
-      if (!title) {
-        alert('请输入话题标题');
-        return;
-      }
-
-      try {
-        const messageIds = Array.from(selectedMessages);
-        const res = await fetch('/api/topics', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            title,
-            description: topicDesc.value.trim(),
-            created_by: currentUser.id,
-            message_ids: messageIds
-          })
-        });
-
-        const data = await res.json();
-
-        if (data.success) {
-          alert('话题创建成功！');
-          topicModal.classList.add('hidden');
-          exitSelectionMode();
-          topicTitle.value = '';
-          topicDesc.value = '';
-        } else {
-          alert('创建失败: ' + (data.error || '未知错误'));
-        }
-      } catch (e) {
-        alert('创建失败: ' + e.message);
-      }
-    });
-
-    // 点击弹窗外部关闭
-    topicModal.addEventListener('click', (e) => {
-      if (e.target === topicModal) {
-        topicModal.classList.add('hidden');
-      }
-    });
-
-    // ==================== Agent 设置功能 ====================
-
-    let currentEditingAgent = null;
-
-    // 打开 Agent 设置弹窗
-    async function openAgentSettings(agentId) {
-      currentEditingAgent = agentId;
-      const modal = document.getElementById('agentSettingsModal');
-      const content = document.getElementById('agentSettingsContent');
-
-      modal.classList.remove('hidden');
-      content.innerHTML = '<div class="text-center text-gray-400 py-8">加载中...</div>';
-
-      try {
-        const res = await fetch(`/api/agents/${agentId}/config`);
-        const data = await res.json();
-
-        if (!data.success) {
-          content.innerHTML = `<div class="text-red-500 text-center py-4">${data.error || '加载失败'}</div>`;
-          return;
-        }
-
-        const config = data.config;
-        const customSettings = config.custom_settings || {};
-
-        content.innerHTML = `
-          <div class="space-y-4">
-            <!-- 基本信息 -->
-            <div>
-              <label class="block text-sm text-gray-600 mb-1">名称</label>
-              <input type="text" id="agentName" value="${config.name || ''}" class="w-full px-3 py-2 border rounded-lg">
-            </div>
-
-            <!-- 人设 -->
-            <div>
-              <label class="block text-sm text-gray-600 mb-1">🎭 人设 / 性格</label>
-              <textarea id="agentPersona" class="w-full px-3 py-2 border rounded-lg" rows="3" placeholder="描述 Agent 的性格特点、说话风格...">${config.persona || ''}</textarea>
-            </div>
-
-            <!-- 对话模式 -->
-            <div>
-              <label class="block text-sm text-gray-600 mb-1">💬 对话模式</label>
-              <select id="agentConversationMode" class="w-full px-3 py-2 border rounded-lg">
-                <option value="free" ${config.conversation_mode === 'free' ? 'selected' : ''}>自由模式 - 随时参与</option>
-                <option value="mention" ${config.conversation_mode === 'mention' ? 'selected' : ''}>提及模式 - 仅在被 @ 时回复</option>
-                <option value="passive" ${config.conversation_mode === 'passive' ? 'selected' : ''}>被动模式 - 仅回答问题</option>
-              </select>
-            </div>
-
-            <!-- 消息过滤 -->
-            <div>
-              <label class="block text-sm text-gray-600 mb-1">📩 消息过滤</label>
-              <select id="agentMessageFilter" class="w-full px-3 py-2 border rounded-lg">
-                <option value="all" ${config.message_filter === 'all' ? 'selected' : ''}>接收所有消息</option>
-                <option value="keywords" ${config.message_filter === 'keywords' ? 'selected' : ''}>仅关键词匹配</option>
-                <option value="mention" ${config.message_filter === 'mention' ? 'selected' : ''}>仅被提及时</option>
-              </select>
-            </div>
-
-            <!-- 历史消息限制 -->
-            <div>
-              <label class="block text-sm text-gray-600 mb-1">📜 历史消息数量</label>
-              <input type="number" id="agentHistoryLimit" value="${config.history_limit || 50}" min="10" max="500" class="w-full px-3 py-2 border rounded-lg">
-            </div>
-
-            <!-- 自定义设置（JSON格式） -->
-            <div>
-              <label class="block text-sm text-gray-600 mb-1">🔧 自定义设置 (JSON)</label>
-              <textarea id="agentCustomSettings" class="w-full px-3 py-2 border rounded-lg font-mono text-sm" rows="3" placeholder='{"key": "value"}'>${JSON.stringify(customSettings, null, 2)}</textarea>
-            </div>
-
-            <!-- 保存按钮 -->
-            <div class="flex space-x-2 pt-2">
-              <button onclick="saveAgentSettings()" class="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">
-                💾 保存设置
-              </button>
-              <button onclick="closeAgentSettings()" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">
-                取消
-              </button>
-            </div>
-          </div>
-        `;
-      } catch (e) {
-        content.innerHTML = `<div class="text-red-500 text-center py-4">加载失败: ${e.message}</div>`;
-      }
-    }
-
-    // 关闭 Agent 设置弹窗
-    function closeAgentSettings() {
-      document.getElementById('agentSettingsModal').classList.add('hidden');
-      currentEditingAgent = null;
-    }
-
-    // 保存 Agent 设置
-    async function saveAgentSettings() {
-      if (!currentEditingAgent) return;
-
-      const name = document.getElementById('agentName').value.trim();
-      const persona = document.getElementById('agentPersona').value.trim();
-      const conversationMode = document.getElementById('agentConversationMode').value;
-      const messageFilter = document.getElementById('agentMessageFilter').value;
-      const historyLimit = parseInt(document.getElementById('agentHistoryLimit').value) || 50;
-      const customSettingsStr = document.getElementById('agentCustomSettings').value.trim();
-
-      let customSettings = {};
-      if (customSettingsStr) {
-        try {
-          customSettings = JSON.parse(customSettingsStr);
-        } catch (e) {
-          alert('自定义设置 JSON 格式错误');
-          return;
-        }
-      }
-
-      const settings = {
-        name,
-        persona,
-        conversation_mode: conversationMode,
-        message_filter: messageFilter,
-        history_limit: historyLimit,
-        custom_settings: customSettings
-      };
-
-      try {
-        const res = await fetch(`/api/agents/${currentEditingAgent}/config`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(settings)
-        });
-        const data = await res.json();
-
-        if (data.success) {
-          closeAgentSettings();
-          // 刷新 Agent 列表
-          if (ws && ws.readyState === 1) {
-            ws.send(JSON.stringify({ type: 'get_agent_list' }));
-          }
-          // 显示成功提示
-          showToast(`✅ Agent "${name}" 设置已保存`);
-        } else {
-          alert(data.error || '保存失败');
-        }
-      } catch (e) {
-        alert('保存失败: ' + e.message);
-      }
-    }
-
-    // 简单的 Toast 提示
-    function showToast(message) {
-      const toast = document.createElement('div');
-      toast.className = 'fixed bottom-4 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white px-4 py-2 rounded-lg shadow-lg z-50';
-      toast.textContent = message;
-      document.body.appendChild(toast);
-      setTimeout(() => toast.remove(), 3000);
-    }
-
-    // 点击弹窗外部关闭
-    document.getElementById('agentSettingsModal').addEventListener('click', (e) => {
-      if (e.target.id === 'agentSettingsModal') {
-        closeAgentSettings();
-      }
-    });
-
-    // 启动
-    connect();
-  </script>
+    ChatWS.connect(
+        () => ChatWS.join(sessionId),
+        onMessage,
+    );
+
+    // 验证会话
+    ChatAPI.validateSession(sessionId);
+</script>
 </body>
 </html>
