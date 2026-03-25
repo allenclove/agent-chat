@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Agent Chat - 群聊</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- Markdown渲染 -->
-  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <!-- Markdown渲染 - 使用 markdown-it 库更稳定 -->
+  <script src="https://cdn.jsdelivr.net/npm/markdown-it@14/dist/markdown-it.min.js"></script>
   <!-- 代码高亮 -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11/styles/github-dark.min.css">
   <script src="https://cdn.jsdelivr.net/npm/highlight.js@11/lib/core.min.js"></script>
@@ -137,6 +137,48 @@
     }
     .markdown-content.self-message blockquote {
       border-left-color: rgba(255,255,255,0.3);
+    }
+    /* 消息复制按钮 */
+    .message-wrapper {
+      position: relative;
+    }
+    .message-copy-btn {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      opacity: 0;
+      transition: opacity 0.2s;
+      background: rgba(0,0,0,0.6);
+      color: white;
+      border: none;
+      padding: 4px 8px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 12px;
+      z-index: 5;
+    }
+    .message-wrapper:hover .message-copy-btn {
+      opacity: 1;
+    }
+    .message-copy-btn.left {
+      right: 100%;
+      margin-right: 8px;
+    }
+    .message-copy-btn.right {
+      left: 100%;
+      margin-left: 8px;
+    }
+    .message-copy-btn:active {
+      background: rgba(0,0,0,0.8);
+    }
+    .message-copy-btn.copied {
+      background: #22c55e;
+    }
+    /* 移动端隐藏悬浮复制按钮，使用长按 */
+    @media (max-width: 768px) {
+      .message-copy-btn {
+        display: none;
+      }
     }
   </style>
 </head>
@@ -404,17 +446,24 @@
       const div = document.createElement('div');
       div.className = `flex ${isSelf ? 'justify-end' : 'justify-start'}`;
 
+      // 复制按钮的位置：自我消息在左边，其他消息在右边
+      const copyBtnClass = isSelf ? 'left' : 'right';
+      const copyBtnPosition = isSelf ? 'right: 100%; margin-right: 8px;' : 'left: 100%; margin-left: 8px;';
+
       div.innerHTML = `
         <div class="max-w-xs md:max-w-md lg:max-w-xl ${isSelf ? 'order-2' : ''}">
           <div class="flex items-end space-x-2 ${isSelf ? 'flex-row-reverse space-x-reverse' : ''}">
             <div class="w-8 h-8 rounded-full flex items-center justify-center text-sm ${isAgent ? 'bg-purple-100' : 'bg-blue-100'}">
               ${isAgent ? '🤖' : '👤'}
             </div>
-            <div class="min-w-0">
+            <div class="min-w-0 message-wrapper">
               <div class="text-xs text-gray-500 mb-1 ${isSelf ? 'text-right' : ''}">${msg.sender_name}</div>
               <div class="px-4 py-2 rounded-2xl ${isSelf ? 'bg-purple-600 text-white' : isAgent ? 'bg-purple-100 text-purple-900' : 'bg-white text-gray-800'} shadow-sm">
                 <div id="${msgId}" class="markdown-content ${isSelf ? 'self-message' : ''}">${renderContent(msg.content, isSelf)}</div>
               </div>
+              <button class="message-copy-btn ${copyBtnClass}" title="复制消息" data-content="${escapeHtml(msg.content).replace(/"/g, '&quot;')}">
+                📋
+              </button>
               <div class="text-xs text-gray-400 mt-1 ${isSelf ? 'text-right' : ''}">${time}</div>
             </div>
           </div>
@@ -426,7 +475,69 @@
       // 为代码块添加复制按钮
       addCopyButtons(msgId);
 
-      // 只有在底部时才自动滚动，      if (scroll && isAtBottom) {
+      // 为消息添加复制功能（桌面端点击）
+      const copyBtn = div.querySelector('.message-copy-btn');
+      if (copyBtn) {
+        copyBtn.addEventListener('click', async () => {
+          const content = copyBtn.dataset.content.replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&#39;/g, "'");
+          try {
+            await navigator.clipboard.writeText(content);
+            copyBtn.textContent = '✓';
+            copyBtn.classList.add('copied');
+            setTimeout(() => {
+              copyBtn.textContent = '📋';
+              copyBtn.classList.remove('copied');
+            }, 2000);
+          } catch (e) {
+            copyBtn.textContent = '✗';
+            setTimeout(() => {
+              copyBtn.textContent = '📋';
+            }, 2000);
+          }
+        });
+      }
+
+      // 为消息添加长按复制功能（移动端）
+      const messageBubble = div.querySelector('.rounded-2xl');
+      let longPressTimer = null;
+      let touchMoved = false;
+
+      messageBubble.addEventListener('touchstart', (e) => {
+        touchMoved = false;
+        longPressTimer = setTimeout(() => {
+          if (!touchMoved) {
+            // 长按触发复制
+            const content = msg.content;
+            if (navigator.clipboard) {
+              navigator.clipboard.writeText(content).then(() => {
+                showToast('已复制');
+              }).catch(() => {
+                fallbackCopy(content);
+              });
+            } else {
+              fallbackCopy(content);
+            }
+          }
+        }, 500); // 500ms 长按
+      }, { passive: true });
+
+      messageBubble.addEventListener('touchmove', () => {
+        touchMoved = true;
+        if (longPressTimer) {
+          clearTimeout(longPressTimer);
+          longPressTimer = null;
+        }
+      });
+
+      messageBubble.addEventListener('touchend', () => {
+        if (longPressTimer) {
+          clearTimeout(longPressTimer);
+          longPressTimer = null;
+        }
+      });
+
+      // 只有在底部时才自动滚动
+      if (scroll && isAtBottom) {
         scrollToBottom();
       } else if (scroll && !isAtBottom) {
         // 用户不在底部，增加未读计数
@@ -434,6 +545,56 @@
         updateNewMessageButton();
       }
     }
+
+    // Toast 提示
+    function showToast(message) {
+      // 移除已有的toast
+      const existingToast = document.querySelector('.toast-message');
+      if (existingToast) existingToast.remove();
+
+      const toast = document.createElement('div');
+      toast.className = 'toast-message fixed top-20 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white px-4 py-2 rounded-lg shadow-lg z-50 text-sm';
+      toast.textContent = message;
+      document.body.appendChild(toast);
+
+      setTimeout(() => {
+        toast.remove();
+      }, 2000);
+    }
+
+    // 降级复制方案
+    function fallbackCopy(text) {
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      textarea.style.position = 'fixed';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.select();
+      try {
+        document.execCommand('copy');
+        showToast('已复制');
+      } catch (e) {
+        showToast('复制失败');
+      }
+      document.body.removeChild(textarea);
+    }
+
+    // 初始化 markdown-it
+    const md = window.markdownit({
+      html: false,         // 不允许HTML标签
+      xhtmlOut: false,     // 不使用XHTML自闭合标签
+      breaks: true,        // 换行转<br>
+      linkify: true,       // 自动识别链接
+      typographer: true,   // 启用排版替换
+      highlight: function(code, lang) {
+        if (lang && hljs.getLanguage(lang)) {
+          try {
+            return hljs.highlight(code, { language: lang }).value;
+          } catch (e) {}
+        }
+        return hljs.highlightAuto(code).value;
+      }
+    });
 
     // 渲染消息内容（Markdown + @提及高亮）
     function renderContent(content, isSelf) {
@@ -458,23 +619,10 @@
         }
       }
 
-      // 渲染Markdown
+      // 使用 markdown-it 渲染
       let html;
       try {
-        // 配置marked
-        marked.setOptions({
-          highlight: function(code, lang) {
-            if (lang && hljs.getLanguage(lang)) {
-              try {
-                return hljs.highlight(code, { language: lang }).value;
-              } catch (e) {}
-            }
-            return hljs.highlightAuto(code).value;
-          },
-          breaks: true,
-          gfm: true
-        });
-        html = marked.parse(processedContent);
+        html = md.render(processedContent);
       } catch (e) {
         html = escapeHtml(processedContent).replace(/\n/g, '<br>');
       }
@@ -484,6 +632,11 @@
         // 处理原始占位符和可能的HTML编码版本
         const placeholder = placeholderPrefix + i;
         html = html.split(placeholder).join(mention);
+        // 处理可能被markdown-it包裹在p标签中的情况
+        const pWrapped = '<p>' + placeholder;
+        if (html.includes(pWrapped)) {
+          html = html.split(pWrapped).join('<p>' + mention);
+        }
       });
 
       return html;

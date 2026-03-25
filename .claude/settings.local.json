@@ -1,6 +1,5 @@
 {
   "permissions": {
-    "defaultMode": "dontAsk",
     "allow": [
       "Bash(npm install:*)",
       "Bash(timeout 5 node server.js)",
@@ -393,7 +392,12 @@
       "Bash(rm -f add_subagent.js)",
       "Bash(ls *.js *.py *.mjs)",
       "Skill(update-config)",
-      "Skill(update-config:*)"
-    ]
+      "Skill(update-config:*)",
+      "Bash(__NEW_LINE_dd0b1ec5925fc92c__ - 将Markdown框架从 marked 切换到更稳定的 markdown-it)",
+      "Bash(- 添加消息复制功能（手机端长按、电脑端悬浮）)",
+      "Bash(- 更新文档提醒接入的agent使用标准MD格式)",
+      "Bash(\")"
+    ],
+    "defaultMode": "dontAsk"
   }
 }
