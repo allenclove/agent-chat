@@ -74,6 +74,47 @@ async function init() {
     )
   `);
 
+  // 话题表
+  db.run(`
+    CREATE TABLE IF NOT EXISTS topics (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL,
+      description TEXT,
+      created_by TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      status TEXT DEFAULT 'active'
+    )
+  `);
+
+  // 话题消息表（消息副本，独立于 messages 表）
+  db.run(`
+    CREATE TABLE IF NOT EXISTS topic_messages (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      topic_id TEXT NOT NULL,
+      sender_id TEXT NOT NULL,
+      sender_name TEXT NOT NULL,
+      sender_type TEXT NOT NULL,
+      content TEXT NOT NULL,
+      original_created_at TEXT,
+      sequence INTEGER NOT NULL,
+      FOREIGN KEY (topic_id) REFERENCES topics(id) ON DELETE CASCADE
+    )
+  `);
+
+  // 话题总结表
+  db.run(`
+    CREATE TABLE IF NOT EXISTS topic_summaries (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      topic_id TEXT NOT NULL,
+      narrative TEXT,
+      viewpoints TEXT,
+      consensus TEXT,
+      open_questions TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (topic_id) REFERENCES topics(id) ON DELETE CASCADE
+    )
+  `);
+
   // 初始化默认设置
   initDefaultSettings();
 
@@ -499,6 +540,251 @@ function updateSettings(settings) {
   return true;
 }
 
+// ==================== 话题相关操作 ====================
+
+// 创建话题
+function createTopic(title, description, createdBy, messageIds) {
+  const id = uuidv4();
+  const now = formatShanghaiTime(new Date());
+
+  db.run(
+    'INSERT INTO topics (id, title, description, created_by, created_at) VALUES (?, ?, ?, ?, ?)',
+    [id, title, description || null, createdBy, now]
+  );
+
+  // 如果有消息IDs，复制消息到话题消息表
+  if (messageIds && messageIds.length > 0) {
+    // 获取原始消息
+    const placeholders = messageIds.map(() => '?').join(',');
+    const result = db.exec(
+      `SELECT id, sender_id, sender_name, sender_type, content, created_at FROM messages WHERE id IN (${placeholders}) ORDER BY id`,
+      messageIds
+    );
+
+    if (result.length > 0) {
+      const columns = result[0].columns;
+      result[0].values.forEach((values, index) => {
+        const msg = {};
+        columns.forEach((col, i) => msg[col] = values[i]);
+
+        db.run(
+          `INSERT INTO topic_messages (topic_id, original_message_id, sender_id, sender_name, sender_type, content, original_created_at, sequence) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          [id, msg.id, msg.sender_id, msg.sender_name, msg.sender_type, msg.content, msg.created_at, index]
+        );
+      });
+    }
+  }
+
+  save();
+
+  return {
+    id,
+    title,
+    description,
+    created_by,
+    created_at: now,
+    message_count: messageIds ? messageIds.length : 0
+  };
+}
+
+// 获取所有话题列表
+function getTopics(limit = 50, offset = 0) {
+  const result = db.exec(
+    `SELECT t.id, t.title, t.description, t.created_by, t.created_at, t.status,
+            (SELECT COUNT(*) FROM topic_messages WHERE topic_id = t.id) as message_count,
+            (SELECT content FROM topic_summaries WHERE topic_id = t.id ORDER BY created_at DESC LIMIT 1) as has_summary
+     FROM topics t
+     ORDER BY t.created_at DESC
+     LIMIT ? OFFSET ?`,
+    [limit, offset]
+  );
+
+  if (result.length === 0) return [];
+
+  const columns = result[0].columns;
+  return result[0].values.map(values => {
+    const topic = {};
+    columns.forEach((col, i) => topic[col] = values[i]);
+    return topic;
+  });
+}
+
+// 获取话题详情
+function getTopicById(topicId) {
+  const result = db.exec(
+    `SELECT t.id, t.title, t.description, t.created_by, t.created_at, t.status,
+            (SELECT COUNT(*) FROM topic_messages WHERE topic_id = t.id) as message_count
+     FROM topics t
+     WHERE t.id = ?`,
+    [topicId]
+  );
+
+  if (result.length === 0 || result[0].values.length === 0) return null;
+
+  const columns = result[0].columns;
+  const values = result[0].values[0];
+  const topic = {};
+  columns.forEach((col, i) => topic[col] = values[i]);
+
+  return topic;
+}
+
+// 获取话题消息列表
+function getTopicMessages(topicId) {
+  const result = db.exec(
+    `SELECT id, original_message_id, sender_id, sender_name, sender_type, content, original_created_at, sequence
+     FROM topic_messages
+     WHERE topic_id = ?
+     ORDER BY sequence ASC`,
+    [topicId]
+  );
+
+  if (result.length === 0) return [];
+
+  const columns = result[0].columns;
+  return result[0].values.map(values => {
+    const msg = {};
+    columns.forEach((col, i) => msg[col] = values[i]);
+    return msg;
+  });
+}
+
+// 添加消息到话题
+function addMessagesToTopic(topicId, messageIds) {
+  if (!messageIds || messageIds.length === 0) return 0;
+
+  // 获取话题当前最大sequence
+  const maxSeqResult = db.exec(
+    'SELECT MAX(sequence) FROM topic_messages WHERE topic_id = ?',
+    [topicId]
+  );
+  let nextSeq = 0;
+  if (maxSeqResult.length > 0 && maxSeqResult[0].values.length > 0) {
+    nextSeq = maxSeqResult[0].values[0][0] || 0;
+  }
+
+  // 获取原始消息
+  const placeholders = messageIds.map(() => '?').join(',');
+  const result = db.exec(
+    `SELECT id, sender_id, sender_name, sender_type, content, created_at FROM messages WHERE id IN (${placeholders}) ORDER BY id`,
+    messageIds
+  );
+
+  let added = 0;
+  if (result.length > 0) {
+    const columns = result[0].columns;
+    result[0].values.forEach((values) => {
+      const msg = {};
+      columns.forEach((col, i) => msg[col] = values[i]);
+
+      // 检查是否已存在
+      const existsResult = db.exec(
+        'SELECT id FROM topic_messages WHERE topic_id = ? AND original_message_id = ?',
+        [topicId, msg.id]
+      );
+
+      if (existsResult.length === 0 || existsResult[0].values.length === 0) {
+        db.run(
+          `INSERT INTO topic_messages (topic_id, original_message_id, sender_id, sender_name, sender_type, content, original_created_at, sequence) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          [topicId, msg.id, msg.sender_id, msg.sender_name, msg.sender_type, msg.content, msg.created_at, nextSeq++]
+        );
+        added++;
+      }
+    });
+  }
+
+  save();
+  return added;
+}
+
+// 更新话题
+function updateTopic(topicId, title, description) {
+  db.run(
+    'UPDATE topics SET title = ?, description = ? WHERE id = ?',
+    [title, description || null, topicId]
+  );
+  save();
+  return true;
+}
+
+// 删除话题
+function deleteTopic(topicId) {
+  db.run('DELETE FROM topics WHERE id = ?', [topicId]);
+  save();
+  return true;
+}
+
+// 保存话题总结
+function saveTopicSummary(topicId, narrative, viewpoints, consensus, openQuestions) {
+  const now = formatShanghaiTime(new Date());
+
+  // 先删除旧总结
+  db.run('DELETE FROM topic_summaries WHERE topic_id = ?', [topicId]);
+
+  db.run(
+    `INSERT INTO topic_summaries (topic_id, narrative, viewpoints, consensus, open_questions, created_at) VALUES (?, ?, ?, ?, ?, ?)`,
+    [topicId, narrative, JSON.stringify(viewpoints), consensus, JSON.stringify(openQuestions), now]
+  );
+
+  save();
+
+  return {
+    topic_id: topicId,
+    narrative,
+    viewpoints,
+    consensus,
+    open_questions,
+    created_at: now
+  };
+}
+
+// 获取话题总结
+function getTopicSummary(topicId) {
+  const result = db.exec(
+    'SELECT id, topic_id, narrative, viewpoints, consensus, open_questions, created_at FROM topic_summaries WHERE topic_id = ? ORDER BY created_at DESC LIMIT 1',
+    [topicId]
+  );
+
+  if (result.length === 0 || result[0].values.length === 0) return null;
+
+  const columns = result[0].columns;
+  const values = result[0].values[0];
+  const summary = {};
+  columns.forEach((col, i) => {
+    if (col === 'viewpoints' || col === 'open_questions') {
+      try {
+        summary[col] = JSON.parse(values[i]);
+      } catch (e) {
+        summary[col] = values[i];
+      }
+    } else {
+      summary[col] = values[i];
+    }
+  });
+
+  return summary;
+}
+
+// 获取消息用于导出（根据ID列表）
+function getMessagesByIds(messageIds) {
+  if (!messageIds || messageIds.length === 0) return [];
+
+  const placeholders = messageIds.map(() => '?').join(',');
+  const result = db.exec(
+    `SELECT id, sender_id, sender_name, sender_type, content, created_at FROM messages WHERE id IN (${placeholders}) ORDER BY id`,
+    messageIds
+  );
+
+  if (result.length === 0) return [];
+
+  const columns = result[0].columns;
+  return result[0].values.map(values => {
+    const msg = {};
+    columns.forEach((col, i) => msg[col] = values[i]);
+    return msg;
+  });
+}
+
 module.exports = {
   init,
   formatShanghaiTime,
@@ -516,6 +802,7 @@ module.exports = {
   getRecentMessages,
   clearMessages,
   getMessageStats,
+  getMessagesByIds,
   // Agent
   getAllAgents,
   getAgentById,
@@ -528,5 +815,15 @@ module.exports = {
   getSetting,
   getAllSettings,
   updateSetting,
-  updateSettings
+  updateSettings,
+  // 话题相关
+  createTopic,
+  getTopics,
+  getTopicById,
+  getTopicMessages,
+  addMessagesToTopic,
+  updateTopic,
+  deleteTopic,
+  saveTopicSummary,
+  getTopicSummary
 };

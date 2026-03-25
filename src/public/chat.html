@@ -180,6 +180,170 @@
         display: none;
       }
     }
+    /* 消息选择模式 */
+    .message-item.selected {
+      background: rgba(139, 92, 246, 0.15);
+    }
+    .message-checkbox {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translateY(-50%);
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      border: 2px solid #8b5cf6;
+      cursor: pointer;
+      z-index: 10;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+    .message-item:hover .message-checkbox {
+      opacity: 1;
+    }
+    .selection-toolbar {
+      position: fixed;
+      bottom: 80px;
+      left: 0;
+      right: 0;
+      background: white;
+      padding: 12px 20px;
+      box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      z-index: 20;
+    }
+    .selection-toolbar.hidden {
+      display: none;
+    }
+    /* 话题创建弹窗 */
+    .topic-modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 50;
+    }
+    .topic-modal.hidden {
+      display: none;
+    }
+    .topic-modal-content {
+      background: white;
+      border-radius: 12px;
+      padding: 24px;
+      width: 90%;
+      max-width: 480px;
+    }
+    .topic-modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+    .topic-modal-header h3 {
+      font-size: 18px;
+      font-weight: 600;
+    }
+    .topic-modal-close {
+      background: none;
+      border: none;
+      font-size: 24px;
+      cursor: pointer;
+      color: #666;
+    }
+    .topic-modal-close:hover {
+      color: #333;
+    }
+    .topic-modal-body input,
+    .topic-modal-body textarea {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      margin-bottom: 12px;
+    }
+    .topic-modal-body textarea {
+      min-height: 80px;
+      resize: none;
+    }
+    .topic-modal-footer {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      margin-top: 16px;
+    }
+    .topic-modal-footer button {
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-weight: 500;
+      cursor: pointer;
+    }
+    .btn-cancel {
+      background: #f3f4f4;
+      color: #666;
+    }
+    .btn-cancel:hover {
+      background: #e5e7eb;
+    }
+    .btn-create {
+      background: #8b5cf6;
+      color: white;
+    }
+    .btn-create:hover {
+      background: #7c3d0;
+    }
+    /* 消息选择模式 */
+    .message-item {
+      position: relative;
+    }
+    .message-checkbox {
+      position: absolute;
+      left: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      border: 2px solid #d1d5db;
+      background: white;
+      cursor: pointer;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+    .message-item:hover .message-checkbox {
+      opacity: 1;
+    }
+    .message-checkbox.checked {
+      background: #8b5cf6;
+      border-color: #8b5cf6;
+    }
+    .message-checkbox.checked::after {
+      content: '✓';
+      color: white;
+      font-size: 12px;
+      line-height: 16px;
+      text-align: center;
+    }
+    .message-item.selected {
+      background: rgba(139, 92, 246, 0.1);
+    }
+    .selection-toolbar {
+      position: fixed;
+      bottom: 80px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: white;
+      padding: 8px 16px;
+      border-radius: 24px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      z-index: 20;
+    }
   </style>
 </head>
 <body class="h-screen flex flex-col bg-gray-100">
@@ -200,6 +364,12 @@
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7"/>
         </svg>
       </button>
+      <button id="selectModeBtn" class="px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-lg" title="选择消息">
+        ✅ 选择
+      </button>
+      <a href="/topics.html" class="px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-lg" title="话题记录">
+        📚 话题
+      </a>
       <a href="/debug.html" class="px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-lg" title="调试面板">
         🔧 调试
       </a>
@@ -285,6 +455,35 @@
   <!-- 遮罩层 -->
   <div id="overlay" class="hidden fixed inset-0 bg-black bg-opacity-50 z-10 md:hidden"></div>
 
+  <!-- 创建话题弹窗 -->
+  <div id="topicModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div class="bg-white rounded-lg p-6 w-96 max-w-md">
+      <h3 class="font-bold text-lg mb-4">保存为话题</h3>
+      <div class="mb-4">
+        <label class="block text-sm text-gray-600 mb-1">话题标题</label>
+        <input type="text" id="topicTitle" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500" placeholder="输入话题标题...">
+      </div>
+      <div class="mb-4">
+        <label class="block text-sm text-gray-600 mb-1">描述（可选）</label>
+        <textarea id="topicDesc" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500" rows="2" placeholder="话题描述..."></textarea>
+      </div>
+      <div class="mb-4 text-sm text-gray-500">
+        已选择 <span id="selectedCount">0</span> 条消息
+      </div>
+      <div class="flex justify-end space-x-2">
+        <button id="cancelTopicBtn" class="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg">取消</button>
+        <button id="createTopicBtn" class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">创建</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 选择模式工具栏 -->
+  <div id="selectionToolbar" class="hidden fixed bottom-20 left-1/2 transform -translate-x-1/2 bg-white rounded-full shadow-lg px-4 py-2 flex items-center space-x-3 z-20">
+    <span class="text-sm text-gray-600">已选择 <span id="selectionCount">0</span> 条</span>
+    <button id="saveAsTopicBtn" class="px-3 py-1 bg-purple-600 text-white text-sm rounded-full hover:bg-purple-700">保存为话题</button>
+    <button id="cancelSelectionBtn" class="px-3 py-1 text-gray-600 text-sm hover:bg-gray-100 rounded-full">取消</button>
+  </div>
+
   <script>
     const messageContainer = document.getElementById('messageContainer');
     const messageForm = document.getElementById('messageForm');
@@ -309,6 +508,11 @@
     let unreadCount = 0; // 未读消息数
     let isAtBottom = true; // 是否在底部
     const newMessageBtn = document.getElementById('newMessageBtn');
+
+    // 消息选择模式
+    let selectionMode = false;
+    let selectedMessages = new Set();
+    const selectionToolbar = document.getElementById('selectionToolbar');
 
     // 检查登录状态
     if (!sessionId) {
@@ -423,12 +627,6 @@
     // 检查是否在底部
     function checkIsAtBottom() {
       const { scrollTop, scrollHeight, clientHeight } = messageContainer;
-      return scrollTop + clientHeight >= scrollHeight - 50;
-    }
-
-    // 检查是否在底部
-    function checkIsAtBottom() {
-      const { scrollTop, scrollHeight, clientHeight } = messageContainer;
       return scrollTop + clientHeight >= scrollHeight - 50; // 50px 容差
     }
 
@@ -444,13 +642,14 @@
       const msgId = 'msg-' + msg.id + '-' + Date.now();
 
       const div = document.createElement('div');
-      div.className = `flex ${isSelf ? 'justify-end' : 'justify-start'}`;
+      div.className = `message-item flex ${isSelf ? 'justify-end' : 'justify-start'}`;
+      div.dataset.messageId = msg.id;
 
       // 复制按钮的位置：自我消息在左边，其他消息在右边
       const copyBtnClass = isSelf ? 'left' : 'right';
-      const copyBtnPosition = isSelf ? 'right: 100%; margin-right: 8px;' : 'left: 100%; margin-left: 8px;';
 
       div.innerHTML = `
+        <div class="message-checkbox" data-id="${msg.id}"></div>
         <div class="max-w-xs md:max-w-md lg:max-w-xl ${isSelf ? 'order-2' : ''}">
           <div class="flex items-end space-x-2 ${isSelf ? 'flex-row-reverse space-x-reverse' : ''}">
             <div class="w-8 h-8 rounded-full flex items-center justify-center text-sm ${isAgent ? 'bg-purple-100' : 'bg-blue-100'}">
@@ -561,6 +760,44 @@
         toast.remove();
       }, 2000);
     }
+
+    // 消息选择复选框点击
+    div.querySelector('.message-checkbox')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleMessageSelection(msg.id, div);
+    });
+
+    // 点击消息本身也可以切换选择
+    div.addEventListener('click', () => {
+      if (selectionMode) {
+        toggleMessageSelection(msg.id, div);
+      }
+    });
+  }
+
+  // 切换消息选择状态
+  function toggleMessageSelection(msgId, element) {
+    if (selectedMessages.has(msgId)) {
+      selectedMessages.delete(msgId);
+      element.classList.remove('selected');
+      element.querySelector('.message-checkbox')?.classList.remove('checked');
+    } else {
+      selectedMessages.add(msgId);
+      element.classList.add('selected');
+      element.querySelector('.message-checkbox')?.classList.add('checked');
+    }
+    updateSelectionCount();
+  }
+
+  // 更新选择计数
+  function updateSelectionCount() {
+    document.getElementById('selectionCount').textContent = selectedMessages.size;
+    if (selectedMessages.size === 0) {
+      selectionToolbar.classList.add('hidden');
+    } else {
+      selectionToolbar.classList.remove('hidden');
+    }
+  }
 
     // 降级复制方案
     function fallbackCopy(text) {
@@ -917,6 +1154,102 @@
       div.textContent = text;
       return div.innerHTML;
     }
+
+    // ==================== 消息选择模式 ====================
+    const selectModeBtn = document.getElementById('selectModeBtn');
+    const selectionCountEl = document.getElementById('selectionCount');
+    const topicModal = document.getElementById('topicModal');
+    const topicTitle = document.getElementById('topicTitle');
+    const topicDesc = document.getElementById('topicDesc');
+    const selectedCountEl = document.getElementById('selectedCount');
+    const saveAsTopicBtn = document.getElementById('saveAsTopicBtn');
+    const cancelSelectionBtn = document.getElementById('cancelSelectionBtn');
+    const createTopicBtn = document.getElementById('createTopicBtn');
+    const cancelTopicBtn = document.getElementById('cancelTopicBtn');
+
+    // 切换选择模式
+    selectModeBtn.addEventListener('click', () => {
+      selectionMode = !selectionMode;
+      selectModeBtn.classList.toggle('bg-purple-100', selectionMode);
+      selectModeBtn.classList.toggle('text-purple-600', selectionMode);
+
+      if (!selectionMode) {
+        exitSelectionMode();
+      } else {
+        selectionToolbar.classList.remove('hidden');
+      }
+    });
+
+    function exitSelectionMode() {
+      selectionMode = false;
+      selectedMessages.clear();
+      selectModeBtn.classList.remove('bg-purple-100', 'text-purple-600');
+      selectionToolbar.classList.add('hidden');
+
+      // 移除所有消息的选中状态
+      document.querySelectorAll('.message-item.selected').forEach(el => {
+        el.classList.remove('selected');
+      });
+    }
+
+    // 保存为话题按钮
+    saveAsTopicBtn.addEventListener('click', () => {
+      if (selectedMessages.size === 0) return;
+      selectedCountEl.textContent = selectedMessages.size;
+      topicModal.classList.remove('hidden');
+    });
+
+    // 取消选择
+    cancelSelectionBtn.addEventListener('click', exitSelectionMode);
+
+    // 取消弹窗
+    cancelTopicBtn.addEventListener('click', () => {
+      topicModal.classList.add('hidden');
+    });
+
+    // 创建话题
+    createTopicBtn.addEventListener('click', async () => {
+      const title = topicTitle.value.trim();
+      if (!title) {
+        alert('请输入话题标题');
+        return;
+      }
+
+      try {
+        const messageIds = Array.from(selectedMessages);
+        const res = await fetch('/api/topics', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title,
+            description: topicDesc.value.trim(),
+            created_by: currentUser.id,
+            message_ids: messageIds
+          })
+        });
+
+        const data = await res.json();
+
+        if (data.success) {
+          alert('话题创建成功！');
+          topicModal.classList.add('hidden');
+          exitSelectionMode();
+          topicTitle.value = '';
+          topicDesc.value = '';
+        } else {
+          alert('创建失败: ' + (data.error || '未知错误'));
+        }
+      } catch (e) {
+        alert('创建失败: ' + e.message);
+      }
+    });
+
+    // 点击弹窗外部关闭
+    topicModal.addEventListener('click', (e) => {
+      if (e.target === topicModal) {
+        topicModal.classList.add('hidden');
+      }
+    });
 
     // 启动
     connect();

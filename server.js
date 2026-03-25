@@ -221,6 +221,213 @@ async function start() {
       return true;
     }
 
+    // ==================== 话题相关 API ====================
+
+    // 获取话题列表
+    if (req.url === '/api/topics' && req.method === 'GET') {
+      const url = new URL(req.url, `http://localhost:${PORT}`);
+      const limit = parseInt(url.searchParams.get('limit')) || 50;
+      const offset = parseInt(url.searchParams.get('offset')) || 0;
+
+      const topics = db.getTopics(limit, offset);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: true, topics }));
+      return true;
+    }
+
+    // 创建话题
+    if (req.url === '/api/topics' && req.method === 'POST') {
+      let body = '';
+      req.on('data', chunk => body += chunk);
+      req.on('end', () => {
+        try {
+          const { title, description, message_ids, created_by } = JSON.parse(body);
+
+          if (!title || !title.trim()) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: '标题不能为空' }));
+            return;
+          }
+
+          const topic = db.createTopic(title.trim(), description, created_by, message_ids);
+          console.log(`[API] 创建话题: ${topic.title}`);
+
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: true, topic }));
+        } catch (e) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: '创建失败: ' + e.message }));
+        }
+      });
+      return true;
+    }
+
+    // 获取话题详情 / 更新话题 / 删除话题
+    const topicDetailMatch = req.url.match(/^\/api\/topics\/([^/?]+)(\?.*)?$/);
+    if (topicDetailMatch) {
+      const topicId = topicDetailMatch[1];
+
+      // 获取话题详情
+      if (req.method === 'GET') {
+        const topic = db.getTopicById(topicId);
+        if (!topic) {
+          res.writeHead(404, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: '话题不存在' }));
+          return true;
+        }
+
+        const messages = db.getTopicMessages(topicId);
+        const summary = db.getTopicSummary(topicId);
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          success: true,
+          topic: { ...topic, messages, summary }
+        }));
+        return true;
+      }
+
+      // 更新话题
+      if (req.method === 'PUT') {
+        let body = '';
+        req.on('data', chunk => body += chunk);
+        req.on('end', () => {
+          try {
+            const { title, description } = JSON.parse(body);
+            db.updateTopic(topicId, title, description);
+            console.log(`[API] 更新话题: ${topicId}`);
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ success: true }));
+          } catch (e) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: '更新失败' }));
+          }
+        });
+        return true;
+      }
+
+      // 删除话题
+      if (req.method === 'DELETE') {
+        db.deleteTopic(topicId);
+        console.log(`[API] 删除话题: ${topicId}`);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: true }));
+        return true;
+      }
+    }
+
+    // 添加消息到话题
+    const addMessagesMatch = req.url.match(/^\/api\/topics\/([^/]+)\/messages$/);
+    if (addMessagesMatch && req.method === 'POST') {
+      const topicId = addMessagesMatch[1];
+      let body = '';
+      req.on('data', chunk => body += chunk);
+      req.on('end', () => {
+        try {
+          const { message_ids } = JSON.parse(body);
+          const added = db.addMessagesToTopic(topicId, message_ids);
+          console.log(`[API] 添加 ${added} 条消息到话题 ${topicId}`);
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: true, added }));
+        } catch (e) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: '添加失败' }));
+        }
+      });
+      return true;
+    }
+
+    // 生成/保存总结
+    const summaryMatch = req.url.match(/^\/api\/topics\/([^/]+)\/summary$/);
+    if (summaryMatch && req.method === 'POST') {
+      const topicId = summaryMatch[1];
+      let body = '';
+      req.on('data', chunk => body += chunk);
+      req.on('end', () => {
+        try {
+          const { narrative, viewpoints, consensus, open_questions } = JSON.parse(body);
+
+          if (!narrative) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: '总结内容不能为空' }));
+            return;
+          }
+
+          const summary = db.saveTopicSummary(topicId, narrative, viewpoints, consensus, open_questions);
+          console.log(`[API] 保存话题总结: ${topicId}`);
+
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: true, summary }));
+        } catch (e) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: '保存失败' }));
+        }
+      });
+      return true;
+    }
+
+    // 导出话题
+    const exportMatch = req.url.match(/^\/api\/topics\/([^/?]+)\/export(\?.*)?$/);
+    if (exportMatch && req.method === 'GET') {
+      const topicId = exportMatch[1];
+      const url = new URL(req.url, `http://localhost:${PORT}`);
+      const format = url.searchParams.get('format') || 'markdown';
+
+      const topic = db.getTopicById(topicId);
+      if (!topic) {
+        res.writeHead(404, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: '话题不存在' }));
+        return true;
+      }
+
+      const messages = db.getTopicMessages(topicId);
+      const summary = db.getTopicSummary(topicId);
+
+      let content, filename, contentType;
+
+      if (format === 'json') {
+        content = JSON.stringify({ topic, messages, summary }, null, 2);
+        filename = `topic-${topicId}.json`;
+        contentType = 'application/json';
+      } else {
+        // Markdown 格式
+        content = `# ${topic.title}\n\n`;
+        if (topic.description) {
+          content += `> ${topic.description}\n\n`;
+        }
+        content += `**创建时间**: ${topic.created_at}\n\n`;
+        content += `---\n\n`;
+        content += `## 聊天记录\n\n`;
+        messages.forEach(msg => {
+          const time = msg.original_created_at || '';
+          content += `**${msg.sender_name}** (${msg.sender_type}) - ${time}:\n${msg.content}\n\n`;
+        });
+        if (summary) {
+          content += `---\n\n`;
+          content += `## 总结\n\n`;
+          content += `${summary.narrative}\n\n`;
+          if (summary.viewpoints && summary.viewpoints.length > 0) {
+            content += `### 各方观点\n\n`;
+            summary.viewpoints.forEach(v => {
+              content += `- **${v.name}** (${v.type}): ${v.summary}\n`;
+            });
+          }
+          if (summary.consensus) {
+            content += `\n### 共识\n${summary.consensus}\n`;
+          }
+        }
+        filename = `topic-${topicId}.md`;
+        contentType = 'text/markdown';
+      }
+
+      res.writeHead(200, {
+        'Content-Type': contentType,
+        'Content-Disposition': `attachment; filename="${filename}"`
+      });
+      res.end(content);
+      return true;
+    }
+
     return false;
   };
 
