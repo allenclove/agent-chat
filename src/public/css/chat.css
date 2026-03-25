@@ -26,100 +26,248 @@
   }
 }
 
-/* Markdown样式 */
-.markdown-content {
-  line-height: 1.6;
+/* Markdown样式 - 使用 .message-content */
+.message-content {
+  line-height: 1.7;
+  word-wrap: break-word;
 }
-.markdown-content p {
-  margin: 0.5em 0;
+.message-content p {
+  margin: 0.6em 0;
 }
-.markdown-content p:first-child {
+.message-content p:first-child {
   margin-top: 0;
 }
-.markdown-content p:last-child {
+.message-content p:last-child {
   margin-bottom: 0;
 }
-.markdown-content code:not(pre code) {
-  background: rgba(0,0,0,0.1);
-  padding: 0.1em 0.3em;
-  border-radius: 3px;
-  font-size: 0.9em;
+
+/* 行内代码 */
+.message-content code:not(pre code) {
+  background: rgba(0,0,0,0.08);
+  padding: 0.15em 0.4em;
+  border-radius: 4px;
+  font-size: 0.88em;
+  font-family: 'Consolas', 'Monaco', 'SF Mono', monospace;
+  color: #e83e8c;
 }
-.markdown-content pre {
-  margin: 0.5em 0;
+
+/* 代码块 - 深色主题 */
+.message-content pre {
+  margin: 0.8em 0;
   border-radius: 8px;
   overflow: hidden;
+  background: #1e1e1e !important;
 }
-.markdown-content pre code {
+.message-content pre code {
   display: block;
   padding: 1em;
   overflow-x: auto;
   font-size: 0.85em;
+  line-height: 1.5;
+  font-family: 'Consolas', 'Monaco', 'SF Mono', monospace;
+  background: transparent !important;
 }
-.markdown-content ul, .markdown-content ol {
-  margin: 0.5em 0;
-  padding-left: 1.5em;
+
+/* 列表样式 */
+.message-content ul {
+  margin: 0.6em 0;
+  padding-left: 1.8em;
+  list-style-type: disc;
 }
-.markdown-content li {
-  margin: 0.25em 0;
+.message-content ol {
+  margin: 0.6em 0;
+  padding-left: 1.8em;
+  list-style-type: decimal;
 }
-.markdown-content blockquote {
-  border-left: 3px solid rgba(0,0,0,0.2);
-  padding-left: 0.75em;
-  margin: 0.5em 0;
-  opacity: 0.85;
+.message-content li {
+  margin: 0.35em 0;
+  line-height: 1.6;
 }
-.markdown-content h1, .markdown-content h2, .markdown-content h3 {
-  margin: 0.5em 0 0.25em;
+.message-content li > ul,
+.message-content li > ol {
+  margin: 0.2em 0;
+}
+.message-content ul ul {
+  list-style-type: circle;
+}
+.message-content ul ul ul {
+  list-style-type: square;
+}
+
+/* 引用块 */
+.message-content blockquote {
+  border-left: 4px solid #8b5cf6;
+  padding: 0.5em 1em;
+  margin: 0.8em 0;
+  background: rgba(139, 92, 246, 0.05);
+  border-radius: 0 6px 6px 0;
+  color: #555;
+}
+.message-content blockquote p {
+  margin: 0.3em 0;
+}
+
+/* 标题样式 */
+.message-content h1 {
+  margin: 1em 0 0.5em;
+  font-size: 1.6em;
+  font-weight: 700;
+  border-bottom: 2px solid #e5e7eb;
+  padding-bottom: 0.3em;
+}
+.message-content h2 {
+  margin: 0.9em 0 0.4em;
+  font-size: 1.4em;
+  font-weight: 700;
+  border-bottom: 1px solid #e5e7eb;
+  padding-bottom: 0.25em;
+}
+.message-content h3 {
+  margin: 0.8em 0 0.4em;
+  font-size: 1.2em;
   font-weight: 600;
 }
-.markdown-content a {
-  color: inherit;
-  text-decoration: underline;
+.message-content h4 {
+  margin: 0.7em 0 0.3em;
+  font-size: 1.1em;
+  font-weight: 600;
+}
+.message-content h5 {
+  margin: 0.6em 0 0.3em;
+  font-size: 1em;
+  font-weight: 600;
+}
+.message-content h6 {
+  margin: 0.5em 0 0.3em;
+  font-size: 0.9em;
+  font-weight: 600;
+  color: #666;
 }
 
-/* 自我消息的markdown调整 */
-.markdown-content.self-message code:not(pre code) {
-  background: rgba(255,255,255,0.2);
+/* 链接 */
+.message-content a {
+  color: #8b5cf6;
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition: border-color 0.2s;
 }
-.markdown-content.self-message blockquote {
-  border-left-color: rgba(255,255,255,0.3);
+.message-content a:hover {
+  border-bottom-color: #8b5cf6;
 }
 
-/* 代码块容器 */
+/* 加粗和斜体 */
+.message-content strong {
+  font-weight: 700;
+}
+.message-content em {
+  font-style: italic;
+}
+
+/* 表格 */
+.message-content table {
+  border-collapse: collapse;
+  margin: 0.8em 0;
+  width: 100%;
+  font-size: 0.95em;
+}
+.message-content th, .message-content td {
+  border: 1px solid #d1d5db;
+  padding: 0.5em 0.8em;
+  text-align: left;
+}
+.message-content th {
+  background: #f3f4f6;
+  font-weight: 600;
+}
+.message-content tr:nth-child(even) {
+  background: #f9fafb;
+}
+
+/* 分割线 */
+.message-content hr {
+  border: none;
+  border-top: 2px solid #e5e7eb;
+  margin: 1.2em 0;
+}
+
+/* 图片 */
+.message-content img {
+  max-width: 100%;
+  border-radius: 8px;
+  margin: 0.5em 0;
+}
+
+/* ============ 自我消息的markdown调整 ============ */
+.message-content.self-message code:not(pre code) {
+  background: rgba(255,255,255,0.25);
+  color: #fff;
+}
+.message-content.self-message blockquote {
+  border-left-color: rgba(255,255,255,0.5);
+  background: rgba(255,255,255,0.1);
+  color: rgba(255,255,255,0.9);
+}
+.message-content.self-message a {
+  color: #fff;
+  border-bottom-color: rgba(255,255,255,0.5);
+}
+.message-content.self-message th {
+  background: rgba(255,255,255,0.15);
+}
+.message-content.self-message td {
+  border-color: rgba(255,255,255,0.2);
+}
+
+/* ============ 代码块容器（带头部和复制按钮） ============ */
 .code-block-wrapper {
   position: relative;
-  margin: 0.5em 0;
+  margin: 0.8em 0;
   border-radius: 8px;
   overflow: hidden;
+  background: #1e1e1e;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
 }
 .code-block-wrapper pre {
-  margin: 0;
+  margin: 0 !important;
+  background: transparent !important;
+  border-radius: 0 !important;
+}
+.code-block-wrapper pre code {
+  padding: 1em !important;
 }
 .code-block-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0.25em 0.75em;
+  padding: 6px 12px;
   background: #2d2d2d;
-  color: #888;
-  font-size: 0.75em;
+  border-bottom: 1px solid #404040;
 }
-.copy-btn {
+.code-block-header span {
+  color: #888;
+  font-size: 12px;
+  font-family: 'Consolas', monospace;
+  text-transform: lowercase;
+}
+.code-block-header .copy-btn {
   background: transparent;
   border: 1px solid #555;
   color: #aaa;
-  padding: 0.2em 0.5em;
+  padding: 3px 10px;
   border-radius: 4px;
   cursor: pointer;
-  font-size: 0.9em;
+  font-size: 12px;
   transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
-.copy-btn:hover {
+.code-block-header .copy-btn:hover {
   background: #444;
   color: #fff;
+  border-color: #666;
 }
-.copy-btn.copied {
+.code-block-header .copy-btn.copied {
   background: #22c55e;
   border-color: #22c55e;
   color: #fff;
@@ -316,4 +464,74 @@
   box-shadow: 0 4px 12px rgba(0,0,0,0.15);
   z-index: 50;
   font-size: 14px;
+}
+
+/* 消息气泡容器 */
+.message-bubble-wrapper {
+  display: inline-block;
+  position: relative;
+}
+
+/* 消息复制按钮 - 深色图标，透明背景 */
+.msg-copy-btn {
+  position: absolute;
+  bottom: 4px;
+  right: 4px;
+  width: 24px;
+  height: 24px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+.msg-copy-btn svg {
+  width: 16px;
+  height: 16px;
+  color: rgba(0, 0, 0, 0.4);
+  transition: color 0.2s;
+}
+.msg-copy-btn:hover svg {
+  color: rgba(0, 0, 0, 0.7);
+}
+.msg-copy-btn.copied svg {
+  color: #22c55e;
+}
+
+/* 白色气泡中的复制按钮 */
+.bg-gray-100 .msg-copy-btn svg,
+.bg-gradient-to-r .msg-copy-btn svg {
+  color: rgba(0, 0, 0, 0.4);
+}
+.bg-gray-100 .msg-copy-btn:hover svg,
+.bg-gradient-to-r .msg-copy-btn:hover svg {
+  color: rgba(0, 0, 0, 0.7);
+}
+
+/* 紫色气泡中的复制按钮 */
+.bg-purple-500 .msg-copy-btn svg {
+  color: rgba(255, 255, 255, 0.5);
+}
+.bg-purple-500 .msg-copy-btn:hover svg {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+/* 手机版复制菜单 */
+.mobile-copy-menu {
+  position: fixed;
+  min-width: 120px;
+  z-index: 100;
+}
+.mobile-copy-menu button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+}
+.mobile-copy-menu button:active {
+  background: #f3f4f6;
 }

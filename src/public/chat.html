@@ -37,13 +37,10 @@
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7"/>
                 </svg>
             </button>
-            <button id="selectModeBtn" class="px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-lg" title="选择消息">
-                ✅ 选择
-            </button>
-            <a href="/topics.html" class="px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-lg" title="话题记录">
+            <a href="/topics.html" class="px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-lg" target="_blank" title="话题记录">
                 📚 话题
             </a>
-            <a href="/debug.html" class="px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-lg" title="调试面板">
+            <a href="/debug.html" class="px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-lg" target="_blank" title="调试面板">
                 🔧 调试
             </a>
             <button id="clearHistoryBtn" class="px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-lg" title="清空聊天记录">
@@ -66,36 +63,35 @@
                 <span id="newMessageCount">0</span>
                 <span>条新消息</span>
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0"></path>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7"></path>
                 </svg>
             </button>
-        </main>
 
-        <!-- 输入区域 -->
-        <div class="bg-white border-t p-4 relative">
-            <form id="messageForm" class="flex space-x-3">
-                <div class="flex-1 relative">
-                    <input
-                        type="text"
-                        id="messageInput"
-                        placeholder="输入消息... (@提及Agent)"
-                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none"
-                        autocomplete="off"
-                    >
-                    <!-- @提及下拉菜单 -->
-                    <div id="mentionDropdown" class="absolute left-0 bottom-full mb-1 w-full bg-white border rounded-lg shadow-lg hidden z-10 max-h-48 overflow-y-auto">
-                        <!-- Agent列表动态插入 -->
+            <!-- 输入区域 -->
+            <div class="bg-white border-t p-4">
+                <form id="messageForm" class="flex space-x-3">
+                    <div class="flex-1 relative">
+                        <input
+                            type="text"
+                            id="messageInput"
+                            placeholder="输入消息... (@提及Agent)"
+                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none"
+                            autocomplete="off"
+                        >
+                        <!-- @提及下拉菜单 -->
+                        <div id="mentionDropdown" class="absolute left-0 bottom-full mb-1 w-full bg-white border rounded-lg shadow-lg hidden z-10 max-h-48 overflow-y-auto">
+                            <!-- Agent列表动态插入 -->
+                        </div>
                     </div>
-                </div>
-                <button
-                    type="submit"
-                    class="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition font-medium"
-                >
-                    发送
-                </button>
-            </form>
-        </div>
-    </main>
+                    <button
+                        type="submit"
+                        class="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition font-medium"
+                    >
+                        发送
+                    </button>
+                </form>
+            </div>
+        </main>
 
     <!-- 侧边栏 -->
     <aside id="sidebar" class="sidebar hidden-mobile fixed md:relative right-0 top-14 md:top-0 h-full md:h-auto w-72 bg-white border-l shadow-lg md:shadow-none z-20 overflow-y-auto">
