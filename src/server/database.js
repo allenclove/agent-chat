@@ -190,8 +190,22 @@ function createMessage(senderId, senderName, senderType, content) {
     sender_name: senderName,
     sender_type: senderType,
     content,
-    created_at: new Date().toISOString()
+    created_at: formatShanghaiTime(new Date())
   };
+}
+
+// 格式化为上海时间: 2026-03-23 12:00:00
+function formatShanghaiTime(date) {
+  return date.toLocaleString('zh-CN', {
+    timeZone: 'Asia/Shanghai',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false
+  }).replace(/\//g, '-');
 }
 
 function getRecentMessages(limit = 50) {
@@ -487,6 +501,7 @@ function updateSettings(settings) {
 
 module.exports = {
   init,
+  formatShanghaiTime,
   // 用户
   createUser,
   findUserByUsername,

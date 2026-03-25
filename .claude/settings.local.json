@@ -1,5 +1,6 @@
 {
   "permissions": {
+    "defaultMode": "dontAsk",
     "allow": [
       "Bash(npm install:*)",
       "Bash(timeout 5 node server.js)",
@@ -390,7 +391,9 @@
       "Bash(curl -s http://106.52.237.169:18080/api/agents)",
       "Bash(node -e \"fetch\\(''http://106.52.237.169:18080/api/agents''\\)\")",
       "Bash(rm -f add_subagent.js)",
-      "Bash(ls *.js *.py *.mjs)"
+      "Bash(ls *.js *.py *.mjs)",
+      "Skill(update-config)",
+      "Skill(update-config:*)"
     ]
   }
 }

@@ -166,7 +166,7 @@ function setupWebSocket(server) {
         sender_name: '🔧 调试面板',
         sender_type: 'system',
         content: content.trim(),
-        created_at: new Date().toISOString()
+        created_at: db.formatShanghaiTime(new Date())
       };
 
       // 广播给所有用户
@@ -269,7 +269,7 @@ function setupWebSocket(server) {
             sender_name: '系统',
             sender_type: 'system',
             content: `✅ Agent "${result.agentName}" 已成功加入群聊`,
-            created_at: new Date().toISOString()
+            created_at: db.formatShanghaiTime(new Date())
           };
           chat.broadcast('message', sysMessage);
         } else {
