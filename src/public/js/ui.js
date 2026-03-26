@@ -151,7 +151,8 @@ const ChatUI = {
     const el = this.elements.messageContainer;
     if (!el) return true;
     const { scrollTop, scrollHeight, clientHeight } = el;
-    return scrollTop + clientHeight >= scrollHeight - 100;
+    // 增大阈值到 250px，更容易触发自动滚动
+    return scrollTop + clientHeight >= scrollHeight - 250;
   },
 
   scrollToBottom() {

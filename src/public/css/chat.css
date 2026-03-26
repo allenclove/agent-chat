@@ -518,15 +518,24 @@
 .message-bubble-wrapper {
   display: inline-block;
   position: relative;
-  max-width: 85%;
+  max-width: 75%;
   min-width: 0;
+  width: fit-content;
 }
 
-/* 消息项 - 防止横向溢出 */
+/* 消息项 - 宽度占满容器 */
 .message-item {
+  width: 100%;
   min-width: 0;
   padding-left: 8px;
   padding-right: 8px;
+}
+
+/* 移动端消息气泡宽度 */
+@media (max-width: 768px) {
+  .message-bubble-wrapper {
+    max-width: 85%;
+  }
 }
 
 /* 消息复制按钮 - 深色图标，透明背景 */
@@ -619,9 +628,4 @@
   .message-bubble-wrapper {
     max-width: 85%;
   }
-}
-
-/* 新消息提示按钮 - 右上角简洁风格 */
-.new-message-btn {
-  border-radius: 8px;
 }
