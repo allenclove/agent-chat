@@ -60,7 +60,6 @@
   overflow-y: hidden;
   background: #1e1e1e !important;
   max-width: 100%;
-  white-space: pre-wrap;
 }
 .message-content pre code {
   display: block;
@@ -273,7 +272,7 @@
   position: relative;
   margin: 0.8em 0;
   border-radius: 8px;
-  overflow: hidden;
+  overflow-x: auto;
   background: #1e1e1e;
   box-shadow: 0 2px 8px rgba(0,0,0,0.15);
   max-width: 100%;
@@ -285,8 +284,6 @@
 }
 .code-block-wrapper pre code {
   padding: 1em !important;
-  white-space: pre-wrap;
-  word-break: break-all;
 }
 .code-block-header {
   display: flex;
