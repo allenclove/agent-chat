@@ -184,10 +184,10 @@ const ChatRender = {
     `;
     div.appendChild(header);
 
-    // 消息气泡容器（用于定位复制按钮）
+    // 消息气泡容器（用于定位复制按钮）- 强制限制宽度
     const bubbleWrapper = document.createElement('div');
     bubbleWrapper.className = 'message-bubble-wrapper relative group';
-    bubbleWrapper.style.maxWidth = '75%';  // 强制设置最大宽度
+    bubbleWrapper.style.cssText = 'display: inline-block; max-width: 70%; width: fit-content;';
 
     // 消息气泡 - 直接在气泡上设置宽度限制
     const bubble = document.createElement('div');

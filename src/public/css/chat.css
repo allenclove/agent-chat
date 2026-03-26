@@ -58,8 +58,10 @@
 .message-content pre {
   margin: 0.8em 0;
   border-radius: 8px;
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
   background: #1e1e1e !important;
+  max-width: 100%;
 }
 .message-content pre code {
   display: block;
@@ -514,17 +516,19 @@
   font-size: 14px;
 }
 
-/* 消息气泡容器 */
+/* 消息气泡容器 - 强制限制宽度 */
 .message-bubble-wrapper {
-  display: inline-block;
+  display: inline-block !important;
   position: relative;
-  max-width: 75% !important;
+  max-width: 70% !important;
+  width: auto !important;
 }
 
 /* 消息气泡 - 限制最大宽度 */
 .msg-bubble {
   display: block;
   max-width: 100%;
+  width: fit-content;
   word-wrap: break-word;
   overflow-wrap: break-word;
 }
