@@ -658,20 +658,25 @@
 
 /* 置顶消息区域 */
 #pinnedMessageContainer {
-  max-height: 200px;
-  overflow-y: auto;
+  max-height: 80px;
+  overflow: hidden;
 }
 
 #pinnedMessageContainer .message-content {
-  line-height: 1.5;
+  line-height: 1.4;
+  max-height: 42px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
 }
 
-#pinnedMessageContainer .message-content pre {
-  margin: 0.4em 0;
-  font-size: 0.8em;
+#pinnedMessageContainer .message-content pre,
+#pinnedMessageContainer .message-content code {
+  display: none;
 }
 
-#pinnedMessageContainer .message-content code:not(pre code) {
-  background: rgba(139, 92, 246, 0.1);
-  color: #7c3aed;
+#pinnedMessageContainer .message-content p {
+  margin: 0;
 }
