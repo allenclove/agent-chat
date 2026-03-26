@@ -29,8 +29,8 @@
 /* Markdown样式 - 使用 .message-content */
 .message-content {
   line-height: 1.7;
-  overflow-wrap: anywhere;
-  word-break: break-all;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
   min-width: 0;
   max-width: 100%;
 }
