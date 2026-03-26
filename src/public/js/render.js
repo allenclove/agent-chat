@@ -191,10 +191,10 @@ const ChatRender = {
     // 消息气泡 - 直接在气泡上设置宽度限制
     const bubble = document.createElement('div');
     const bubbleClass = isSelf
-      ? 'msg-bubble msg-bubble-self bg-purple-500 text-white rounded-2xl rounded-tr-sm px-4 py-2 pr-10'
+      ? 'msg-bubble msg-bubble-self bg-purple-500 text-white rounded-2xl rounded-tr-sm px-4 py-2 pr-8'
       : senderType === 'agent'
-        ? 'msg-bubble msg-bubble-other bg-gradient-to-r from-purple-50 to-indigo-50 text-gray-800 rounded-2xl rounded-tl-sm px-4 py-2 pr-10 border border-purple-200'
-        : 'msg-bubble msg-bubble-other bg-gray-100 text-gray-800 rounded-2xl rounded-tl-sm px-4 py-2 pr-10';
+        ? 'msg-bubble msg-bubble-other bg-gradient-to-r from-purple-50 to-indigo-50 text-gray-800 rounded-2xl rounded-tl-sm px-4 py-2 pr-8 border border-purple-200'
+        : 'msg-bubble msg-bubble-other bg-gray-100 text-gray-800 rounded-2xl rounded-tl-sm px-4 py-2 pr-8';
 
     bubble.className = bubbleClass;
     bubble.innerHTML = `<div class="message-content text-sm ${isSelf ? 'self-message' : ''}">${this.renderContent(msg.content, isSelf)}</div>`;
