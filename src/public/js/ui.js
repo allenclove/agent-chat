@@ -151,20 +151,29 @@ const ChatUI = {
     const el = this.elements.messageContainer;
     if (!el) return true;
     const { scrollTop, scrollHeight, clientHeight } = el;
-    return scrollTop + clientHeight >= scrollHeight - 50;
+    return scrollTop + clientHeight >= scrollHeight - 100;
   },
 
   scrollToBottom() {
     const el = this.elements.messageContainer;
     if (el) {
-      el.scrollTop = el.scrollHeight;
+      el.scrollTo({
+        top: el.scrollHeight,
+        behavior: 'smooth'
+      });
       this.state.isAtBottom = true;
+      this.state.unreadCount = 0;
+      this.updateNewMessageButton();
     }
   },
 
   handleScroll() {
+    const wasAtBottom = this.state.isAtBottom;
     this.state.isAtBottom = this.checkIsAtBottom();
-    if (!this.state.isAtBottom && this.state.unreadCount > 0) {
+
+    // 如果滚动到底部，清除未读计数
+    if (this.state.isAtBottom && this.state.unreadCount > 0) {
+      this.state.unreadCount = 0;
       this.updateNewMessageButton();
     }
   },
@@ -172,8 +181,10 @@ const ChatUI = {
   updateNewMessageButton() {
     const btn = this.elements.newMessageBtn;
     if (!btn) return;
+
+    const countEl = document.getElementById('newMessageCount');
     if (this.state.unreadCount > 0) {
-      btn.textContent = `↓ ${this.state.unreadCount} 条新消息`;
+      if (countEl) countEl.textContent = this.state.unreadCount;
       btn.classList.remove('hidden');
     } else {
       btn.classList.add('hidden');

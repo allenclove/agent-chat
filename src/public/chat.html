@@ -23,7 +23,11 @@
   <!-- Header -->
     <header class="bg-white shadow-sm px-3 md:px-4 py-2 md:py-3 flex items-center justify-between z-10">
         <div class="flex items-center space-x-2 md:space-x-3">
-            <span class="text-xl md:text-2xl">💬</span>
+            <div class="w-8 h-8 md:w-9 md:h-9 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-xl flex items-center justify-center">
+                <svg class="w-5 h-5 md:w-5 md:h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
+                </svg>
+            </div>
             <div>
                 <h1 class="font-bold text-gray-800 text-sm md:text-base">Agent Chat</h1>
                 <p class="text-xs text-gray-500">
@@ -32,25 +36,31 @@
             </div>
         </div>
         <div class="flex items-center space-x-1 md:space-x-2">
-            <button id="toggleSidebar" class="p-2 hover:bg-gray-100 rounded-lg" title="成员列表">
-                <svg class="w-5 h-5 md:w-6 md:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7"/>
+            <a href="/topics.html" class="p-2 hover:bg-gray-100 rounded-lg text-gray-600" target="_blank" title="话题记录">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
+                </svg>
+            </a>
+            <button id="toggleSidebar" class="p-2 hover:bg-gray-100 rounded-lg text-gray-600" title="成员列表">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
                 </svg>
             </button>
-            <!-- 移动端隐藏部分按钮 -->
-            <a href="/topics.html" class="hidden md:block px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-lg" target="_blank" title="话题记录">
-                📚 话题
+            <a href="/debug.html" class="hidden md:block p-2 hover:bg-gray-100 rounded-lg text-gray-600" target="_blank" title="调试面板">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                </svg>
             </a>
-            <a href="/debug.html" class="hidden md:block px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-lg" target="_blank" title="调试面板">
-                🔧 调试
-            </a>
-            <button id="clearHistoryBtn" class="px-2 md:px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-lg" title="清空聊天记录">
-                <span class="hidden md:inline">🗑️ 清空</span>
-                <span class="md:hidden">🗑️</span>
+            <button id="clearHistoryBtn" class="p-2 hover:bg-gray-100 rounded-lg text-gray-600" title="清空聊天记录">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                </svg>
             </button>
-            <button id="logoutBtn" class="px-2 md:px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">
-                <span class="hidden md:inline">退出</span>
-                <span class="md:hidden">🚪</span>
+            <button id="logoutBtn" class="p-2 hover:bg-gray-100 rounded-lg text-gray-600" title="退出">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
+                </svg>
             </button>
         </div>
     </header>
@@ -62,12 +72,11 @@
                 <!-- 消息会动态插入这里 -->
             </div>
             <!-- 新消息提示按钮 -->
-            <button id="newMessageBtn" class="hidden absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-purple-600 text-white px-4 py-2 rounded-full shadow-lg hover:bg-purple-700 transition-all duration-200 flex items-center space-x-1 text-sm font-medium z-10">
-                <span id="newMessageCount">0</span>
-                <span>条新消息</span>
+            <button id="newMessageBtn" class="new-message-btn hidden absolute bottom-20 left-1/2 transform -translate-x-1/2 bg-white text-purple-600 px-5 py-2.5 shadow-lg hover:shadow-xl transition-all duration-200 flex items-center space-x-2 text-sm font-medium z-10 border border-purple-100">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7"></path>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path>
                 </svg>
+                <span><span id="newMessageCount">0</span> 条新消息</span>
             </button>
 
             <!-- 输入区域 -->

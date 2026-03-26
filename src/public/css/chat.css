@@ -619,3 +619,26 @@
     max-width: 85%;
   }
 }
+
+/* 新消息提示按钮 - 两端圆弧形 */
+.new-message-btn {
+  border-radius: 9999px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none !important;
+  animation: pulse-subtle 2s infinite;
+}
+
+.new-message-btn:hover {
+  background: linear-gradient(135deg, #5a67d8 0%, #6b46c1 100%);
+  transform: translateX(-50%) scale(1.02);
+}
+
+@keyframes pulse-subtle {
+  0%, 100% {
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+  }
+  50% {
+    box-shadow: 0 4px 20px rgba(102, 126, 234, 0.6);
+  }
+}

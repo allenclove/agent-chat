@@ -6,14 +6,17 @@ const ChatRender = {
   md: null,
   agents: [],
 
-  // 解析上海时间字符串为Date对象
-  // 输入格式: "2026-03-23 12:00:00" (上海时间)
-  parseShanghaiTime(timeStr) {
-    if (!timeStr) return new Date();
-    // 将上海时间字符串转换为ISO格式，明确指定时区
-    // 格式: "2026-03-23 12:00:00" -> "2026-03-23T12:00:00+08:00"
-    const isoStr = timeStr.replace(' ', 'T') + '+08:00';
-    return new Date(isoStr);
+  // 格式化时间显示
+  // 输入格式: "2026-03-23 12:00:00" (服务器存储的上海时间字符串)
+  formatTime(timeStr) {
+    if (!timeStr) return '';
+    // 直接从字符串中提取时间部分 "HH:MM:SS"，截取为 "HH:MM"
+    const parts = timeStr.split(' ');
+    if (parts.length >= 2) {
+      const timePart = parts[1];
+      return timePart.substring(0, 5); // 返回 "HH:MM"
+    }
+    return timeStr;
   },
 
   // 初始化 Markdown-it
@@ -173,12 +176,11 @@ const ChatRender = {
     // 消息头部
     const header = document.createElement('div');
     header.className = 'flex items-center space-x-2 mb-1';
-    const messageTime = this.parseShanghaiTime(msg.created_at);
     header.innerHTML = `
       <span class="text-sm font-semibold ${isSelf ? 'text-purple-600' : 'text-gray-600'}">
         ${senderIcon}${ChatUtils.escapeHtml(senderName)}
       </span>
-      <span class="text-xs text-gray-400">${messageTime.toLocaleTimeString('zh-CN', { hour12: false })}</span>
+      <span class="text-xs text-gray-400">${this.formatTime(msg.created_at)}</span>
     `;
     div.appendChild(header);
 
@@ -248,8 +250,13 @@ const ChatRender = {
 
     container.appendChild(div);
 
-    if (autoScroll) {
+    // 只有在用户已经在底部时才自动滚动
+    if (autoScroll && ChatUI.checkIsAtBottom()) {
       container.scrollTop = container.scrollHeight;
+    } else if (autoScroll && !ChatUI.checkIsAtBottom()) {
+      // 用户在浏览历史消息，显示新消息提示
+      ChatUI.state.unreadCount++;
+      ChatUI.updateNewMessageButton();
     }
   },
 

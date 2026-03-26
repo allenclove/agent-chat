@@ -215,13 +215,14 @@
       indicator.className = `w-2 h-2 rounded-full mr-2 ${connected ? 'bg-green-500 pulse' : 'bg-red-500'}`;
     }
 
-    // 解析上海时间字符串为Date对象
-    function parseShanghaiTime(timeStr) {
-      if (!timeStr) return new Date();
-      // 将上海时间字符串转换为ISO格式，明确指定时区
-      // 格式: "2026-03-23 12:00:00" -> "2026-03-23T12:00:00+08:00"
-      const isoStr = timeStr.replace(' ', 'T') + '+08:00';
-      return new Date(isoStr);
+    // 格式化时间显示 - 直接从字符串提取时间部分
+    function formatTime(timeStr) {
+      if (!timeStr) return '';
+      const parts = timeStr.split(' ');
+      if (parts.length >= 2) {
+        return parts[1].substring(0, 5); // 返回 "HH:MM"
+      }
+      return timeStr;
     }
 
     // 添加消息到时间线
@@ -232,7 +233,7 @@
 
       const isAgent = msg.sender_type === 'agent';
       const isSystem = msg.sender_type === 'system';
-      const time = parseShanghaiTime(msg.created_at).toLocaleTimeString('zh-CN', { hour12: false });
+      const time = formatTime(msg.created_at);
 
       const div = document.createElement('div');
       div.className = 'timeline-item relative py-2';
