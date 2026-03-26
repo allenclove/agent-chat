@@ -89,6 +89,12 @@ const ChatUI = {
       ChatWS.sendMessage(content);
       el.messageInput.value = '';
       this.hideMentionDropdown();
+
+      // 发送消息后重置状态，确保后续回复自动滚动到底部
+      this.state.isAtBottom = true;
+      this.state.unreadCount = 0;
+      this.updateNewMessageButton();
+      this.scrollToBottom();
     });
 
     // 回车发送
