@@ -527,7 +527,7 @@
 .message-bubble-wrapper {
   display: inline-block;
   position: relative;
-  max-width: 70%;
+  max-width: 80%;
   min-width: 0;
 }
 
