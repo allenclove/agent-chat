@@ -102,6 +102,7 @@ async function init() {
     CREATE TABLE IF NOT EXISTS topic_messages (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       topic_id TEXT NOT NULL,
+      original_message_id TEXT,
       sender_id TEXT NOT NULL,
       sender_name TEXT NOT NULL,
       sender_type TEXT NOT NULL,
@@ -111,6 +112,20 @@ async function init() {
       FOREIGN KEY (topic_id) REFERENCES topics(id) ON DELETE CASCADE
     )
   `);
+
+  // 迁移：为已存在的表添加 original_message_id 列
+  try {
+    const columns = db.exec("PRAGMA table_info(topic_messages)");
+    if (columns.length > 0) {
+      const hasOriginalId = columns[0].values.some(col => col[1] === 'original_message_id');
+      if (!hasOriginalId) {
+        db.run('ALTER TABLE topic_messages ADD COLUMN original_message_id TEXT');
+        console.log('[DB] 已添加 original_message_id 列到 topic_messages 表');
+      }
+    }
+  } catch (e) {
+    console.log('[DB] 迁移检查跳过:', e.message);
+  }
 
   // 话题总结表
   db.run(`
@@ -627,12 +642,19 @@ function createTopic(title, description, createdBy, messageIds) {
   const id = uuidv4();
   const now = formatShanghaiTime(new Date());
 
-  db.run(
-    'INSERT INTO topics (id, title, description, created_by, created_at) VALUES (?, ?, ?, ?, ?)',
-    [id, title, description || null, createdBy, now]
-  );
+  try {
+    db.run(
+      'INSERT INTO topics (id, title, description, created_by, created_at) VALUES (?, ?, ?, ?, ?)',
+      [id, title, description || null, createdBy, now]
+    );
+    console.log(`[DB] 话题创建成功: ${id} - ${title}`);
+  } catch (e) {
+    console.error(`[DB] 创建话题失败:`, e.message);
+    throw new Error('创建话题失败: ' + e.message);
+  }
 
   // 如果有消息IDs，复制消息到话题消息表
+  let actualCount = 0;
   if (messageIds && messageIds.length > 0) {
     // 获取原始消息
     const placeholders = messageIds.map(() => '?').join(',');
@@ -647,12 +669,18 @@ function createTopic(title, description, createdBy, messageIds) {
         const msg = {};
         columns.forEach((col, i) => msg[col] = values[i]);
 
-        db.run(
-          `INSERT INTO topic_messages (topic_id, original_message_id, sender_id, sender_name, sender_type, content, original_created_at, sequence) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-          [id, msg.id, msg.sender_id, msg.sender_name, msg.sender_type, msg.content, msg.created_at, index]
-        );
+        try {
+          db.run(
+            `INSERT INTO topic_messages (topic_id, original_message_id, sender_id, sender_name, sender_type, content, original_created_at, sequence) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            [id, msg.id, msg.sender_id, msg.sender_name, msg.sender_type, msg.content, msg.created_at, index]
+          );
+          actualCount++;
+        } catch (e) {
+          console.error(`[DB] 插入话题消息失败:`, e.message);
+        }
       });
     }
+    console.log(`[DB] 已复制 ${actualCount}/${messageIds.length} 条消息到话题`);
   }
 
   save();
@@ -661,32 +689,40 @@ function createTopic(title, description, createdBy, messageIds) {
     id,
     title,
     description,
-    created_by,
+    created_by: createdBy,
     created_at: now,
-    message_count: messageIds ? messageIds.length : 0
+    message_count: actualCount
   };
 }
 
 // 获取所有话题列表
 function getTopics(limit = 50, offset = 0) {
-  const result = db.exec(
-    `SELECT t.id, t.title, t.description, t.created_by, t.created_at, t.status,
-            (SELECT COUNT(*) FROM topic_messages WHERE topic_id = t.id) as message_count,
-            (SELECT content FROM topic_summaries WHERE topic_id = t.id ORDER BY created_at DESC LIMIT 1) as has_summary
-     FROM topics t
-     ORDER BY t.created_at DESC
-     LIMIT ? OFFSET ?`,
-    [limit, offset]
-  );
+  try {
+    const result = db.exec(
+      `SELECT t.id, t.title, t.description, t.created_by, t.created_at, t.status,
+              (SELECT COUNT(*) FROM topic_messages WHERE topic_id = t.id) as message_count,
+              (SELECT content FROM topic_summaries WHERE topic_id = t.id ORDER BY created_at DESC LIMIT 1) as has_summary
+       FROM topics t
+       ORDER BY t.created_at DESC
+       LIMIT ? OFFSET ?`,
+      [limit, offset]
+    );
 
-  if (result.length === 0) return [];
+    if (result.length === 0) return [];
 
-  const columns = result[0].columns;
-  return result[0].values.map(values => {
-    const topic = {};
-    columns.forEach((col, i) => topic[col] = values[i]);
-    return topic;
-  });
+    const columns = result[0].columns;
+    const topics = result[0].values.map(values => {
+      const topic = {};
+      columns.forEach((col, i) => topic[col] = values[i]);
+      return topic;
+    });
+
+    console.log(`[DB] 查询到 ${topics.length} 个话题`);
+    return topics;
+  } catch (e) {
+    console.error('[DB] 查询话题列表失败:', e.message);
+    return [];
+  }
 }
 
 // 获取话题详情
