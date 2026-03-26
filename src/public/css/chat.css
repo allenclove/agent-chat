@@ -62,6 +62,9 @@
   overflow-y: hidden;
   background: #1e1e1e !important;
   max-width: 100%;
+  width: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
 }
 .message-content pre code {
   display: block;
@@ -278,7 +281,6 @@
   background: #1e1e1e;
   box-shadow: 0 2px 8px rgba(0,0,0,0.15);
   max-width: 100%;
-  overflow-x: auto;
 }
 .code-block-wrapper pre {
   margin: 0 !important;
@@ -287,6 +289,8 @@
 }
 .code-block-wrapper pre code {
   padding: 1em !important;
+  white-space: pre-wrap;
+  word-break: break-all;
 }
 .code-block-header {
   display: flex;
@@ -525,7 +529,6 @@
   position: relative;
   max-width: 80%;
   min-width: 0;
-  overflow: hidden;
 }
 
 /* 消息气泡 - 自适应内容宽度 */
