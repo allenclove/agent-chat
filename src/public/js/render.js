@@ -6,6 +6,16 @@ const ChatRender = {
   md: null,
   agents: [],
 
+  // 解析上海时间字符串为Date对象
+  // 输入格式: "2026-03-23 12:00:00" (上海时间)
+  parseShanghaiTime(timeStr) {
+    if (!timeStr) return new Date();
+    // 将上海时间字符串转换为ISO格式，明确指定时区
+    // 格式: "2026-03-23 12:00:00" -> "2026-03-23T12:00:00+08:00"
+    const isoStr = timeStr.replace(' ', 'T') + '+08:00';
+    return new Date(isoStr);
+  },
+
   // 初始化 Markdown-it
   initMarkdown() {
     this.md = window.markdownit({
@@ -163,18 +173,19 @@ const ChatRender = {
     // 消息头部
     const header = document.createElement('div');
     header.className = 'flex items-center space-x-2 mb-1';
+    const messageTime = this.parseShanghaiTime(msg.created_at);
     header.innerHTML = `
       <span class="text-sm font-semibold ${isSelf ? 'text-purple-600' : 'text-gray-600'}">
         ${senderIcon}${ChatUtils.escapeHtml(senderName)}
       </span>
-      <span class="text-xs text-gray-400">${new Date(msg.created_at).toLocaleTimeString()}</span>
+      <span class="text-xs text-gray-400">${messageTime.toLocaleTimeString('zh-CN', { hour12: false })}</span>
     `;
     div.appendChild(header);
 
     // 消息气泡容器（用于定位复制按钮）
     // 消息气泡容器 - inline-block 让宽度适应内容
     const bubbleWrapper = document.createElement('div');
-    bubbleWrapper.className = 'message-bubble-wrapper inline-block relative group max-w-[70%]';
+    bubbleWrapper.className = 'message-bubble-wrapper inline-block relative group max-w-[85%] md:max-w-[75%]';
 
     // 消息气泡
     const bubble = document.createElement('div');

@@ -30,6 +30,9 @@
 .message-content {
   line-height: 1.7;
   word-wrap: break-word;
+  overflow-wrap: break-word;
+  word-break: break-word;
+  min-width: 0; /* 防止flex子元素溢出 */
 }
 .message-content p {
   margin: 0.6em 0;
@@ -66,6 +69,51 @@
   line-height: 1.5;
   font-family: 'Consolas', 'Monaco', 'SF Mono', monospace;
   background: transparent !important;
+  color: #d4d4d4 !important; /* 确保代码文字是浅色的 */
+}
+/* highlight.js 语法高亮颜色 - 确保在深色背景上可见 */
+.message-content pre code .hljs-keyword,
+.message-content pre code .hljs-selector-tag,
+.message-content pre code .hljs-built_in,
+.message-content pre code .hljs-name,
+.message-content pre code .hljs-tag {
+  color: #569cd6 !important; /* 蓝色 */
+}
+.message-content pre code .hljs-string,
+.message-content pre code .hljs-title,
+.message-content pre code .hljs-section,
+.message-content pre code .hljs-attribute,
+.message-content pre code .hljs-literal,
+.message-content pre code .hljs-template-tag,
+.message-content pre code .hljs-template-variable,
+.message-content pre code .hljs-type {
+  color: #ce9178 !important; /* 橙色 */
+}
+.message-content pre code .hljs-comment,
+.message-content pre code .hljs-deletion {
+  color: #6a9955 !important; /* 绿色 */
+}
+.message-content pre code .hljs-number,
+.message-content pre code .hljs-regexp,
+.message-content pre code .hljs-addition {
+  color: #b5cea8 !important; /* 浅绿 */
+}
+.message-content pre code .hljs-function {
+  color: #dcdcaa !important; /* 黄色 */
+}
+.message-content pre code .hljs-variable,
+.message-content pre code .hljs-params {
+  color: #9cdcfe !important; /* 浅蓝 */
+}
+.message-content pre code .hljs-symbol,
+.message-content pre code .hljs-bullet,
+.message-content pre code .hljs-link,
+.message-content pre code .hljs-meta {
+  color: #808080 !important; /* 灰色 */
+}
+.message-content pre code .hljs-selector-id,
+.message-content pre code .hljs-selector-class {
+  color: #d7ba7d !important; /* 金色 */
 }
 
 /* 列表样式 */
@@ -470,6 +518,14 @@
 .message-bubble-wrapper {
   display: inline-block;
   position: relative;
+  max-width: 100%;
+  min-width: 0;
+}
+
+/* 消息项 - 防止横向溢出 */
+.message-item {
+  min-width: 0;
+  width: 100%;
 }
 
 /* 消息复制按钮 - 深色图标，透明背景 */
@@ -534,4 +590,32 @@
 }
 .mobile-copy-menu button:active {
   background: #f3f4f6;
+}
+
+/* 移动端适配 */
+@media (max-width: 768px) {
+  /* 消息区域 - 允许横向滚动查看长内容 */
+  .message-container {
+    overflow-x: auto;
+  }
+
+  /* 输入区域 - 确保按钮可见 */
+  #messageForm {
+    flex-wrap: nowrap;
+  }
+
+  #messageForm input {
+    min-width: 0;
+  }
+
+  #messageForm button[type="submit"] {
+    flex-shrink: 0;
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  /* 消息气泡 - 移动端宽度 */
+  .message-bubble-wrapper {
+    max-width: 85%;
+  }
 }

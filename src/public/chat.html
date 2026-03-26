@@ -21,33 +21,36 @@
 </head>
 <body class="h-screen flex flex-col bg-gray-100">
   <!-- Header -->
-    <header class="bg-white shadow-sm px-4 py-3 flex items-center justify-between z-10">
-        <div class="flex items-center space-x-3">
-            <span class="text-2xl">💬</span>
+    <header class="bg-white shadow-sm px-3 md:px-4 py-2 md:py-3 flex items-center justify-between z-10">
+        <div class="flex items-center space-x-2 md:space-x-3">
+            <span class="text-xl md:text-2xl">💬</span>
             <div>
-                <h1 class="font-bold text-gray-800">Agent Chat</h1>
+                <h1 class="font-bold text-gray-800 text-sm md:text-base">Agent Chat</h1>
                 <p class="text-xs text-gray-500">
                     在线: <span id="onlineCount">0</span> 人 · <span id="agentCount">0</span> Agent
                 </p>
             </div>
         </div>
-        <div class="flex items-center space-x-2">
-            <button id="toggleSidebar" class="md:hidden p-2 hover:bg-gray-100 rounded-lg">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div class="flex items-center space-x-1 md:space-x-2">
+            <button id="toggleSidebar" class="p-2 hover:bg-gray-100 rounded-lg" title="成员列表">
+                <svg class="w-5 h-5 md:w-6 md:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7"/>
                 </svg>
             </button>
-            <a href="/topics.html" class="px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-lg" target="_blank" title="话题记录">
+            <!-- 移动端隐藏部分按钮 -->
+            <a href="/topics.html" class="hidden md:block px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-lg" target="_blank" title="话题记录">
                 📚 话题
             </a>
-            <a href="/debug.html" class="px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-lg" target="_blank" title="调试面板">
+            <a href="/debug.html" class="hidden md:block px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-lg" target="_blank" title="调试面板">
                 🔧 调试
             </a>
-            <button id="clearHistoryBtn" class="px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-lg" title="清空聊天记录">
-                🗑️ 清空
+            <button id="clearHistoryBtn" class="px-2 md:px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-lg" title="清空聊天记录">
+                <span class="hidden md:inline">🗑️ 清空</span>
+                <span class="md:hidden">🗑️</span>
             </button>
-            <button id="logoutBtn" class="px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">
-                退出
+            <button id="logoutBtn" class="px-2 md:px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">
+                <span class="hidden md:inline">退出</span>
+                <span class="md:hidden">🚪</span>
             </button>
         </div>
     </header>
