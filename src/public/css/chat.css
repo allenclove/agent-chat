@@ -60,6 +60,7 @@
   overflow-y: hidden;
   background: #1e1e1e !important;
   max-width: 100%;
+  min-width: 0;
 }
 .message-content pre code {
   display: block;
@@ -521,6 +522,7 @@
   display: inline-block;
   position: relative;
   max-width: 98%;
+  overflow: hidden;
 }
 
 /* 消息气泡 - 自适应内容宽度 */
