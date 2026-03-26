@@ -25,9 +25,11 @@ async function start() {
 
   // 创建HTTP服务器
   const server = http.createServer((req, res) => {
-    // 解析URL
-    let filePath = req.url === '/' ? '/index.html' : req.url;
-    filePath = path.join(__dirname, 'src/public', filePath);
+    // 解析URL - 移除查询参数
+    let urlPath = req.url === '/' ? '/index.html' : req.url;
+    // 移除查询参数 (如 ?v=20250327)
+    urlPath = urlPath.split('?')[0];
+    let filePath = path.join(__dirname, 'src/public', urlPath);
 
     // 确定内容类型
     const ext = path.extname(filePath);
