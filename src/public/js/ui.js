@@ -16,7 +16,8 @@ const ChatUI = {
     displaySettings: {
       pinLastHumanMsg: false
     },
-    lastHumanMessage: null
+    lastHumanMessage: null,
+    pinnedManuallyHidden: false
   },
 
   // DOM 元素缓存
@@ -471,7 +472,13 @@ const ChatUI = {
 
   setLastHumanMessage(msg) {
     this.state.lastHumanMessage = msg;
+    this.state.pinnedManuallyHidden = false; // 新消息时重置
     this.updatePinnedMessage();
+  },
+
+  hidePinnedMessage() {
+    this.state.pinnedManuallyHidden = true;
+    this.elements.pinnedMessageContainer?.classList.add('hidden');
   },
 
   updatePinnedMessage() {
@@ -480,17 +487,22 @@ const ChatUI = {
 
     if (!container || !content) return;
 
+    // 如果用户手动关闭了，不显示
+    if (this.state.pinnedManuallyHidden) {
+      container.classList.add('hidden');
+      return;
+    }
+
     if (this.state.displaySettings.pinLastHumanMsg && this.state.lastHumanMessage) {
       const msg = this.state.lastHumanMessage;
-      const isSelf = msg.sender_id === JSON.parse(localStorage.getItem('user') || '{}')?.id;
       const senderName = msg.sender_name || 'Unknown';
 
       content.innerHTML = `
-        <div class="flex items-start space-x-2">
-          <span class="text-sm font-semibold text-purple-700">${ChatUtils.escapeHtml(senderName)}</span>
+        <div class="flex items-center space-x-2 text-sm">
+          <span class="font-semibold text-purple-700">${ChatUtils.escapeHtml(senderName)}</span>
           <span class="text-xs text-gray-400">${ChatRender.formatTime(msg.created_at)}</span>
         </div>
-        <div class="text-sm text-gray-700 mt-1 message-content">${ChatRender.renderContent(msg.content, false)}</div>
+        <div class="text-sm text-gray-700 mt-0.5 message-content">${ChatRender.renderContent(msg.content, false)}</div>
       `;
       container.classList.remove('hidden');
     } else {

@@ -11,13 +11,13 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
   <!-- 样式文件 -->
-  <link rel="stylesheet" href="/css/chat.css?v=20250328i">
+  <link rel="stylesheet" href="/css/chat.css?v=20250328j">
   <!-- JS模块 -->
-  <script src="/js/utils.js?v=20250328i"></script>
-  <script src="/js/api.js?v=20250328i"></script>
-  <script src="/js/websocket.js?v=20250328i"></script>
-  <script src="/js/render.js?v=20250328i"></script>
-  <script src="/js/ui.js?v=20250328i"></script>
+  <script src="/js/utils.js?v=20250328j"></script>
+  <script src="/js/api.js?v=20250328j"></script>
+  <script src="/js/websocket.js?v=20250328j"></script>
+  <script src="/js/render.js?v=20250328j"></script>
+  <script src="/js/ui.js?v=20250328j"></script>
 </head>
 <body class="h-screen flex flex-col bg-gray-100">
   <!-- Header -->
@@ -74,12 +74,15 @@
         <!-- 消息区域 -->
         <main class="flex-1 flex flex-col bg-gray-50 relative">
             <!-- 置顶消息区域 -->
-            <div id="pinnedMessageContainer" class="hidden bg-purple-50 border-b border-purple-200 p-3">
-                <div class="flex items-center justify-between mb-1">
-                    <span class="text-xs text-purple-600 font-medium">📌 最后一条人类消息</span>
-                    <button onclick="ChatUI.closeDisplaySettings()" class="text-xs text-gray-400 hover:text-gray-600">点击设置关闭</button>
+            <div id="pinnedMessageContainer" class="hidden bg-purple-50 border-b border-purple-200 px-3 py-2">
+                <div class="flex items-start justify-between">
+                    <div id="pinnedMessageContent" class="flex-1 min-w-0"></div>
+                    <button onclick="ChatUI.hidePinnedMessage()" class="ml-2 text-gray-400 hover:text-gray-600 flex-shrink-0">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
                 </div>
-                <div id="pinnedMessageContent"></div>
             </div>
             <div id="messageContainer" class="message-container flex-1 overflow-y-auto p-4 space-y-4">
                 <!-- 消息会动态插入这里 -->
