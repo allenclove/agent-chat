@@ -53,7 +53,8 @@ const ChatUI = {
       displaySettingsModal: document.getElementById('displaySettingsModal'),
       pinLastHumanMsgCheckbox: document.getElementById('pinLastHumanMsg'),
       pinnedMessageContainer: document.getElementById('pinnedMessageContainer'),
-      pinnedMessageContent: document.getElementById('pinnedMessageContent')
+      pinnedMessageContent: document.getElementById('pinnedMessageContent'),
+      newMessageBtnWrapper: document.getElementById('newMessageBtnWrapper')
     };
   },
 
@@ -212,15 +213,25 @@ const ChatUI = {
   },
 
   updateNewMessageButton() {
-    const btn = this.elements.newMessageBtn;
-    if (!btn) return;
+    const wrapper = this.elements.newMessageBtnWrapper;
+    if (!wrapper) return;
 
     const countEl = document.getElementById('newMessageCount');
     if (this.state.unreadCount > 0) {
       if (countEl) countEl.textContent = this.state.unreadCount;
-      btn.classList.remove('hidden');
+
+      // 根据置顶消息是否显示调整按钮位置
+      const pinnedContainer = this.elements.pinnedMessageContainer;
+      const isPinnedVisible = pinnedContainer && !pinnedContainer.classList.contains('hidden');
+      if (isPinnedVisible) {
+        wrapper.style.top = `${pinnedContainer.offsetHeight + 8}px`;
+      } else {
+        wrapper.style.top = '8px';
+      }
+
+      wrapper.classList.remove('hidden');
     } else {
-      btn.classList.add('hidden');
+      wrapper.classList.add('hidden');
     }
   },
 

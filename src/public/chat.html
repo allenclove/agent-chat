@@ -11,13 +11,13 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
   <!-- 样式文件 -->
-  <link rel="stylesheet" href="/css/chat.css?v=20250328k">
+  <link rel="stylesheet" href="/css/chat.css?v=20250328l">
   <!-- JS模块 -->
-  <script src="/js/utils.js?v=20250328k"></script>
-  <script src="/js/api.js?v=20250328k"></script>
-  <script src="/js/websocket.js?v=20250328k"></script>
-  <script src="/js/render.js?v=20250328k"></script>
-  <script src="/js/ui.js?v=20250328k"></script>
+  <script src="/js/utils.js?v=20250328l"></script>
+  <script src="/js/api.js?v=20250328l"></script>
+  <script src="/js/websocket.js?v=20250328l"></script>
+  <script src="/js/render.js?v=20250328l"></script>
+  <script src="/js/ui.js?v=20250328l"></script>
 </head>
 <body class="h-screen flex flex-col bg-gray-100">
   <!-- Header -->
@@ -84,14 +84,16 @@
                     </button>
                 </div>
             </div>
-            <div id="messageContainer" class="message-container flex-1 overflow-y-auto p-4 space-y-4 relative">
-                <!-- 新消息提示按钮 -->
-                <button id="newMessageBtn" class="hidden absolute top-2 right-2 p-2 hover:bg-gray-100 rounded-lg text-gray-600 transition-all duration-200 flex items-center space-x-1 text-sm z-10 bg-white/80 backdrop-blur-sm" title="查看新消息">
+            <!-- 新消息提示按钮 - 在置顶消息下方 -->
+            <div id="newMessageBtnWrapper" class="hidden absolute top-2 right-2 z-20">
+                <button id="newMessageBtn" class="p-2 hover:bg-gray-100 rounded-lg text-gray-600 transition-all duration-200 flex items-center space-x-1 text-sm bg-white/90 backdrop-blur-sm shadow-sm" title="查看新消息">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path>
                     </svg>
                     <span id="newMessageCount">0</span>
                 </button>
+            </div>
+            <div id="messageContainer" class="message-container flex-1 overflow-y-auto p-4 space-y-4">
                 <!-- 消息会动态插入这里 -->
             </div>
 
