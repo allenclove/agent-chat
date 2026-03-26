@@ -62,8 +62,6 @@
   overflow-y: hidden;
   background: #1e1e1e !important;
   max-width: 100%;
-  width: max-content;
-  min-width: 100px;
 }
 .message-content pre code {
   display: block;
