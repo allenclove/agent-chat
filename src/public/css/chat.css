@@ -29,10 +29,9 @@
 /* Markdown样式 - 使用 .message-content */
 .message-content {
   line-height: 1.7;
-  word-wrap: break-word;
-  overflow-wrap: break-word;
-  word-break: break-word;
-  min-width: 0; /* 防止flex子元素溢出 */
+  overflow-wrap: anywhere;
+  word-break: break-all;
+  min-width: 0;
   max-width: 100%;
 }
 .message-content p {
@@ -522,16 +521,17 @@
 
 /* 消息气泡容器 - 限制最大宽度 */
 .message-bubble-wrapper {
-  display: table;
+  display: inline-block;
   position: relative;
   max-width: 70%;
+  min-width: 0;
 }
 
 /* 消息气泡 - 自适应内容宽度 */
 .msg-bubble {
-  display: table-cell;
-  word-wrap: break-word;
-  overflow-wrap: break-word;
+  display: block;
+  max-width: 100%;
+  min-width: 0;
 }
 
 /* 消息项 - 宽度占满容器 */
@@ -546,7 +546,7 @@
 @media (max-width: 768px) {
   .message-bubble-wrapper {
     max-width: 85%;
-    display: table;
+    min-width: 0;
   }
 }
 
