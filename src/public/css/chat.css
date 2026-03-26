@@ -516,15 +516,15 @@
   font-size: 14px;
 }
 
-/* 消息气泡容器 - 强制限制宽度 */
+/* 消息气泡容器 - 限制最大宽度 */
 .message-bubble-wrapper {
-  display: inline-block !important;
+  display: inline-block;
   position: relative;
-  max-width: 70% !important;
-  width: auto !important;
+  max-width: 70%;
+  width: fit-content;
 }
 
-/* 消息气泡 - 限制最大宽度 */
+/* 消息气泡 - 自适应内容宽度 */
 .msg-bubble {
   display: block;
   max-width: 100%;
@@ -544,7 +544,7 @@
 /* 移动端消息气泡宽度 */
 @media (max-width: 768px) {
   .message-bubble-wrapper {
-    max-width: 85% !important;
+    max-width: 85%;
   }
 }
 
