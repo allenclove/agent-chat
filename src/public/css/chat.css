@@ -33,6 +33,7 @@
   overflow-wrap: break-word;
   word-break: break-word;
   min-width: 0; /* 防止flex子元素溢出 */
+  max-width: 100%;
 }
 .message-content p {
   margin: 0.6em 0;
@@ -62,6 +63,7 @@
   overflow-y: hidden;
   background: #1e1e1e !important;
   max-width: 100%;
+  width: auto;
 }
 .message-content pre code {
   display: block;
@@ -217,7 +219,8 @@
 .message-content table {
   border-collapse: collapse;
   margin: 0.8em 0;
-  width: 100%;
+  width: auto;
+  max-width: 100%;
   font-size: 0.95em;
 }
 .message-content th, .message-content td {
@@ -276,6 +279,7 @@
   overflow: hidden;
   background: #1e1e1e;
   box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  max-width: 100%;
 }
 .code-block-wrapper pre {
   margin: 0 !important;
