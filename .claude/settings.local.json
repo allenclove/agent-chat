@@ -461,7 +461,8 @@
       "Bash(curl -s \"http://106.52.237.169:18080/css/chat.css?v=20250327\")",
       "Bash(curl -s \"http://106.52.237.169:18080/css/chat.css\")",
       "Bash(curl -s \"http://106.52.237.169:18080/js/render.js?v=20250327\")",
-      "Bash(curl -s \"http://106.52.237.169:18080/chat.html\")"
+      "Bash(curl -s \"http://106.52.237.169:18080/chat.html\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://106.52.237.169:3000/)"
     ],
     "defaultMode": "dontAsk"
   }

@@ -522,17 +522,14 @@
 
 /* 消息气泡容器 - 限制最大宽度 */
 .message-bubble-wrapper {
-  display: inline-block;
+  display: table;
   position: relative;
   max-width: 70%;
-  width: fit-content;
 }
 
 /* 消息气泡 - 自适应内容宽度 */
 .msg-bubble {
-  display: block;
-  max-width: 100%;
-  width: fit-content;
+  display: table-cell;
   word-wrap: break-word;
   overflow-wrap: break-word;
 }
@@ -549,6 +546,7 @@
 @media (max-width: 768px) {
   .message-bubble-wrapper {
     max-width: 85%;
+    display: table;
   }
 }
 
