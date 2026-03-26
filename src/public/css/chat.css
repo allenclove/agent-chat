@@ -63,6 +63,8 @@
   background: #1e1e1e !important;
   max-width: 100%;
   width: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
 }
 .message-content pre code {
   display: block;
@@ -287,6 +289,8 @@
 }
 .code-block-wrapper pre code {
   padding: 1em !important;
+  white-space: pre-wrap;
+  word-break: break-all;
 }
 .code-block-header {
   display: flex;

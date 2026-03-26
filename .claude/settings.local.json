@@ -462,7 +462,9 @@
       "Bash(curl -s \"http://106.52.237.169:18080/css/chat.css\")",
       "Bash(curl -s \"http://106.52.237.169:18080/js/render.js?v=20250327\")",
       "Bash(curl -s \"http://106.52.237.169:18080/chat.html\")",
-      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://106.52.237.169:3000/)"
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://106.52.237.169:3000/)",
+      "Bash(curl -s -o /tmp/screenshot.png \"https://maas-log-prod.cn-wlcb.ufileos.com/anthropic/f74427e5-78f6-4b06-b7e9-dc1652385e5f/cb7e7fb98d543fb02aff296d430c38f1.png?UCloudPublicKey=TOKEN_e15ba47a-d098-4fbd-9afc-a0dcf0e4e621&Expires=1774546507&Signature=dX0UyAAphjKsWIw3mQs05NAA/gQ=\")",
+      "Bash(curl -s -o \"C:\\\\Users\\\\13936\\\\AppData\\\\Local\\\\Temp\\\\screenshot.png\" \"https://maas-log-prod.cn-wlcb.ufileos.com/anthropic/f74427e5-78f6-4b06-b7e9-dc1652385e5f/cb7e7fb98d543fb02aff296d430c38f1.png?UCloudPublicKey=TOKEN_e15ba47a-d098-4fbd-9afc-a0dcf0e4e621&Expires=1774546507&Signature=dX0UyAAphjKsWIw3mQs05NAA/gQ=\")"
     ],
     "defaultMode": "dontAsk"
   }
