@@ -526,20 +526,28 @@
 
 /* 消息气泡容器 - 限制最大宽度 */
 .message-bubble-wrapper {
-  display: inline-block;
-  position: relative;
+  display: block;
+  width: fit-content;
   max-width: 85%;
-  min-width: 0;
-  overflow: hidden;
+  position: relative;
 }
 
 /* 消息气泡 - 自适应内容宽度 */
 .msg-bubble {
   display: block;
   max-width: 100%;
-  min-width: 0;
+  word-wrap: break-word;
+  overflow-wrap: anywhere;
   word-break: break-word;
-  overflow-wrap: break-word;
+}
+
+/* 确保段落和行内元素换行 */
+.msg-bubble .message-content,
+.msg-bubble .message-content p {
+  word-wrap: break-word;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  max-width: 100%;
 }
 
 /* 消息项 - 宽度占满容器 */
