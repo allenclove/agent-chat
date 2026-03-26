@@ -169,6 +169,11 @@ const ChatRender = {
     // 保存原始消息内容（用于复制）
     div.dataset.rawContent = msg.content;
 
+    // 追踪最后一条人类消息
+    if (senderType !== 'agent') {
+      ChatUI.setLastHumanMessage(msg);
+    }
+
     // 根据发送者设置对齐方式 - w-full 确保宽度占满容器
     div.className = `message-item flex flex-col w-full mb-4 ${isSelf ? 'items-end' : 'items-start'}`;
     div.dataset.msgId = msg.id;

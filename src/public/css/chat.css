@@ -655,3 +655,23 @@
     max-width: 85%;
   }
 }
+
+/* 置顶消息区域 */
+#pinnedMessageContainer {
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+#pinnedMessageContainer .message-content {
+  line-height: 1.5;
+}
+
+#pinnedMessageContainer .message-content pre {
+  margin: 0.4em 0;
+  font-size: 0.8em;
+}
+
+#pinnedMessageContainer .message-content code:not(pre code) {
+  background: rgba(139, 92, 246, 0.1);
+  color: #7c3aed;
+}

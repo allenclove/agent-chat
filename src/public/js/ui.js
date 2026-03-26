@@ -11,7 +11,12 @@ const ChatUI = {
     isAtBottom: true,
     mentionStartIndex: -1,
     showMentionDropdown: false,
-    currentEditingAgent: null
+    currentEditingAgent: null,
+    // 显示设置
+    displaySettings: {
+      pinLastHumanMsg: false
+    },
+    lastHumanMessage: null
   },
 
   // DOM 元素缓存
@@ -41,7 +46,13 @@ const ChatUI = {
       topicTitle: document.getElementById('topicTitle'),
       topicDesc: document.getElementById('topicDesc'),
       selectedCountEl: document.getElementById('selectedCount'),
-      agentSettingsModal: document.getElementById('agentSettingsModal')
+      agentSettingsModal: document.getElementById('agentSettingsModal'),
+      // 显示设置相关
+      settingsBtn: document.getElementById('settingsBtn'),
+      displaySettingsModal: document.getElementById('displaySettingsModal'),
+      pinLastHumanMsgCheckbox: document.getElementById('pinLastHumanMsg'),
+      pinnedMessageContainer: document.getElementById('pinnedMessageContainer'),
+      pinnedMessageContent: document.getElementById('pinnedMessageContent')
     };
   },
 
@@ -149,6 +160,20 @@ const ChatUI = {
     el.agentSettingsModal?.addEventListener('click', (e) => {
       if (e.target === el.agentSettingsModal) this.closeAgentSettings();
     });
+
+    // 显示设置
+    el.settingsBtn?.addEventListener('click', () => this.openDisplaySettings());
+    el.displaySettingsModal?.addEventListener('click', (e) => {
+      if (e.target === el.displaySettingsModal) this.closeDisplaySettings();
+    });
+    el.pinLastHumanMsgCheckbox?.addEventListener('change', (e) => {
+      this.state.displaySettings.pinLastHumanMsg = e.target.checked;
+      this.saveDisplaySettings();
+      this.updatePinnedMessage();
+    });
+
+    // 加载显示设置
+    this.loadDisplaySettings();
   },
 
   // ==================== 滚动相关 ====================
@@ -403,6 +428,73 @@ const ChatUI = {
       }
     } catch (e) {
       alert('保存失败: ' + e.message);
+    }
+  },
+
+  // ==================== 显示设置 ====================
+
+  openDisplaySettings() {
+    this.elements.displaySettingsModal?.classList.remove('hidden');
+    if (this.elements.pinLastHumanMsgCheckbox) {
+      this.elements.pinLastHumanMsgCheckbox.checked = this.state.displaySettings.pinLastHumanMsg;
+    }
+  },
+
+  closeDisplaySettings() {
+    this.elements.displaySettingsModal?.classList.add('hidden');
+  },
+
+  loadDisplaySettings() {
+    try {
+      const saved = localStorage.getItem('chat_display_settings');
+      if (saved) {
+        this.state.displaySettings = JSON.parse(saved);
+      }
+    } catch (e) {
+      console.error('加载显示设置失败:', e);
+    }
+    // 更新复选框状态
+    if (this.elements.pinLastHumanMsgCheckbox) {
+      this.elements.pinLastHumanMsgCheckbox.checked = this.state.displaySettings.pinLastHumanMsg;
+    }
+    // 更新置顶消息
+    this.updatePinnedMessage();
+  },
+
+  saveDisplaySettings() {
+    try {
+      localStorage.setItem('chat_display_settings', JSON.stringify(this.state.displaySettings));
+    } catch (e) {
+      console.error('保存显示设置失败:', e);
+    }
+  },
+
+  setLastHumanMessage(msg) {
+    this.state.lastHumanMessage = msg;
+    this.updatePinnedMessage();
+  },
+
+  updatePinnedMessage() {
+    const container = this.elements.pinnedMessageContainer;
+    const content = this.elements.pinnedMessageContent;
+
+    if (!container || !content) return;
+
+    if (this.state.displaySettings.pinLastHumanMsg && this.state.lastHumanMessage) {
+      const msg = this.state.lastHumanMessage;
+      const isSelf = msg.sender_id === JSON.parse(localStorage.getItem('user') || '{}')?.id;
+      const senderName = msg.sender_name || 'Unknown';
+
+      content.innerHTML = `
+        <div class="flex items-start space-x-2">
+          <span class="text-sm font-semibold text-purple-700">${ChatUtils.escapeHtml(senderName)}</span>
+          <span class="text-xs text-gray-400">${ChatRender.formatTime(msg.created_at)}</span>
+        </div>
+        <div class="text-sm text-gray-700 mt-1 message-content">${ChatRender.renderContent(msg.content, false)}</div>
+      `;
+      container.classList.remove('hidden');
+    } else {
+      container.classList.add('hidden');
     }
   },
 
