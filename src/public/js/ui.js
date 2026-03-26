@@ -103,11 +103,17 @@ const ChatUI = {
       el.messageInput.value = '';
       this.hideMentionDropdown();
 
-      // 发送消息后重置状态，确保后续回复自动滚动到底部
+      // 发送消息后强制滚动到底部，确保用户能看到自己的消息
       this.state.isAtBottom = true;
       this.state.unreadCount = 0;
+      this.state.forceScrollToBottom = true; // 强制滚动标志
       this.updateNewMessageButton();
-      this.scrollToBottom();
+
+      // 立即滚动（不用 smooth，确保立即到位）
+      const container = el.messageContainer;
+      if (container) {
+        container.scrollTop = container.scrollHeight;
+      }
     });
 
     // 回车发送

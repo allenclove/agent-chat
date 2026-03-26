@@ -254,13 +254,17 @@ const ChatRender = {
 
     container.appendChild(div);
 
-    // 只有在用户已经在底部时才自动滚动
-    if (autoScroll && ChatUI.state.isAtBottom) {
-      container.scrollTop = container.scrollHeight;
-    } else if (autoScroll && !ChatUI.state.isAtBottom) {
-      // 用户在浏览历史消息，显示新消息提示
-      ChatUI.state.unreadCount++;
-      ChatUI.updateNewMessageButton();
+    // 滚动逻辑
+    if (autoScroll) {
+      // 如果用户刚发送消息（forceScrollToBottom）或在底部，自动滚动
+      if (ChatUI.state.forceScrollToBottom || ChatUI.state.isAtBottom) {
+        container.scrollTop = container.scrollHeight;
+        ChatUI.state.forceScrollToBottom = false; // 重置标志
+      } else {
+        // 用户在浏览历史消息，显示新消息提示
+        ChatUI.state.unreadCount++;
+        ChatUI.updateNewMessageButton();
+      }
     }
   },
 

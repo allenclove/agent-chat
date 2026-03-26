@@ -642,41 +642,44 @@ function createTopic(title, description, createdBy, messageIds) {
   const id = uuidv4();
   const now = formatShanghaiTime(new Date());
 
-  try {
-    db.run(
-      'INSERT INTO topics (id, title, description, created_by, created_at) VALUES (?, ?, ?, ?, ?)',
-      [id, title, description || null, createdBy, now]
-    );
-    console.log(`[DB] 话题创建成功: ${id} - ${title}`);
-  } catch (e) {
-    console.error(`[DB] 创建话题失败:`, e.message);
-    throw new Error('创建话题失败: ' + e.message);
+  const result = db.run(
+    'INSERT INTO topics (id, title, description, created_by, created_at) VALUES (?, ?, ?, ?, ?)',
+    [id, title, description || null, createdBy, now]
+  );
+
+  // sql.js 的 db.run() 返回对象，检查是否有错误
+  if (result && result.error) {
+    console.error(`[DB] 创建话题失败:`, result.error);
+    throw new Error('创建话题失败: ' + (result.error.message || result.error));
   }
+
+  console.log(`[DB] 话题创建成功: ${id} - ${title}`);
 
   // 如果有消息IDs，复制消息到话题消息表
   let actualCount = 0;
   if (messageIds && messageIds.length > 0) {
     // 获取原始消息
     const placeholders = messageIds.map(() => '?').join(',');
-    const result = db.exec(
+    const msgResult = db.exec(
       `SELECT id, sender_id, sender_name, sender_type, content, created_at FROM messages WHERE id IN (${placeholders}) ORDER BY id`,
       messageIds
     );
 
-    if (result.length > 0) {
-      const columns = result[0].columns;
-      result[0].values.forEach((values, index) => {
+    if (msgResult.length > 0) {
+      const columns = msgResult[0].columns;
+      msgResult[0].values.forEach((values, index) => {
         const msg = {};
         columns.forEach((col, i) => msg[col] = values[i]);
 
-        try {
-          db.run(
-            `INSERT INTO topic_messages (topic_id, original_message_id, sender_id, sender_name, sender_type, content, original_created_at, sequence) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-            [id, msg.id, msg.sender_id, msg.sender_name, msg.sender_type, msg.content, msg.created_at, index]
-          );
+        const insertResult = db.run(
+          `INSERT INTO topic_messages (topic_id, original_message_id, sender_id, sender_name, sender_type, content, original_created_at, sequence) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          [id, msg.id, msg.sender_id, msg.sender_name, msg.sender_type, msg.content, msg.created_at, index]
+        );
+
+        if (insertResult && insertResult.error) {
+          console.error(`[DB] 插入话题消息失败:`, insertResult.error);
+        } else {
           actualCount++;
-        } catch (e) {
-          console.error(`[DB] 插入话题消息失败:`, e.message);
         }
       });
     }
