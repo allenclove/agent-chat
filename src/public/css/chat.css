@@ -516,15 +516,14 @@
 
 /* 消息气泡容器 */
 .message-bubble-wrapper {
-  display: block;
+  display: inline-block;
   position: relative;
-  max-width: 75%;
-  width: fit-content;
+  max-width: 75% !important;
 }
 
 /* 消息气泡 - 限制最大宽度 */
 .msg-bubble {
-  display: inline-block;
+  display: block;
   max-width: 100%;
   word-wrap: break-word;
   overflow-wrap: break-word;
@@ -541,7 +540,7 @@
 /* 移动端消息气泡宽度 */
 @media (max-width: 768px) {
   .message-bubble-wrapper {
-    max-width: 85%;
+    max-width: 85% !important;
   }
 }
 
