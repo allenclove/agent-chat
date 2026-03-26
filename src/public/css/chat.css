@@ -525,6 +525,7 @@
   position: relative;
   max-width: 80%;
   min-width: 0;
+  overflow: hidden;
 }
 
 /* 消息气泡 - 自适应内容宽度 */
