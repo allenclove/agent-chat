@@ -524,20 +524,17 @@
   display: inline-block;
   position: relative;
   max-width: 98%;
-  min-width: 0;
 }
 
 /* 消息气泡 - 自适应内容宽度 */
 .msg-bubble {
   display: block;
   max-width: 100%;
-  min-width: 0;
 }
 
 /* 消息项 - 宽度占满容器 */
 .message-item {
   width: 100%;
-  min-width: 0;
   padding-left: 4px;
   padding-right: 4px;
 }
