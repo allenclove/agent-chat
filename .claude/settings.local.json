@@ -420,7 +420,27 @@
       "Bash(curl -s http://localhost:8080/)",
       "Bash(start http://localhost:8080 sleep 3)",
       "Bash(\"服务已启动，正在监听端口 8080...\" timeout 10)",
-      "Bash(start http://localhost:8080)"
+      "Bash(start http://localhost:8080)",
+      "Bash(scp -r d:cycprojectclaude_projectagent_chatsrcpublicchat.html cycroot@106.52.237.169:/home/cycroot/agent-chat/)",
+      "Bash(exit 0)",
+      "Bash(echo没有变化)",
+      "Bash(scp -r d:cycprojectclaude_projectagent_chatsrcpublic)",
+      "Bash(scp -r d:cycprojectclaude_projectagent_chatsrcpublicchat.html 服务器)",
+      "Bash(__NEW_LINE_700665f886773f15__ 同步文件。。部署完成。)",
+      "Bash(scp -r d:cycprojectclaude_projectagent_chatsrcpublicchat.html cycroot@106.52.237.169)",
+      "Bash(同步文件。验证修复是否。 echo:*)",
+      "Bash(scp -P 8022 cycroot@106.52.237.169:/home/cycroot/agent-chat/* d:cycprojectclaude_projectagent_chatsrcpublicchat.html cycroot@106.52.237.169:/home/cycroot/agent-chat/*)",
+      "Bash(curl -s http://106.52.237.169:8080/api/v1/topics)",
+      "Bash(scp -P 8022 d:cycprojectclaude_projectagent_chatsrcpublicjsrender.js cycroot@106.52.237.169:/home/cycroot/agent-chat/*)",
+      "Bash(curl -s http://106.52.237.169:8080/api/health 2)",
+      "Bash(1 /dev/null)",
+      "Bash(scp -P 8022 \"d:\\\\cycproject\\\\claude_project\\\\agent_chat\\\\src\\\\public\\\\js\\\\render.js\" cycroot@106.52.237.169:/home/cycroot/agent-chat/src/public/js/render.js)",
+      "Bash(scp -P 8022 \"d:\\\\cycproject\\\\claude_project\\\\agent_chat\\\\src\\\\public\\\\chat.html\" cycroot@106.52.237.169:/home/cycroot/agent-chat/src/public/chat.html)",
+      "Bash(scp -P 8022 \"d:\\\\cycproject\\\\claude_project\\\\agent_chat\\\\src\\\\public\\\\chat.html\" cycroot@106.52.237.169:/home/cycroot/agent-chat/src/public/)",
+      "Bash(sshpass -p 'chenyuchao' scp -P 8022 \"d:/cycproject/claude_project/agent_chat/src/public/chat.html\" cycroot@106.52.237.169:/home/cycroot/agent-chat/src/public/)",
+      "Bash(scp -P 8022 \"d:/cycproject/claude_project/agent_chat/src/public/chat.html\" cycroot@106.52.237.169:/home/cycroot/agent-chat/src/public/)",
+      "Bash(node -c \"d:/cycproject/claude_project/agent_chat/src/public/js/render.js\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://106.52.237.169:8080/)"
     ],
     "defaultMode": "dontAsk"
   }

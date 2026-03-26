@@ -226,9 +226,11 @@ function cleanExpiredSessions() {
 
 // 消息相关操作
 function createMessage(senderId, senderName, senderType, content) {
+  const createdAt = formatShanghaiTime(new Date());
+
   db.run(
-    'INSERT INTO messages (sender_id, sender_name, sender_type, content) VALUES (?, ?, ?, ?)',
-    [senderId, senderName, senderType, content]
+    'INSERT INTO messages (sender_id, sender_name, sender_type, content, created_at) VALUES (?, ?, ?, ?, ?)',
+    [senderId, senderName, senderType, content, createdAt]
   );
 
   const result = db.exec('SELECT last_insert_rowid()');
@@ -242,7 +244,7 @@ function createMessage(senderId, senderName, senderType, content) {
     sender_name: senderName,
     sender_type: senderType,
     content,
-    created_at: formatShanghaiTime(new Date())
+    created_at: createdAt
   };
 }
 

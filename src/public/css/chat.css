@@ -518,14 +518,15 @@
 .message-bubble-wrapper {
   display: inline-block;
   position: relative;
-  max-width: 100%;
+  max-width: 85%;
   min-width: 0;
 }
 
 /* 消息项 - 防止横向溢出 */
 .message-item {
   min-width: 0;
-  width: 100%;
+  padding-left: 8px;
+  padding-right: 8px;
 }
 
 /* 消息复制按钮 - 深色图标，透明背景 */
@@ -620,25 +621,7 @@
   }
 }
 
-/* 新消息提示按钮 - 两端圆弧形 */
+/* 新消息提示按钮 - 右上角简洁风格 */
 .new-message-btn {
-  border-radius: 9999px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  border: none !important;
-  animation: pulse-subtle 2s infinite;
-}
-
-.new-message-btn:hover {
-  background: linear-gradient(135deg, #5a67d8 0%, #6b46c1 100%);
-  transform: translateX(-50%) scale(1.02);
-}
-
-@keyframes pulse-subtle {
-  0%, 100% {
-    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
-  }
-  50% {
-    box-shadow: 0 4px 20px rgba(102, 126, 234, 0.6);
-  }
+  border-radius: 8px;
 }
