@@ -516,11 +516,18 @@
 
 /* 消息气泡容器 */
 .message-bubble-wrapper {
-  display: inline-block;
+  display: block;
   position: relative;
   max-width: 75%;
-  min-width: 0;
   width: fit-content;
+}
+
+/* 消息气泡 - 限制最大宽度 */
+.msg-bubble {
+  display: inline-block;
+  max-width: 100%;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
 }
 
 /* 消息项 - 宽度占满容器 */

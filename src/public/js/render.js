@@ -185,17 +185,16 @@ const ChatRender = {
     div.appendChild(header);
 
     // 消息气泡容器（用于定位复制按钮）
-    // 消息气泡容器 - inline-block 让宽度适应内容
     const bubbleWrapper = document.createElement('div');
-    bubbleWrapper.className = 'message-bubble-wrapper inline-block relative group max-w-[85%] md:max-w-[75%]';
+    bubbleWrapper.className = 'message-bubble-wrapper relative group';
 
-    // 消息气泡
+    // 消息气泡 - 直接在气泡上设置宽度限制
     const bubble = document.createElement('div');
     const bubbleClass = isSelf
-      ? 'bg-purple-500 text-white rounded-2xl rounded-tr-sm px-4 py-2 pr-10'
+      ? 'msg-bubble msg-bubble-self bg-purple-500 text-white rounded-2xl rounded-tr-sm px-4 py-2 pr-10'
       : senderType === 'agent'
-        ? 'bg-gradient-to-r from-purple-50 to-indigo-50 text-gray-800 rounded-2xl rounded-tl-sm px-4 py-2 pr-10 border border-purple-200'
-        : 'bg-gray-100 text-gray-800 rounded-2xl rounded-tl-sm px-4 py-2 pr-10';
+        ? 'msg-bubble msg-bubble-other bg-gradient-to-r from-purple-50 to-indigo-50 text-gray-800 rounded-2xl rounded-tl-sm px-4 py-2 pr-10 border border-purple-200'
+        : 'msg-bubble msg-bubble-other bg-gray-100 text-gray-800 rounded-2xl rounded-tl-sm px-4 py-2 pr-10';
 
     bubble.className = bubbleClass;
     bubble.innerHTML = `<div class="message-content text-sm ${isSelf ? 'self-message' : ''}">${this.renderContent(msg.content, isSelf)}</div>`;
