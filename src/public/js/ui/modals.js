@@ -66,11 +66,27 @@ const ModalsModule = {
     const expandBtn = this.elements.pinnedExpandBtn;
     const closeBtn = this.elements.pinnedCloseBtn;
 
-    // 双击跳转到原消息
+    // 桌面端：双击跳转到原消息
     container?.addEventListener('dblclick', (e) => {
       // 排除点击按钮的情况
       if (e.target.closest('button')) return;
       this.scrollToPinnedMessage();
+    });
+
+    // 手机端：双击跳转（使用触摸事件模拟）
+    let lastTap = 0;
+    container?.addEventListener('touchend', (e) => {
+      // 排除点击按钮的情况
+      if (e.target.closest('button')) return;
+
+      const currentTime = new Date().getTime();
+      const tapLength = currentTime - lastTap;
+      if (tapLength < 300 && tapLength > 0) {
+        // 双击检测到
+        e.preventDefault();
+        this.scrollToPinnedMessage();
+      }
+      lastTap = currentTime;
     });
 
     // 关闭按钮
@@ -270,6 +286,10 @@ const ModalsModule = {
   hidePinnedMessage() {
     this.state.pinnedManuallyHidden = true;
     this.elements.pinnedMessageContainer?.classList.add('hidden');
+    // 更新新消息按钮位置
+    if (typeof ScrollModule !== 'undefined') {
+      ScrollModule.updateNewMessageButton();
+    }
   },
 
   // 双击跳转到原消息
@@ -324,6 +344,11 @@ const ModalsModule = {
       `;
       expandBtn.title = '收起';
     }
+
+    // 更新新消息按钮位置
+    if (typeof ScrollModule !== 'undefined') {
+      ScrollModule.updateNewMessageButton();
+    }
   },
 
   collapsePinned() {
@@ -347,6 +372,13 @@ const ModalsModule = {
       `;
       expandBtn.title = '展开查看完整内容';
     }
+
+    // 更新新消息按钮位置（延迟等待 CSS 过渡完成）
+    setTimeout(() => {
+      if (typeof ScrollModule !== 'undefined') {
+        ScrollModule.updateNewMessageButton();
+      }
+    }, 350);
   },
 
   updatePinnedMessage() {
@@ -388,12 +420,20 @@ const ModalsModule = {
             expandBtn.classList.add('hidden');
           }
         }
+        // 更新新消息按钮位置
+        if (typeof ScrollModule !== 'undefined') {
+          ScrollModule.updateNewMessageButton();
+        }
       }, 50);
 
       // 重置展开状态
       this.collapsePinned();
     } else {
       container.classList.add('hidden');
+      // 更新新消息按钮位置
+      if (typeof ScrollModule !== 'undefined') {
+        ScrollModule.updateNewMessageButton();
+      }
     }
   }
 };
