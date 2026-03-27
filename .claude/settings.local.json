@@ -465,7 +465,27 @@
       "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://106.52.237.169:3000/)",
       "Bash(curl -s -o /tmp/screenshot.png \"https://maas-log-prod.cn-wlcb.ufileos.com/anthropic/f74427e5-78f6-4b06-b7e9-dc1652385e5f/cb7e7fb98d543fb02aff296d430c38f1.png?UCloudPublicKey=TOKEN_e15ba47a-d098-4fbd-9afc-a0dcf0e4e621&Expires=1774546507&Signature=dX0UyAAphjKsWIw3mQs05NAA/gQ=\")",
       "Bash(curl -s -o \"C:\\\\Users\\\\13936\\\\AppData\\\\Local\\\\Temp\\\\screenshot.png\" \"https://maas-log-prod.cn-wlcb.ufileos.com/anthropic/f74427e5-78f6-4b06-b7e9-dc1652385e5f/cb7e7fb98d543fb02aff296d430c38f1.png?UCloudPublicKey=TOKEN_e15ba47a-d098-4fbd-9afc-a0dcf0e4e621&Expires=1774546507&Signature=dX0UyAAphjKsWIw3mQs05NAA/gQ=\")",
-      "Bash(git checkout:*)"
+      "Bash(git checkout:*)",
+      "Bash(mkdir -p backup css/components js/ui)",
+      "Bash(cp css/chat.css backup/chat.css.bak)",
+      "Bash(cp js/ui.js backup/ui.js.bak)",
+      "Bash(cp chat.html backup/chat.html.bak)",
+      "Bash(curl -s http://localhost:3000/api/platform/time)",
+      "Bash(netstat -ano)",
+      "Bash(findstr :8080)",
+      "Bash(taskkill /F /PID 21744)",
+      "Bash(taskkill //F //PID 21744)",
+      "Bash(curl -s http://localhost:8080/api/platform/time)",
+      "Bash(curl -s http://localhost:8080/chat.html)",
+      "Bash(curl -s http://localhost:8080/css/chat.css)",
+      "Bash(curl -s http://localhost:8080/js/ui/scroll.js)",
+      "Bash(sshpass -p 'chenyuchao' ssh -p 8022 -o StrictHostKeyChecking=no cycroot@106.52.237.169 'cd /home/cycroot/agent-chat && git pull && pm2 restart agent-chat 2>/dev/null || \\(kill $\\(pgrep -f \"\"node server.js\"\"\\) 2>/dev/null; nohup node server.js > /tmp/agent-chat.log 2>&1 & echo \"\"Service restarted\"\"\\)')",
+      "Bash(curl -s http://106.52.237.169:8080/api/platform/time)",
+      "Bash(curl -s --connect-timeout 5 http://106.52.237.169:3000/api/platform/time)",
+      "Bash(curl -s --connect-timeout 5 http://106.52.237.169:8080/api/platform/time)",
+      "Bash(curl -s http://106.52.237.169:3000/api/platform/time)",
+      "Bash(curl -s --connect-timeout 10 http://106.52.237.169:8080/api/platform/time)",
+      "Bash(curl -s http://27.44.25.144:8080/api/platform/time)"
     ],
     "defaultMode": "dontAsk"
   }

@@ -10,7 +10,8 @@ const ModalsModule = {
       pinLastHumanMsg: false
     },
     lastHumanMessage: null,
-    pinnedManuallyHidden: false
+    pinnedManuallyHidden: false,
+    pinnedExpanded: false  // 置顶消息是否展开
   },
 
   // DOM 元素
@@ -20,7 +21,9 @@ const ModalsModule = {
     settingsBtn: null,
     pinLastHumanMsgCheckbox: null,
     pinnedMessageContainer: null,
-    pinnedMessageContent: null
+    pinnedMessageContent: null,
+    pinnedExpandBtn: null,
+    pinnedCloseBtn: null
   },
 
   // 初始化
@@ -31,6 +34,8 @@ const ModalsModule = {
     this.elements.pinLastHumanMsgCheckbox = pinLastHumanMsgCheckbox;
     this.elements.pinnedMessageContainer = pinnedMessageContainer;
     this.elements.pinnedMessageContent = pinnedMessageContent;
+    this.elements.pinnedExpandBtn = document.getElementById('pinnedExpandBtn');
+    this.elements.pinnedCloseBtn = document.getElementById('pinnedCloseBtn');
 
     // Agent设置弹窗关闭
     this.elements.agentSettingsModal?.addEventListener('click', (e) => {
@@ -48,8 +53,56 @@ const ModalsModule = {
       this.updatePinnedMessage();
     });
 
+    // 置顶消息事件
+    this.initPinnedMessageEvents();
+
     // 加载显示设置
     this.loadDisplaySettings();
+  },
+
+  // 初始化置顶消息事件
+  initPinnedMessageEvents() {
+    const container = this.elements.pinnedMessageContainer;
+    const expandBtn = this.elements.pinnedExpandBtn;
+    const closeBtn = this.elements.pinnedCloseBtn;
+
+    // 双击跳转到原消息
+    container?.addEventListener('dblclick', (e) => {
+      // 排除点击按钮的情况
+      if (e.target.closest('button')) return;
+      this.scrollToPinnedMessage();
+    });
+
+    // 关闭按钮
+    closeBtn?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.hidePinnedMessage();
+    });
+
+    // 展开/收起按钮
+    expandBtn?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.togglePinnedExpand();
+    });
+
+    // 点击外部收起（手机端逻辑）
+    document.addEventListener('click', (e) => {
+      if (this.state.pinnedExpanded && container && !container.contains(e.target)) {
+        this.collapsePinned();
+      }
+    });
+
+    // 电脑端：鼠标离开时收起（如果已展开）
+    container?.addEventListener('mouseleave', () => {
+      if (this.state.pinnedExpanded && window.innerWidth >= 768) {
+        // 电脑端延迟收起，给用户时间操作
+        setTimeout(() => {
+          if (!container.matches(':hover')) {
+            this.collapsePinned();
+          }
+        }, 500);
+      }
+    });
   },
 
   // ==================== Agent 设置 ====================
@@ -210,6 +263,7 @@ const ModalsModule = {
   setLastHumanMessage(msg) {
     this.state.lastHumanMessage = msg;
     this.state.pinnedManuallyHidden = false; // 新消息时重置
+    this.state.pinnedExpanded = false; // 重置展开状态
     this.updatePinnedMessage();
   },
 
@@ -218,9 +272,82 @@ const ModalsModule = {
     this.elements.pinnedMessageContainer?.classList.add('hidden');
   },
 
+  // 双击跳转到原消息
+  scrollToPinnedMessage() {
+    if (!this.state.lastHumanMessage) return;
+
+    const msgId = this.state.lastHumanMessage.id;
+    const messageContainer = document.getElementById('messageContainer');
+
+    if (!messageContainer) return;
+
+    // 查找对应的消息元素
+    const targetMsg = messageContainer.querySelector(`[data-msg-id="${msgId}"]`);
+
+    if (targetMsg) {
+      // 滚动到消息位置
+      targetMsg.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+      // 高亮效果
+      targetMsg.classList.add('ring-2', 'ring-purple-400', 'ring-opacity-75');
+      setTimeout(() => {
+        targetMsg.classList.remove('ring-2', 'ring-purple-400', 'ring-opacity-75');
+      }, 2000);
+    } else {
+      // 如果消息不在当前视图中，提示用户
+      ChatUtils.showToast('消息已不在当前页面，请向上滚动查找');
+    }
+  },
+
+  // 展开/收起置顶消息
+  togglePinnedExpand() {
+    if (this.state.pinnedExpanded) {
+      this.collapsePinned();
+    } else {
+      this.expandPinned();
+    }
+  },
+
+  expandPinned() {
+    const container = this.elements.pinnedMessageContainer;
+    const expandBtn = this.elements.pinnedExpandBtn;
+
+    this.state.pinnedExpanded = true;
+    container?.classList.add('pinned-expanded');
+
+    // 更新按钮图标为向上箭头
+    if (expandBtn) {
+      expandBtn.innerHTML = `
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"></path>
+        </svg>
+      `;
+      expandBtn.title = '收起';
+    }
+  },
+
+  collapsePinned() {
+    const container = this.elements.pinnedMessageContainer;
+    const expandBtn = this.elements.pinnedExpandBtn;
+
+    this.state.pinnedExpanded = false;
+    container?.classList.remove('pinned-expanded');
+
+    // 更新按钮图标为向下箭头
+    if (expandBtn) {
+      expandBtn.innerHTML = `
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+        </svg>
+      `;
+      expandBtn.title = '展开查看完整内容';
+    }
+  },
+
   updatePinnedMessage() {
     const container = this.elements.pinnedMessageContainer;
     const content = this.elements.pinnedMessageContent;
+    const expandBtn = this.elements.pinnedExpandBtn;
 
     if (!container || !content) return;
 
@@ -239,9 +366,27 @@ const ModalsModule = {
           <span class="font-semibold text-purple-700">${ChatUtils.escapeHtml(senderName)}</span>
           <span class="text-xs text-gray-400">${ChatRender.formatTime(msg.created_at)}</span>
         </div>
-        <div class="text-sm text-gray-700 mt-0.5 message-content">${ChatRender.renderContent(msg.content, false)}</div>
+        <div class="text-sm text-gray-700 mt-0.5 pinned-message-content">${ChatRender.renderContent(msg.content, false)}</div>
       `;
+
       container.classList.remove('hidden');
+
+      // 检查消息是否过长，显示/隐藏展开按钮
+      // 延迟检查，等待 DOM 渲染完成
+      setTimeout(() => {
+        const msgContent = content.querySelector('.pinned-message-content');
+        if (msgContent && expandBtn) {
+          const isOverflow = msgContent.scrollHeight > 42; // 约2行文字高度
+          if (isOverflow) {
+            expandBtn.classList.remove('hidden');
+          } else {
+            expandBtn.classList.add('hidden');
+          }
+        }
+      }, 50);
+
+      // 重置展开状态
+      this.collapsePinned();
     } else {
       container.classList.add('hidden');
     }

@@ -4,6 +4,14 @@
 #pinnedMessageContainer {
   max-height: 80px;
   overflow: hidden;
+  transition: max-height 0.3s ease, box-shadow 0.3s ease;
+}
+
+/* 展开状态 */
+#pinnedMessageContainer.pinned-expanded {
+  max-height: 300px;
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.15);
+  overflow-y: auto;
 }
 
 #pinnedMessageContainer .message-content {
@@ -16,13 +24,30 @@
   -webkit-box-orient: vertical;
 }
 
+/* 展开时显示完整内容 */
+#pinnedMessageContainer.pinned-expanded .message-content {
+  max-height: none;
+  -webkit-line-clamp: unset;
+  overflow: visible;
+}
+
 #pinnedMessageContainer .message-content pre,
 #pinnedMessageContainer .message-content code {
   display: none;
 }
 
+#pinnedMessageContainer.pinned-expanded .message-content pre,
+#pinnedMessageContainer.pinned-expanded .message-content code {
+  display: block;
+}
+
 #pinnedMessageContainer .message-content p {
   margin: 0;
+}
+
+/* ========== 高亮效果（跳转时） ========== */
+.message-item {
+  transition: box-shadow 0.3s ease;
 }
 
 /* ========== 移动端适配 ========== */
@@ -34,5 +59,9 @@
   #pinnedMessageContainer .message-content {
     max-height: 38px;
     font-size: 13px;
+  }
+
+  #pinnedMessageContainer.pinned-expanded {
+    max-height: 250px;
   }
 }
