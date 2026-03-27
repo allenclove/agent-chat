@@ -308,10 +308,10 @@ const ModalsModule = {
       // 滚动到消息位置
       targetMsg.scrollIntoView({ behavior: 'smooth', block: 'center' });
 
-      // 高亮效果
-      targetMsg.classList.add('ring-2', 'ring-purple-400', 'ring-opacity-75');
+      // 高亮效果 - 消息框背景闪烁
+      targetMsg.classList.add('message-highlight');
       setTimeout(() => {
-        targetMsg.classList.remove('ring-2', 'ring-purple-400', 'ring-opacity-75');
+        targetMsg.classList.remove('message-highlight');
       }, 2000);
     } else {
       // 如果消息不在当前视图中，提示用户

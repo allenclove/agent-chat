@@ -180,3 +180,20 @@
     display: none;
   }
 }
+
+/* ========== 消息高亮效果（跳转时） ========== */
+.message-item.message-highlight {
+  animation: message-highlight-pulse 2s ease-out;
+}
+
+@keyframes message-highlight-pulse {
+  0% {
+    background-color: rgba(139, 92, 246, 0.3);
+  }
+  50% {
+    background-color: rgba(139, 92, 246, 0.15);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
