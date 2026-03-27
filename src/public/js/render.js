@@ -254,17 +254,9 @@ const ChatRender = {
 
     container.appendChild(div);
 
-    // 滚动逻辑
+    // 滚动逻辑 - 委托给 ScrollModule
     if (autoScroll) {
-      // 如果用户刚发送消息（forceScrollToBottom）或在底部，自动滚动
-      if (ChatUI.state.forceScrollToBottom || ChatUI.state.isAtBottom) {
-        container.scrollTop = container.scrollHeight;
-        ChatUI.state.forceScrollToBottom = false; // 重置标志
-      } else {
-        // 用户在浏览历史消息，显示新消息提示
-        ChatUI.state.unreadCount++;
-        ChatUI.updateNewMessageButton();
-      }
+      ScrollModule.onNewMessage();
     }
   },
 
