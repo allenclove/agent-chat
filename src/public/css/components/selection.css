@@ -1,0 +1,76 @@
+/* 选择模式组件 - 包含选择工具栏 */
+
+/* ========== 消息选择模式 ========== */
+.message-item {
+  position: relative;
+}
+.message-item.selected {
+  background: rgba(139, 92, 246, 0.1);
+}
+
+.message-checkbox {
+  position: absolute;
+  left: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid #d1d5db;
+  background: white;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.message-item:hover .message-checkbox {
+  opacity: 1;
+}
+
+.message-checkbox.checked {
+  background: #8b5cf6;
+  border-color: #8b5cf6;
+}
+.message-checkbox.checked::after {
+  content: '✓';
+  color: white;
+  font-size: 12px;
+  line-height: 16px;
+  text-align: center;
+}
+
+/* ========== 选择工具栏 ========== */
+.selection-toolbar {
+  position: fixed;
+  bottom: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: white;
+  padding: 8px 16px;
+  border-radius: 24px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  z-index: 20;
+}
+.selection-toolbar.hidden {
+  display: none;
+}
+
+/* ========== 移动端适配 ========== */
+@media (max-width: 768px) {
+  .selection-toolbar {
+    bottom: 70px;
+    padding: 6px 12px;
+    font-size: 14px;
+  }
+
+  /* 选择模式下的复选框更容易点击 */
+  .message-checkbox {
+    opacity: 1;
+    width: 24px;
+    height: 24px;
+    left: 4px;
+  }
+}

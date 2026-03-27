@@ -1,0 +1,109 @@
+/* 弹窗和提示组件 - 包含所有模态框和移动端适配 */
+
+/* ========== 话题创建弹窗 ========== */
+.topic-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+}
+.topic-modal.hidden {
+  display: none;
+}
+.topic-modal-content {
+  background: white;
+  border-radius: 12px;
+  padding: 24px;
+  width: 90%;
+  max-width: 480px;
+}
+.topic-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+.topic-modal-header h3 {
+  font-size: 18px;
+  font-weight: 600;
+}
+.topic-modal-close {
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  color: #666;
+}
+.topic-modal-close:hover {
+  color: #333;
+}
+.topic-modal-body input,
+.topic-modal-body textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  margin-bottom: 12px;
+}
+.topic-modal-body textarea {
+  min-height: 80px;
+  resize: none;
+}
+.topic-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+}
+.topic-modal-footer button {
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.btn-cancel {
+  background: #f3f4f6;
+  color: #666;
+}
+.btn-cancel:hover {
+  background: #e5e7eb;
+}
+.btn-create {
+  background: #8b5cf6;
+  color: white;
+}
+.btn-create:hover {
+  background: #7c3aed;
+}
+
+/* ========== Toast 提示 ========== */
+.toast-message {
+  position: fixed;
+  top: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1f2937;
+  color: white;
+  padding: 8px 16px;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  z-index: 50;
+  font-size: 14px;
+}
+
+/* ========== 移动端弹窗适配 ========== */
+@media (max-width: 768px) {
+  .topic-modal-content {
+    width: 95%;
+    padding: 16px;
+    margin: 0 10px;
+  }
+
+  .topic-modal-body input,
+  .topic-modal-body textarea {
+    font-size: 16px; /* 防止 iOS 缩放 */
+  }
+}

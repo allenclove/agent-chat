@@ -1,0 +1,19 @@
+/* 输入区域组件 - 包含输入框和发送按钮的移动端适配 */
+
+/* ========== 移动端输入区域适配 ========== */
+@media (max-width: 768px) {
+  /* 输入区域 - 确保按钮可见 */
+  #messageForm {
+    flex-wrap: nowrap;
+  }
+
+  #messageForm input {
+    min-width: 0;
+  }
+
+  #messageForm button[type="submit"] {
+    flex-shrink: 0;
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+}

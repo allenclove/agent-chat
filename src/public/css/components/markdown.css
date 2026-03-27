@@ -1,0 +1,309 @@
+/* Markdown 渲染样式 - 包含代码块、列表、表格等 */
+
+/* ========== 消息内容基础 ========== */
+.message-content {
+  line-height: 1.7;
+  min-width: 0;
+  max-width: 100%;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+/* 行内代码换行 */
+.message-content code:not(pre code) {
+  word-break: break-all;
+}
+
+.message-content p {
+  margin: 0.6em 0;
+}
+.message-content p:first-child {
+  margin-top: 0;
+}
+.message-content p:last-child {
+  margin-bottom: 0;
+}
+
+/* ========== 行内代码 ========== */
+.message-content code:not(pre code) {
+  background: rgba(0,0,0,0.08);
+  padding: 0.15em 0.4em;
+  border-radius: 4px;
+  font-size: 0.88em;
+  font-family: 'Consolas', 'Monaco', 'SF Mono', monospace;
+  color: #e83e8c;
+}
+
+/* ========== 代码块 - 深色主题 ========== */
+.message-content pre {
+  margin: 0.8em 0;
+  border-radius: 8px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  background: #1e1e1e !important;
+  max-width: min(100%, 80vw);
+}
+
+.message-content pre code {
+  display: block;
+  padding: 1em;
+  overflow-x: auto;
+  font-size: 0.85em;
+  line-height: 1.5;
+  font-family: 'Consolas', 'Monaco', 'SF Mono', monospace;
+  background: transparent !important;
+  color: #d4d4d4 !important;
+}
+
+/* highlight.js 语法高亮颜色 */
+.message-content pre code .hljs-keyword,
+.message-content pre code .hljs-selector-tag,
+.message-content pre code .hljs-built_in,
+.message-content pre code .hljs-name,
+.message-content pre code .hljs-tag {
+  color: #569cd6 !important;
+}
+.message-content pre code .hljs-string,
+.message-content pre code .hljs-title,
+.message-content pre code .hljs-section,
+.message-content pre code .hljs-attribute,
+.message-content pre code .hljs-literal,
+.message-content pre code .hljs-template-tag,
+.message-content pre code .hljs-template-variable,
+.message-content pre code .hljs-type {
+  color: #ce9178 !important;
+}
+.message-content pre code .hljs-comment,
+.message-content pre code .hljs-deletion {
+  color: #6a9955 !important;
+}
+.message-content pre code .hljs-number,
+.message-content pre code .hljs-regexp,
+.message-content pre code .hljs-addition {
+  color: #b5cea8 !important;
+}
+.message-content pre code .hljs-function {
+  color: #dcdcaa !important;
+}
+.message-content pre code .hljs-variable,
+.message-content pre code .hljs-params {
+  color: #9cdcfe !important;
+}
+.message-content pre code .hljs-symbol,
+.message-content pre code .hljs-bullet,
+.message-content pre code .hljs-link,
+.message-content pre code .hljs-meta {
+  color: #808080 !important;
+}
+.message-content pre code .hljs-selector-id,
+.message-content pre code .hljs-selector-class {
+  color: #d7ba7d !important;
+}
+
+/* ========== 列表样式 ========== */
+.message-content ul {
+  margin: 0.6em 0;
+  padding-left: 1.8em;
+  list-style-type: disc;
+}
+.message-content ol {
+  margin: 0.6em 0;
+  padding-left: 1.8em;
+  list-style-type: decimal;
+}
+.message-content li {
+  margin: 0.35em 0;
+  line-height: 1.6;
+}
+.message-content li > ul,
+.message-content li > ol {
+  margin: 0.2em 0;
+}
+.message-content ul ul {
+  list-style-type: circle;
+}
+.message-content ul ul ul {
+  list-style-type: square;
+}
+
+/* ========== 引用块 ========== */
+.message-content blockquote {
+  border-left: 4px solid #8b5cf6;
+  padding: 0.5em 1em;
+  margin: 0.8em 0;
+  background: rgba(139, 92, 246, 0.05);
+  border-radius: 0 6px 6px 0;
+  color: #555;
+}
+.message-content blockquote p {
+  margin: 0.3em 0;
+}
+
+/* ========== 标题样式 ========== */
+.message-content h1 {
+  margin: 1em 0 0.5em;
+  font-size: 1.6em;
+  font-weight: 700;
+  border-bottom: 2px solid #e5e7eb;
+  padding-bottom: 0.3em;
+}
+.message-content h2 {
+  margin: 0.9em 0 0.4em;
+  font-size: 1.4em;
+  font-weight: 700;
+  border-bottom: 1px solid #e5e7eb;
+  padding-bottom: 0.25em;
+}
+.message-content h3 {
+  margin: 0.8em 0 0.4em;
+  font-size: 1.2em;
+  font-weight: 600;
+}
+.message-content h4 {
+  margin: 0.7em 0 0.3em;
+  font-size: 1.1em;
+  font-weight: 600;
+}
+.message-content h5 {
+  margin: 0.6em 0 0.3em;
+  font-size: 1em;
+  font-weight: 600;
+}
+.message-content h6 {
+  margin: 0.5em 0 0.3em;
+  font-size: 0.9em;
+  font-weight: 600;
+  color: #666;
+}
+
+/* ========== 链接 ========== */
+.message-content a {
+  color: #8b5cf6;
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition: border-color 0.2s;
+}
+.message-content a:hover {
+  border-bottom-color: #8b5cf6;
+}
+
+/* ========== 加粗和斜体 ========== */
+.message-content strong {
+  font-weight: 700;
+}
+.message-content em {
+  font-style: italic;
+}
+
+/* ========== 表格 ========== */
+.message-content table {
+  border-collapse: collapse;
+  margin: 0.8em 0;
+  width: auto;
+  max-width: 100%;
+  font-size: 0.95em;
+}
+.message-content th, .message-content td {
+  border: 1px solid #d1d5db;
+  padding: 0.5em 0.8em;
+  text-align: left;
+}
+.message-content th {
+  background: #f3f4f6;
+  font-weight: 600;
+}
+.message-content tr:nth-child(even) {
+  background: #f9fafb;
+}
+
+/* ========== 分割线 ========== */
+.message-content hr {
+  border: none;
+  border-top: 2px solid #e5e7eb;
+  margin: 1.2em 0;
+}
+
+/* ========== 图片 ========== */
+.message-content img {
+  max-width: 100%;
+  border-radius: 8px;
+  margin: 0.5em 0;
+}
+
+/* ========== 自我消息的 Markdown 调整 ========== */
+.message-content.self-message code:not(pre code) {
+  background: rgba(255,255,255,0.25);
+  color: #fff;
+}
+.message-content.self-message blockquote {
+  border-left-color: rgba(255,255,255,0.5);
+  background: rgba(255,255,255,0.1);
+  color: rgba(255,255,255,0.9);
+}
+.message-content.self-message a {
+  color: #fff;
+  border-bottom-color: rgba(255,255,255,0.5);
+}
+.message-content.self-message th {
+  background: rgba(255,255,255,0.15);
+}
+.message-content.self-message td {
+  border-color: rgba(255,255,255,0.2);
+}
+
+/* ========== 代码块容器（带头部和复制按钮） ========== */
+.code-block-wrapper {
+  position: relative;
+  margin: 0.8em 0;
+  border-radius: 8px;
+  overflow-x: auto;
+  background: #1e1e1e;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  max-width: min(100%, 80vw);
+}
+.code-block-wrapper pre {
+  margin: 0 !important;
+  background: transparent !important;
+  border-radius: 0 !important;
+}
+.code-block-wrapper pre code {
+  padding: 1em !important;
+}
+.code-block-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 12px;
+  background: #2d2d2d;
+  border-bottom: 1px solid #404040;
+}
+.code-block-header span {
+  color: #888;
+  font-size: 12px;
+  font-family: 'Consolas', monospace;
+  text-transform: lowercase;
+}
+.code-block-header .copy-btn {
+  background: transparent;
+  border: 1px solid #555;
+  color: #aaa;
+  padding: 3px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.code-block-header .copy-btn:hover {
+  background: #444;
+  color: #fff;
+  border-color: #666;
+}
+.code-block-header .copy-btn.copied {
+  background: #22c55e;
+  border-color: #22c55e;
+  color: #fff;
+}

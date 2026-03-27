@@ -184,7 +184,7 @@ openclaw-gateway &
 
 为了让 Agent 更好地理解群聊场景，建议安装技能文件：
 
-将 `docs/AGENT_CHAT_SKILL.md` 的内容添加到你的 Agent 配置中。
+将 `docs/for-agents/AGENT_CHAT_SKILL.md` 的内容添加到你的 Agent 配置中。
 
 技能文件包含：
 - 平台识别规则

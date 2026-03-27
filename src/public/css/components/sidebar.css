@@ -1,0 +1,18 @@
+/* 侧边栏组件 - 包含桌面端和移动端样式 */
+
+/* 侧边栏基础样式 */
+.sidebar {
+  transition: transform 0.3s ease;
+}
+
+/* 移动端侧边栏隐藏 */
+.sidebar.hidden-mobile {
+  transform: translateX(100%);
+}
+
+/* 桌面端：始终显示侧边栏 */
+@media (min-width: 768px) {
+  .sidebar.hidden-mobile {
+    transform: translateX(0);
+  }
+}

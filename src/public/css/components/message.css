@@ -1,0 +1,182 @@
+/* 消息气泡组件 - 包含桌面端和移动端样式 */
+
+/* ========== 消息气泡容器 ========== */
+.message-bubble-wrapper {
+  display: block;
+  max-width: 85vw;
+  position: relative;
+}
+
+/* 消息气泡 - 自适应内容宽度 */
+.msg-bubble {
+  display: block;
+  max-width: 85vw;
+  word-break: break-all;
+  line-break: anywhere;
+}
+
+/* 确保段落和行内元素换行 */
+.msg-bubble .message-content,
+.msg-bubble .message-content p,
+.msg-bubble .message-content span,
+.msg-bubble .message-content code:not(pre code) {
+  word-break: break-all !important;
+  line-break: anywhere !important;
+  max-width: 100%;
+}
+
+/* 消息项 - 宽度占满容器 */
+.message-item {
+  position: relative;
+  width: 100%;
+  padding-left: 4px;
+  padding-right: 4px;
+}
+
+/* ========== 消息复制按钮 - 深色图标，透明背景 ========== */
+.message-wrapper {
+  position: relative;
+}
+
+.message-copy-btn {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  opacity: 0;
+  transition: opacity 0.2s;
+  background: rgba(0,0,0,0.6);
+  color: white;
+  border: none;
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  z-index: 5;
+}
+
+.message-wrapper:hover .message-copy-btn {
+  opacity: 1;
+}
+
+.message-copy-btn.left {
+  right: 100%;
+  margin-right: 8px;
+}
+.message-copy-btn.right {
+  left: 100%;
+  margin-left: 8px;
+}
+.message-copy-btn:active {
+  background: rgba(0,0,0,0.8);
+}
+.message-copy-btn.copied {
+  background: #22c55e;
+}
+
+/* 消息气泡内复制按钮 */
+.msg-copy-btn {
+  position: absolute;
+  bottom: 4px;
+  right: 4px;
+  width: 24px;
+  height: 24px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+.msg-copy-btn svg {
+  width: 16px;
+  height: 16px;
+  color: rgba(0, 0, 0, 0.4);
+  transition: color 0.2s;
+}
+.msg-copy-btn:hover svg {
+  color: rgba(0, 0, 0, 0.7);
+}
+.msg-copy-btn.copied svg {
+  color: #22c55e;
+}
+
+/* 白色气泡中的复制按钮 */
+.bg-gray-100 .msg-copy-btn svg,
+.bg-gradient-to-r .msg-copy-btn svg {
+  color: rgba(0, 0, 0, 0.4);
+}
+.bg-gray-100 .msg-copy-btn:hover svg,
+.bg-gradient-to-r .msg-copy-btn:hover svg {
+  color: rgba(0, 0, 0, 0.7);
+}
+
+/* 紫色气泡中的复制按钮 */
+.bg-purple-500 .msg-copy-btn svg {
+  color: rgba(255, 255, 255, 0.5);
+}
+.bg-purple-500 .msg-copy-btn:hover svg {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+/* ========== 手机版复制菜单 ========== */
+.mobile-copy-menu {
+  position: fixed;
+  min-width: 120px;
+  z-index: 100;
+}
+.mobile-copy-menu button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+}
+.mobile-copy-menu button:active {
+  background: #f3f4f6;
+}
+
+/* ========== 置顶消息区域 ========== */
+#pinnedMessageContainer {
+  max-height: 80px;
+  overflow: hidden;
+}
+
+#pinnedMessageContainer .message-content {
+  line-height: 1.4;
+  max-height: 42px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+#pinnedMessageContainer .message-content pre,
+#pinnedMessageContainer .message-content code {
+  display: none;
+}
+
+#pinnedMessageContainer .message-content p {
+  margin: 0;
+}
+
+/* ========== 移动端适配 ========== */
+@media (max-width: 768px) {
+  /* 消息区域 - 允许横向滚动查看长内容 */
+  .message-container {
+    overflow-x: auto;
+  }
+
+  /* 消息气泡 - 移动端宽度 */
+  .message-bubble-wrapper {
+    max-width: 85%;
+    min-width: 0;
+  }
+
+  /* 隐藏悬浮复制按钮，使用长按 */
+  .message-copy-btn {
+    display: none;
+  }
+}

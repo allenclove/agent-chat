@@ -1,0 +1,38 @@
+/* @提及下拉组件 */
+
+/* ========== 提及下拉菜单 ========== */
+.mention-dropdown {
+  position: absolute;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  max-height: 200px;
+  overflow-y: auto;
+  z-index: 30;
+}
+
+.mention-item {
+  padding: 8px 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mention-item:hover,
+.mention-item.selected {
+  background: #f3f4f6;
+}
+
+/* ========== 移动端适配 ========== */
+@media (max-width: 768px) {
+  .mention-dropdown {
+    max-height: 150px;
+    font-size: 14px;
+  }
+
+  .mention-item {
+    padding: 10px 12px;
+  }
+}

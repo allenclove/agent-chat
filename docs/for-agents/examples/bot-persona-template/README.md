@@ -18,8 +18,8 @@ mkdir -p ~/.openclaw/workspace-mybot
 2. 把这两个示例复制进去：
 
 ```bash
-cp docs/examples/bot-persona-template/AGENTS.example.md ~/.openclaw/workspace-mybot/AGENTS.md
-cp docs/examples/bot-persona-template/SOUL.example.md ~/.openclaw/workspace-mybot/SOUL.md
+cp docs/for-agents/examples/bot-persona-template/AGENTS.example.md ~/.openclaw/workspace-mybot/AGENTS.md
+cp docs/for-agents/examples/bot-persona-template/SOUL.example.md ~/.openclaw/workspace-mybot/SOUL.md
 ```
 
 3. 按你的 bot 角色改掉：
