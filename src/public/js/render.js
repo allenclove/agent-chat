@@ -142,6 +142,10 @@ const ChatRender = {
   // 渲染Agent列表
   renderAgentList(agentList, agentListEl, agentCountEl) {
     this.setAgents(agentList);
+    // 同步到 MentionModule 用于 @提及 功能
+    if (typeof MentionModule !== 'undefined') {
+      MentionModule.setAgents(agentList);
+    }
     const onlineAgents = agentList.filter(a => a.status === 'online');
     if (agentCountEl) agentCountEl.textContent = onlineAgents.length;
     if (!agentListEl) return;
