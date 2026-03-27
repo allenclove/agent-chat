@@ -305,13 +305,42 @@ const ModalsModule = {
     const targetMsg = messageContainer.querySelector(`[data-msg-id="${msgId}"]`);
 
     if (targetMsg) {
-      // 滚动到消息位置
+      // 先移除之前可能存在的高亮
+      targetMsg.classList.remove('message-highlight');
+
+      // 监听滚动，提前开始高亮
+      let scrollTimeout = null;
+      let highlighted = false;
+
+      const onScroll = () => {
+        if (scrollTimeout) clearTimeout(scrollTimeout);
+        scrollTimeout = setTimeout(() => {
+          messageContainer.removeEventListener('scroll', onScroll);
+          if (!highlighted) {
+            targetMsg.classList.add('message-highlight');
+            highlighted = true;
+            setTimeout(() => {
+              targetMsg.classList.remove('message-highlight');
+            }, 2000);
+          }
+        }, 80); // 80ms 无滚动则开始高亮，更丝滑
+      };
+
+      messageContainer.addEventListener('scroll', onScroll);
+
+      // 平滑滚动到消息位置
       targetMsg.scrollIntoView({ behavior: 'smooth', block: 'center' });
 
-      // 高亮效果 - 消息框背景闪烁
-      targetMsg.classList.add('message-highlight');
+      // 备用：最多2秒后强制显示高亮
       setTimeout(() => {
-        targetMsg.classList.remove('message-highlight');
+        messageContainer.removeEventListener('scroll', onScroll);
+        if (!highlighted) {
+          targetMsg.classList.add('message-highlight');
+          highlighted = true;
+          setTimeout(() => {
+            targetMsg.classList.remove('message-highlight');
+          }, 2000);
+        }
       }, 2000);
     } else {
       // 如果消息不在当前视图中，提示用户

@@ -227,28 +227,46 @@ const ChatRender = {
     div.appendChild(bubbleWrapper);
 
     // 手机版长按复制
+    let longPressTriggered = false;
+    let longPressTimer = null;
+
     div.addEventListener('contextmenu', (e) => {
       if (window.innerWidth < 768) {
         e.preventDefault();
-        this.showMobileCopyMenu(e, div.dataset.rawContent);
+        e.stopPropagation();
+        if (!longPressTriggered) {
+          this.showMobileCopyMenu(e, div.dataset.rawContent, div);
+        }
+        return false;
       }
     });
 
-    // 手机版长按
-    let longPressTimer = null;
+    // 手机版长按 - 阻止文本选择
     div.addEventListener('touchstart', (e) => {
       if (window.innerWidth < 768) {
+        longPressTriggered = false;
         longPressTimer = setTimeout(() => {
-          this.showMobileCopyMenu(e, div.dataset.rawContent);
+          longPressTriggered = true;
+          // 阻止后续的文本选择
+          if (e.cancelable) {
+            e.preventDefault();
+          }
+          this.showMobileCopyMenu(e, div.dataset.rawContent, div);
         }, 500);
       }
-    });
-    div.addEventListener('touchend', () => {
+    }, { passive: false });
+
+    div.addEventListener('touchend', (e) => {
       if (longPressTimer) {
         clearTimeout(longPressTimer);
         longPressTimer = null;
       }
-    });
+      // 如果触发了长按，阻止点击后的文本选择
+      if (longPressTriggered) {
+        e.preventDefault();
+      }
+    }, { passive: false });
+
     div.addEventListener('touchmove', () => {
       if (longPressTimer) {
         clearTimeout(longPressTimer);
@@ -256,11 +274,18 @@ const ChatRender = {
       }
     });
 
+    // 阻止长按后的选择菜单
+    div.addEventListener('selectstart', (e) => {
+      if (window.innerWidth < 768 && longPressTriggered) {
+        e.preventDefault();
+      }
+    });
+
     container.appendChild(div);
 
     // 滚动逻辑 - 委托给 ScrollModule
     if (autoScroll) {
-      ScrollModule.onNewMessage();
+      ScrollModule.onNewMessage(msg);
     }
   },
 
@@ -328,7 +353,7 @@ const ChatRender = {
   },
 
   // 手机版复制菜单
-  showMobileCopyMenu(e, content) {
+  showMobileCopyMenu(e, content, messageEl) {
     // 移除已存在的菜单
     const existingMenu = document.querySelector('.mobile-copy-menu');
     if (existingMenu) existingMenu.remove();
@@ -341,27 +366,42 @@ const ChatRender = {
       </button>
     `;
 
+    // 菜单本身禁止选择文字
+    menu.style.userSelect = 'none';
+    menu.style.webkitUserSelect = 'none';
+
     // 定位菜单
-    const touch = e.touches ? e.touches[0] : e;
+    const touch = e.touches ? e.touches[0] : (e.changedTouches ? e.changedTouches[0] : e);
     if (touch) {
-      menu.style.left = `${Math.min(touch.clientX - 60, window.innerWidth - 120)}px`;
-      menu.style.top = `${Math.min(touch.clientY - 50, window.innerHeight - 60)}px`;
+      menu.style.left = `${Math.min(touch.clientX - 60, window.innerWidth - 130)}px`;
+      menu.style.top = `${Math.min(touch.clientY - 50, window.innerHeight - 80)}px`;
     }
 
     document.body.appendChild(menu);
 
     // 点击复制按钮
-    menu.querySelector('.copy-raw-btn').onclick = () => {
+    menu.querySelector('.copy-raw-btn').onclick = (evt) => {
+      evt.stopPropagation();
       ChatUtils.fallbackCopy(content);
       menu.remove();
     };
 
+    // 阻止菜单内的触摸事件冒泡
+    menu.addEventListener('touchstart', (evt) => {
+      evt.stopPropagation();
+    });
+
     // 点击其他地方关闭菜单
-    setTimeout(() => {
-      document.addEventListener('click', function closeMenu() {
+    const closeMenu = (evt) => {
+      if (!menu.contains(evt.target)) {
         menu.remove();
         document.removeEventListener('click', closeMenu);
-      });
+        document.removeEventListener('touchstart', closeMenu);
+      }
+    };
+    setTimeout(() => {
+      document.addEventListener('click', closeMenu);
+      document.addEventListener('touchstart', closeMenu);
     }, 100);
   }
 };

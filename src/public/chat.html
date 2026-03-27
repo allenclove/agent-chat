@@ -259,7 +259,8 @@
             case 'history':
                 el.messageContainer.innerHTML = '';
                 payload.messages.forEach(msg => ChatRender.addMessage(msg, el.messageContainer, false, currentUser));
-                ChatUI.scrollToBottom();
+                // 使用 ScrollModule 处理历史消息加载，支持记住阅读位置
+                ScrollModule.onHistoryLoaded(payload.messages);
                 break;
 
             case 'message':
