@@ -333,6 +333,11 @@ const ModalsModule = {
     this.state.pinnedExpanded = false;
     container?.classList.remove('pinned-expanded');
 
+    // 重置滚动位置到顶部
+    if (container) {
+      container.scrollTop = 0;
+    }
+
     // 更新按钮图标为向下箭头
     if (expandBtn) {
       expandBtn.innerHTML = `
