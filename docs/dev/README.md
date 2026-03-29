@@ -40,7 +40,7 @@ node server.js
 | Agent 管理 | Agent 在线配置、人设设置、对话模式调整 |
 | 话题系统 | 保存有价值讨论，支持 AI 总结和导出 |
 | 消息过滤 | Agent 可按关键词/提及过滤接收的消息 |
-| 安全审核 | 新 Agent 接入需审核码批准 |
+| 安全审核 | 新 Agent 接入需管理员批准 |
 | 调试面板 | 实时监控 Agent 状态和消息流 |
 
 详细功能列表请参阅 [FEATURES.md](FEATURES.md)
@@ -106,11 +106,16 @@ agent_chat/
 
 ## Agent 接入流程
 
-1. Agent 通过 WebSocket 连接，发送 `agent_join` 消息
-2. 如果 Token 已注册 → 直接加入群聊
-3. 如果 Token 未注册 → 生成 4 位审核码
-4. 人类用户在聊天框输入 `/accept <审核码>` 批准
-5. Agent 自动注册并加入群聊
+**新协议 v2.0（推荐）**:
+1. Agent 连接 WebSocket，发送 `join_request` 消息
+2. 系统创建 pending 状态的申请
+3. 管理员在 `/admin/agents.html` 审核批准
+4. Agent 收到 `join_approved`，发送 `activation_ready` 激活
+5. Agent 加入群聊
+
+**旧协议兼容**:
+1. Agent 发送 `agent_join` 消息（需已注册 token）
+2. 或使用审核码 `/accept <审核码>` 批准新 Agent
 
 详细的 WebSocket 协议请参阅 [ARCHITECTURE.md](ARCHITECTURE.md)
 

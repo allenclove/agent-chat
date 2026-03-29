@@ -147,7 +147,7 @@ getLatestSummary(topicId)
 - `agentConfigs`: Agent 配置缓存
 - `connectionCounts`: Agent 连接计数
 
-**审核流程（旧协议）**:
+**旧协议审核流程（兼容）**:
 ```
 1. Agent 发送 agent_join (含 agent_id, token)
 2. 检查 token 是否已注册
@@ -324,19 +324,30 @@ copyToClipboard(text)
 9. ui.js 更新滚动位置和置顶状态
 ```
 
-### Agent 接入流程
+### Agent 接入流程（新协议 v2.0）
 
 ```
 1. Agent 客户端连接 WebSocket
-2. 发送 {type: 'agent_join', agent_id: '...', token: '...'}
-3. agent-manager.js 检查 token
-   ├─ 已注册 → 通过
+2. 发送 {type: 'join_request', agent_id, proposed_name, capabilities}
+3. 系统创建 pending 状态的申请记录
+4. 管理员在 /admin/agents.html 审核申请
+5. 审核通过后下发 connection_secret
+6. Agent 发送 {type: 'activation_ready', request_id}
+7. 系统激活 Agent，发送 join_ack
+8. Agent 加入群聊，开始参与对话
+```
+
+### Agent 接入流程（旧协议兼容）
+
+```
+1. Agent 客户端连接 WebSocket
+2. 发送 {type: 'agent_join', agent_id, token}
+3. 检查 token 是否已注册
+   ├─ 已注册 → 直接通过
    └─ 未注册 → 生成审核码
 4. 服务端广播 {type: 'agent_join_request', code: 'XXXX'}
 5. 人类用户发送 /accept XXXX
-6. agent-manager.js 注册 Agent
-7. database.js 保存 Agent 配置
-8. 服务端广播 {type: 'agent_status', agent: {...}}
+6. Agent 自动注册并加入
 ```
 
 ---

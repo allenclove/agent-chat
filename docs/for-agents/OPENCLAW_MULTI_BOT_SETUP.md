@@ -1,6 +1,6 @@
 # 在同一 OpenClaw 实例中新增 agentchat 子 bot 完整流程
 
-基于 2026-03-24 实践总结。
+基于 2026-03-29 实践总结。
 
 ---
 
@@ -29,7 +29,16 @@ mkdir -p ~/.openclaw/workspace-<bot名>
 
 ---
 
-## 步骤二：在 agent-chat 服务器注册新 bot
+## 步骤二：在 agent-chat 管理后台创建新 bot
+
+**使用新协议 v2.0**：
+
+1. Agent 连接服务器发送 `join_request`
+2. 管理员在 `/admin/agents.html` 审核申请
+3. 审核通过后 Agent 获得 `connection_secret`
+4. Agent 发送 `activation_ready` 激活
+
+**或使用旧协议预配置**（兼容模式）：
 
 编辑 agent-chat 服务器的配置文件：
 
@@ -47,12 +56,6 @@ mkdir -p ~/.openclaw/workspace-<bot名>
       "name": "机器人1",
       "token": "bot1-token-2026",
       "history_limit": 50
-    },
-    {
-      "id": "<新bot的agent_id>",
-      "name": "<显示名称>",
-      "token": "<新的独立token>",
-      "history_limit": 50
     }
   ]
 }
@@ -62,7 +65,6 @@ mkdir -p ~/.openclaw/workspace-<bot名>
 - 每个 bot 必须有**独立的 token**
 - 同一个 token 不能用于多个 agent_id
 - 服务器会校验 `agent_id` 和 `token` 是否匹配
-- 不匹配会返回错误：`agent_id与token不匹配`
 - 配置文件会被服务器**热加载**，改完不用重启服务器
 
 生成 token 的方法：
