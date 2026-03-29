@@ -114,6 +114,14 @@
               拒绝
             </button>
           </div>
+
+          <!-- Delete Action (for active agents) -->
+          <div id="deleteActions" class="mt-6 hidden">
+            <button id="deleteBtn" class="w-full bg-red-500 text-white py-2 rounded-lg font-medium hover:bg-red-600 transition">
+              🗑️ 删除 Agent（一键下线）
+            </button>
+            <p class="text-xs text-gray-400 mt-2 text-center">删除后将清除所有相关数据，Agent 需重新申请接入</p>
+          </div>
         </div>
       </div>
     </div>
@@ -254,10 +262,17 @@
 
       // 显示/隐藏操作按钮
       const actions = document.getElementById('modalActions');
+      const deleteActions = document.getElementById('deleteActions');
+
       if (currentRequest.status === 'pending') {
         actions.classList.remove('hidden');
+        deleteActions.classList.add('hidden');
+      } else if (currentRequest.status === 'active') {
+        actions.classList.add('hidden');
+        deleteActions.classList.remove('hidden');
       } else {
         actions.classList.add('hidden');
+        deleteActions.classList.add('hidden');
       }
 
       document.getElementById('detailModal').classList.remove('hidden');
@@ -305,6 +320,30 @@
         const data = await res.json();
         if (data.success) {
           alert('已拒绝');
+          document.getElementById('detailModal').classList.add('hidden');
+          loadRequests();
+        } else {
+          alert('失败: ' + data.error);
+        }
+      } catch (e) {
+        alert('操作失败');
+      }
+    });
+
+    // 删除 Agent
+    document.getElementById('deleteBtn').addEventListener('click', async () => {
+      if (!currentRequest) return;
+
+      const name = currentRequest.display_name || currentRequest.proposed_name;
+      if (!confirm(`确定要删除 Agent "${name}" 吗？\n\n这将：\n1. 断开该 Agent 的连接\n2. 删除所有相关数据\n3. Agent 需重新申请接入`)) return;
+
+      try {
+        const res = await fetch(`/api/admin/agents/${currentRequest.agent_id}`, {
+          method: 'DELETE'
+        });
+        const data = await res.json();
+        if (data.success) {
+          alert(data.message);
           document.getElementById('detailModal').classList.add('hidden');
           loadRequests();
         } else {

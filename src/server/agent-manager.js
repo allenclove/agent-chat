@@ -571,6 +571,38 @@ const agentManager = {
     console.log('[Agent] 已通知所有Agent清空历史');
   },
 
+  // 断开指定 Agent 的连接
+  disconnectAgent(agentId) {
+    const agent = connectedAgents.get(agentId);
+    if (agent && agent.ws.readyState === 1) {
+      // 发送下线通知
+      agent.ws.send(JSON.stringify({
+        type: 'join_revoked',
+        payload: {
+          reason: '已被管理员删除',
+          revoked_at: db.formatShanghaiTime(new Date())
+        }
+      }));
+      // 关闭连接
+      agent.ws.close();
+      connectedAgents.delete(agentId);
+      console.log(`[Agent] 已断开 ${agentId} 的连接`);
+      return true;
+    }
+
+    // 检查待审核连接
+    for (const [requestId, pending] of pendingConnections) {
+      if (pending.request.agent_id === agentId) {
+        pending.ws.close();
+        pendingConnections.delete(requestId);
+        console.log(`[Agent] 已断开待审核的 ${agentId} 连接`);
+        return true;
+      }
+    }
+
+    return false;
+  },
+
   // ==================== 话题总结相关 ====================
 
   requestTopicSummary(topicId, topicTitle, messages) {

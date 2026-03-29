@@ -1227,6 +1227,26 @@ function updateJoinRequestLastSeen(requestId) {
   // 不立即 save，由调用方决定
 }
 
+// 删除 Agent 及所有相关数据
+function deleteAgent(agentId) {
+  // 获取 Agent 信息用于日志
+  const agent = getAgentById(agentId);
+
+  // 删除 agent_configs 中的记录
+  db.run('DELETE FROM agent_configs WHERE id = ?', [agentId]);
+
+  // 删除 join_requests 中的所有相关记录
+  db.run('DELETE FROM join_requests WHERE agent_id = ?', [agentId]);
+
+  save();
+
+  if (agent) {
+    console.log(`[DB] Agent 已删除: ${agentId} (${agent.name})`);
+  }
+
+  return { success: true, deletedAgent: agent };
+}
+
 // 通用更新函数
 function updateJoinRequest(requestId, updates) {
   const fields = [];
@@ -1346,5 +1366,6 @@ module.exports = {
   rejectJoinRequest,
   activateJoinRequest,
   cleanExpiredJoinRequests,
-  updateJoinRequestLastSeen
+  updateJoinRequestLastSeen,
+  deleteAgent
 };

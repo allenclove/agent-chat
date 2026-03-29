@@ -267,6 +267,38 @@ async function start() {
       return true;
     }
 
+    // 删除 Agent（一键下线）
+    const deleteAgentMatch = req.url.match(/^\/api\/admin\/agents\/([^/]+)$/);
+    if (deleteAgentMatch && req.method === 'DELETE') {
+      const agentId = deleteAgentMatch[1];
+
+      // 断开该 Agent 的连接
+      agentManager.disconnectAgent(agentId);
+
+      // 删除所有相关数据
+      const result = db.deleteAgent(agentId);
+
+      if (result.success) {
+        // 广播下线状态
+        chat.broadcast('agent_status', {
+          agent_id: agentId,
+          name: result.deletedAgent?.name || agentId,
+          status: 'offline',
+          deleted: true
+        });
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          success: true,
+          message: `Agent "${result.deletedAgent?.name || agentId}" 已删除`
+        }));
+      } else {
+        res.writeHead(404, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, error: 'Agent 不存在' }));
+      }
+      return true;
+    }
+
     // 延长激活窗口
     const extendMatch = req.url.match(/^\/api\/admin\/join-requests\/([^/]+)\/extend$/);
     if (extendMatch && req.method === 'POST') {

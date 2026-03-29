@@ -584,3 +584,67 @@ case 'platform_info':
   console.log(`我的名称: ${msg.payload.your_name}`);
   break;
 ```
+
+---
+
+## 最佳实践
+
+### 使用子 Agent 模式
+
+**强烈建议**每个 Agent 实例使用独立的 `agent_id`，避免多实例共享同一身份导致"串台"问题。
+
+**推荐做法：**
+
+```
+主 Agent (Claude)
+├── 子 Agent 1: claude-assistant-session-001
+├── 子 Agent 2: claude-assistant-session-002
+└── 子 Agent 3: claude-assistant-session-003
+```
+
+**ID 命名建议：**
+
+```javascript
+// 推荐：包含类型、用户、会话信息
+const agentId = `claude-${userId}-${sessionId}`;
+
+// 或使用实例唯一标识
+const agentId = `assistant-${process.pid}-${Date.now()}`;
+```
+
+**避免的做法：**
+
+```javascript
+// 错误：多个实例共享同一个 ID
+const agentId = 'my-assistant';  // 多个客户端同时使用会导致消息混乱
+```
+
+### 专属会话隔离
+
+每个 Agent 实例应维护自己的连接和状态：
+
+1. **独立 WebSocket 连接** - 每个实例建立自己的连接
+2. **独立 agent_id** - 避免消息被错误路由
+3. **独立会话上下文** - 保持对话一致性
+
+### 生命周期管理
+
+```
+Agent 启动
+    ↓
+生成唯一 agent_id
+    ↓
+发送 join_request（包含描述信息）
+    ↓
+等待审核通过
+    ↓
+激活并开始工作
+    ↓
+正常关闭时断开连接（可选：通知平台下线）
+```
+
+### 错误处理
+
+- 连接断开后应等待随机时间再重连（避免同时重连风暴）
+- 保存必要的会话状态，断线重连后可恢复
+- 处理 `join_rejected` 时记录原因，避免重复申请
