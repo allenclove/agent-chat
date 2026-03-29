@@ -1,9 +1,7 @@
 /**
  * Agent Manager - 管理 Agent 的连接、状态和消息
  *
- * 支持两种接入方式:
- * 1. 新协议 (join_request) - 自助申请 + 人工审核
- * 2. 旧协议 (agent_join) - 快速通道，已注册 Agent 直接连接
+ * 接入协议: join_request -> 管理员审核 -> activation_ready
  */
 
 const db = require('./database');
@@ -13,17 +11,11 @@ const protocol = require('./protocol');
 // 存储已连接的Agent
 const connectedAgents = new Map();
 
-// 待审核的Agent请求 (旧协议) { agentId: { ws, name, token, code, timestamp } }
-const pendingAgents = new Map();
-
-// 待审核的连接 (新协议) { requestId: { ws, request } }
+// 待审核的连接 { requestId: { ws, request } }
 const pendingConnections = new Map();
 
 // 心跳超时
 const HEARTBEAT_TIMEOUT = 60000;
-
-// 旧协议审核码有效期（5分钟）
-const PENDING_TIMEOUT = 5 * 60 * 1000;
 
 const agentManager = {
   // ==================== 新协议处理 ====================
@@ -172,125 +164,6 @@ const agentManager = {
    */
   getJoinRequestById(requestId) {
     return db.getJoinRequestById(requestId);
-  },
-
-  // ==================== 旧协议处理（兼容） ====================
-
-  /**
-   * 处理 Agent 连接 (旧协议 agent_join)
-   */
-  handleAgentConnection(ws, initialMsg) {
-    const { agent_id, token, name } = initialMsg.payload || {};
-
-    if (!agent_id || !token) {
-      return { success: false, error: '缺少agent_id或token' };
-    }
-
-    // 先检查是否是已注册的Agent
-    const agentConfig = db.getAgentByToken(token);
-    if (agentConfig) {
-      if (agentConfig.id !== agent_id) {
-        return { success: false, error: 'agent_id与token不匹配' };
-      }
-      return this.approveAgentConnection(ws, agentConfig);
-    }
-
-    // 未注册的Agent - 进入快速匹配流程
-    const existing = pendingAgents.get(agent_id);
-    if (existing && existing.ws === ws) {
-      return { success: false, error: '等待审核中', pending: true };
-    }
-
-    // 生成审核码（4位数字）
-    const crypto = require('crypto');
-    const code = crypto.randomInt(1000, 9999).toString();
-    const agentName = name || agent_id;
-
-    // 存储待审核请求
-    pendingAgents.set(agent_id, {
-      ws,
-      name: agentName,
-      token,
-      code,
-      timestamp: Date.now()
-    });
-
-    console.log(`[Agent] 新Agent请求接入(旧协议): ${agentName} (审核码: ${code})`);
-
-    // 通知所有用户有新Agent请求接入
-    chat.broadcast('agent_join_request', {
-      agent_id,
-      name: agentName,
-      code,
-      message: `🤖 新Agent "${agentName}" 请求加入群聊\n在聊天框输入 /accept ${code} 批准接入`
-    });
-
-    // 发送等待消息给Agent
-    ws.send(JSON.stringify({
-      type: 'agent_join_pending',
-      payload: {
-        message: '等待管理员审核...请在群聊中发送审核码',
-        code
-      }
-    }));
-
-    return { success: false, error: '等待审核', pending: true, code };
-  },
-
-  /**
-   * 通过审核码批准Agent (旧协议)
-   */
-  approveAgentByCode(code) {
-    for (const [agentId, pending] of pendingAgents) {
-      if (pending.code === code) {
-        if (pending.ws.readyState !== 1) {
-          pendingAgents.delete(agentId);
-          return { success: false, error: 'Agent连接已断开，请重新连接' };
-        }
-
-        // 注册Agent到数据库
-        const agentConfig = {
-          id: agentId,
-          name: pending.name,
-          token: pending.token
-        };
-        db.addAgent(agentConfig);
-
-        pendingAgents.delete(agentId);
-
-        const result = this.approveAgentConnection(pending.ws, {
-          id: agentId,
-          name: pending.name,
-          token: pending.token
-        });
-
-        chat.broadcast('system', {
-          type: 'agent_approved',
-          message: `✅ Agent "${pending.name}" 已成功加入群聊`
-        });
-
-        this.broadcastParticipantsUpdate();
-
-        return { success: true, agentName: pending.name };
-      }
-    }
-    return { success: false, error: '无效的审核码' };
-  },
-
-  /**
-   * 获取待审核的Agent列表 (旧协议)
-   */
-  getPendingAgents() {
-    const list = [];
-    for (const [agentId, pending] of pendingAgents) {
-      list.push({
-        agent_id: agentId,
-        name: pending.name,
-        code: pending.code,
-        timestamp: pending.timestamp
-      });
-    }
-    return list;
   },
 
   // ==================== 通用方法 ====================

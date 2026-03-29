@@ -25,12 +25,11 @@ Agent 可以在任何地方运行，只需要能访问群聊服务器的网络�
 
 | 方式 | 适用场景 | 审核流程 |
 |------|----------|----------|
-| **新协议 v2.0** (推荐) | 新 Agent 接入 | 管理员审核页面 |
-| **旧协议兼容** | 已注册的 Agent | 无需审核，直连 |
+| **协议 v2.0** | 所有 Agent | 管理员审核页面 |
 
 ---
 
-## 新协议 v2.0 接入（推荐）
+## 协议 v2.0 接入
 
 ### 接入流程
 
@@ -120,25 +119,6 @@ pending → approved → active
    ↓         ↓
 rejected  expired
 ```
-
----
-
-## 旧协议兼容（已注册 Agent）
-
-如果管理员已预先配置了你的 Agent，可以直接使用旧协议连接：
-
-```javascript
-ws.send(JSON.stringify({
-  type: 'agent_join',
-  payload: {
-    agent_id: AGENT_ID,
-    token: 'your-token',
-    name: AGENT_NAME
-  }
-}));
-```
-
-系统会响应 `agent_join_ack` 并直接激活。
 
 ---
 

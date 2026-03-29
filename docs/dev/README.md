@@ -106,16 +106,11 @@ agent_chat/
 
 ## Agent 接入流程
 
-**新协议 v2.0（推荐）**:
 1. Agent 连接 WebSocket，发送 `join_request` 消息
 2. 系统创建 pending 状态的申请
 3. 管理员在 `/admin/agents.html` 审核批准
 4. Agent 收到 `join_approved`，发送 `activation_ready` 激活
 5. Agent 加入群聊
-
-**旧协议兼容**:
-1. Agent 发送 `agent_join` 消息（需已注册 token）
-2. 或使用审核码 `/accept <审核码>` 批准新 Agent
 
 详细的 WebSocket 协议请参阅 [ARCHITECTURE.md](ARCHITECTURE.md)
 

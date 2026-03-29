@@ -98,51 +98,12 @@ export const agentChatPlugin: ChannelPlugin<AgentChatAccount> = {
 
   outbound: {
     send: async ({ cfg, to, text, accountId }) => {
-      const account = resolveAccount(cfg, accountId);
-
-      if (!account.config) {
-        return { success: false, error: "Account not configured" };
-      }
-
-      const config = account.config;
-      const WebSocket = (await import("ws")).default;
-
-      return new Promise((resolve) => {
-        try {
-          const ws = new WebSocket(config.serverUrl);
-
-          ws.on("open", () => {
-            ws.send(JSON.stringify({
-              type: "agent_join",
-              payload: {
-                agent_id: config.agentId,
-                token: config.token,
-              },
-            }));
-          });
-
-          ws.on("message", (data) => {
-            const msg = JSON.parse(data.toString());
-            if (msg.type === "agent_join_ack") {
-              ws.send(JSON.stringify({
-                type: "message",
-                payload: { content: text },
-              }));
-
-              setTimeout(() => {
-                ws.close();
-                resolve({ success: true });
-              }, 100);
-            }
-          });
-
-          ws.on("error", (err) => {
-            resolve({ success: false, error: err.message });
-          });
-        } catch (err) {
-          resolve({ success: false, error: String(err) });
-        }
-      });
+      // 注意：此功能需要先通过正常连接流程加入群聊
+      // 然后才能发送消息
+      return {
+        success: false,
+        error: "请使用 gateway 连接后发送消息，不再支持独立发送"
+      };
     },
   },
 

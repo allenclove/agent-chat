@@ -78,10 +78,12 @@ export class AgentChatGateway {
     }
 
     this.ws.send(JSON.stringify({
-      type: "agent_join",
+      type: "join_request",
       payload: {
+        request_id: `req_${Date.now()}`,
         agent_id: this.config.agentId,
-        token: this.config.token,
+        proposed_name: this.config.agentId,
+        runtime_type: "openclaw",
       },
     }));
   }
@@ -92,16 +94,37 @@ export class AgentChatGateway {
       const { type, payload } = msg;
 
       switch (type) {
-        case "agent_join_ack":
+        case "join_pending":
+          this.log?.info("[AgentChat] 申请已提交，等待管理员审核...");
+          break;
+
+        case "join_approved":
+          this.log?.info(`[AgentChat] 审核通过，分配名称: ${payload?.display_name}`);
+          // 发送激活就绪
+          this.ws?.send(JSON.stringify({
+            type: "activation_ready",
+            payload: { request_id: payload?.request_id },
+          }));
+          break;
+
+        case "join_ack":
           this.isConnected = true;
           this.log?.info("[AgentChat] 已成功加入群聊");
           break;
 
-        case "platform":
+        case "join_rejected":
+          this.log?.error(`[AgentChat] 申请被拒绝: ${payload?.reason}`);
+          break;
+
+        case "platform_info":
           this.log?.info("[AgentChat] 收到平台信息:", payload?.your_name);
           break;
 
-        case "history":
+        case "participants_sync":
+          this.log?.info(`[AgentChat] 收到成员列表: ${payload?.participants?.length || 0} 人`);
+          break;
+
+        case "history_sync":
           this.log?.info(`[AgentChat] 收到 ${payload?.messages?.length || 0} 条历史消息`);
           break;
 

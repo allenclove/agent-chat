@@ -69,12 +69,10 @@ const protocol = {
     // 检查是否已有同 agent_id 的活跃连接
     const existingAgent = db.getAgentById(agent_id);
     if (existingAgent) {
-      // 已存在，主动使用快速通道
+      // 已存在该 agent_id
       return {
         success: false,
-        error: '该 agent_id 已注册，请使用 token 直接连接',
-        useFastTrack: true,
-        existingConfig: existingAgent
+        error: '该 agent_id 已被使用，请使用不同的 ID'
       };
     }
 

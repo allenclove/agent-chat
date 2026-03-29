@@ -67,15 +67,9 @@ function setupWebSocket(server) {
         return;
       }
 
-      // 处理Agent激活就绪 - 新协议
+      // 处理Agent激活就绪
       if (type === 'activation_ready') {
         handleActivationReady(ws, msg);
-        return;
-      }
-
-      // 处理Agent消息 - 旧协议（兼容）
-      if (type === 'agent_join') {
-        handleAgentJoin(ws, msg);
         return;
       }
 
@@ -242,24 +236,6 @@ function setupWebSocket(server) {
       agentManager.broadcastParticipantsUpdate();
     }
 
-    function handleAgentJoin(ws, msg) {
-      const result = agentManager.handleAgentConnection(ws, msg);
-
-      if (result.success) {
-        isAgent = true;
-        agentId = msg.payload.agent_id;
-        console.log(`[WS] Agent验证成功: ${agentId}`);
-      } else if (result.pending) {
-        // 等待审核，不关闭连接
-        isAgent = true;
-        agentId = msg.payload.agent_id;
-        console.log(`[WS] Agent等待审核: ${agentId} (审核码: ${result.code})`);
-      } else {
-        sendError(ws, result.error);
-        ws.close();
-      }
-    }
-
     // 处理新的接入申请 (join_request)
     function handleJoinRequest(ws, msg) {
       const result = agentManager.handleJoinRequest(ws, msg.payload);
@@ -269,11 +245,6 @@ function setupWebSocket(server) {
         isAgent = true;
         agentId = msg.payload.agent_id;
         console.log(`[WS] 新接入申请: ${agentId} (${result.request.request_id})`);
-      } else if (result.useFastTrack) {
-        // 已注册的Agent，使用快速通道
-        isAgent = true;
-        agentId = msg.payload.agent_id;
-        console.log(`[WS] Agent快速通道: ${agentId}`);
       } else {
         sendError(ws, result.error);
         if (!result.pending) {
@@ -307,33 +278,6 @@ function setupWebSocket(server) {
       }
 
       const trimmedContent = content.trim();
-
-      // 检查是否是 /accept 命令（快速匹配接入）
-      const acceptMatch = trimmedContent.match(/^\/accept\s+(\d{4})$/);
-      if (acceptMatch) {
-        const code = acceptMatch[1];
-        const result = agentManager.approveAgentByCode(code);
-
-        if (result.success) {
-          // 发送系统消息
-          const sysMessage = {
-            id: Date.now(),
-            sender_id: 'system',
-            sender_name: '系统',
-            sender_type: 'system',
-            content: `✅ Agent "${result.agentName}" 已成功加入群聊`,
-            created_at: db.formatShanghaiTime(new Date())
-          };
-          chat.broadcast('message', sysMessage);
-        } else {
-          // 发送错误提示
-          ws.send(JSON.stringify({
-            type: 'system',
-            payload: { message: `❌ ${result.error}` }
-          }));
-        }
-        return;
-      }
 
       // 正常消息处理
       const message = chat.handleUserMessage(sessionId, trimmedContent);

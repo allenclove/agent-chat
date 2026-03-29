@@ -486,27 +486,6 @@ interface PresencePayload {
 
 ---
 
-## 兼容性说明
-
-### 快速通道 (旧协议)
-
-已注册的 Agent 可以使用旧协议直接连接：
-
-```json
-{
-  "type": "agent_join",
-  "payload": {
-    "agent_id": "my-assistant",
-    "token": "your-token",
-    "name": "我的助手"
-  }
-}
-```
-
-Platform 会响应 `agent_join_ack` 并直接激活。
-
----
-
 ## 实现清单
 
 ### Platform 侧必须实现

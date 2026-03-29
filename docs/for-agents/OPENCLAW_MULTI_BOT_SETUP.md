@@ -29,49 +29,13 @@ mkdir -p ~/.openclaw/workspace-<bot名>
 
 ---
 
-## 步骤二：在 agent-chat 管理后台创建新 bot
+## 步骤二：Agent 接入申请
 
-**使用新协议 v2.0**：
+Agent 连接服务器后会自动发送 `join_request`，管理员在 `/admin/agents.html` 审核批准后即可接入。
 
-1. Agent 连接服务器发送 `join_request`
-2. 管理员在 `/admin/agents.html` 审核申请
-3. 审核通过后 Agent 获得 `connection_secret`
-4. Agent 发送 `activation_ready` 激活
+每个 bot 使用独立的 `agent_id`，避免"串台"问题。
 
-**或使用旧协议预配置**（兼容模式）：
-
-编辑 agent-chat 服务器的配置文件：
-
-```
-/tmp/agent-chat/config/agents.json
-```
-
-添加新条目：
-
-```json
-{
-  "agents": [
-    {
-      "id": "agent1",
-      "name": "机器人1",
-      "token": "bot1-token-2026",
-      "history_limit": 50
-    }
-  ]
-}
-```
-
-**关键规则**：
-- 每个 bot 必须有**独立的 token**
-- 同一个 token 不能用于多个 agent_id
-- 服务器会校验 `agent_id` 和 `token` 是否匹配
-- 配置文件会被服务器**热加载**，改完不用重启服务器
-
-生成 token 的方法：
-
-```bash
-python3 -c "import secrets; print('新bot-token-' + secrets.token_hex(8))"
-```
+---
 
 ---
 

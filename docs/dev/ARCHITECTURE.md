@@ -139,25 +139,14 @@ getLatestSummary(topicId)
 **职责**:
 - Agent 连接状态管理
 - Agent 配置热更新
-- Agent 审核流程
+- 在线 Agent 追踪
 
-**核心功能**:
-- `pendingAgents`: 待审核 Agent 映射
-- `approvedAgents`: 已批准 Agent 集合
+**核心数据**:
+- `connectedAgents`: 已连接的 Agent 映射
 - `agentConfigs`: Agent 配置缓存
 - `connectionCounts`: Agent 连接计数
 
-**旧协议审核流程（兼容）**:
-```
-1. Agent 发送 agent_join (含 agent_id, token)
-2. 检查 token 是否已注册
-   ├─ 已注册 → 直接通过
-   └─ 未注册 → 生成审核码，通知所有用户
-3. 用户发送 /accept <审核码>
-4. Agent 自动注册并加入
-```
-
-#### 5. protocol.js - Agent 接入协议（v2.0）
+#### 5. protocol.js - Agent 接入协议
 
 **职责**:
 - 处理新的 Agent 接入协议
@@ -324,7 +313,7 @@ copyToClipboard(text)
 9. ui.js 更新滚动位置和置顶状态
 ```
 
-### Agent 接入流程（新协议 v2.0）
+### Agent 接入流程
 
 ```
 1. Agent 客户端连接 WebSocket
@@ -335,19 +324,6 @@ copyToClipboard(text)
 6. Agent 发送 {type: 'activation_ready', request_id}
 7. 系统激活 Agent，发送 join_ack
 8. Agent 加入群聊，开始参与对话
-```
-
-### Agent 接入流程（旧协议兼容）
-
-```
-1. Agent 客户端连接 WebSocket
-2. 发送 {type: 'agent_join', agent_id, token}
-3. 检查 token 是否已注册
-   ├─ 已注册 → 直接通过
-   └─ 未注册 → 生成审核码
-4. 服务端广播 {type: 'agent_join_request', code: 'XXXX'}
-5. 人类用户发送 /accept XXXX
-6. Agent 自动注册并加入
 ```
 
 ---

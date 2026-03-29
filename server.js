@@ -341,47 +341,6 @@ async function start() {
       return true;
     }
 
-    // 获取旧协议待审核列表
-    if (req.url === '/api/admin/pending-agents' && req.method === 'GET') {
-      const pending = agentManager.getPendingAgents();
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ success: true, pending }));
-      return true;
-    }
-
-    // 通过审核码批准 Agent（旧协议）
-    if (req.url === '/api/admin/approve-agent' && req.method === 'POST') {
-      let body = '';
-      req.on('data', chunk => body += chunk);
-      req.on('end', () => {
-        try {
-          const { code } = JSON.parse(body);
-          if (!code) {
-            res.writeHead(400, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ success: false, error: '缺少审核码' }));
-            return;
-          }
-
-          const result = agentManager.approveAgentByCode(code);
-          if (result.success) {
-            res.writeHead(200, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({
-              success: true,
-              message: `Agent "${result.agentName}" 已成功加入群聊`,
-              agent_name: result.agentName
-            }));
-          } else {
-            res.writeHead(400, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ success: false, error: result.error }));
-          }
-        } catch (e) {
-          res.writeHead(400, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ success: false, error: '无效的请求数据' }));
-        }
-      });
-      return true;
-    }
-
     // 获取单个 Agent 配置
     const agentConfigMatch = req.url.match(/^\/api\/agents\/([^/]+)\/config$/);
     if (agentConfigMatch && req.method === 'GET') {
