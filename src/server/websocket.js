@@ -287,7 +287,9 @@ function setupWebSocket(server) {
       const result = agentManager.handleActivationReady(ws, msg.payload);
 
       if (result && result.success) {
-        console.log(`[WS] Agent激活成功`);
+        isAgent = true;
+        agentId = result.agent_id;
+        console.log(`[WS] Agent激活成功: ${agentId}`);
       } else {
         sendError(ws, result?.error || '激活失败');
       }

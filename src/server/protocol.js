@@ -249,7 +249,7 @@ const protocol = {
     this.sendHistorySync(ws, request);
 
     console.log(`[Protocol] Agent 激活成功: ${request.display_name || request.proposed_name}`);
-    return { success: true };
+    return { success: true, agent_id: request.agent_id };
   },
 
   /**

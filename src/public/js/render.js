@@ -151,13 +151,13 @@ const ChatRender = {
     if (!agentListEl) return;
 
     agentListEl.innerHTML = agentList.map(agent => `
-      <div class="flex items-center space-x-2 p-2 rounded-lg hover:bg-gray-50 group">
+      <div class="flex items-center space-x-2 p-2 rounded-lg hover:bg-gray-50 group" data-agent-id="${agent.id}">
         <div class="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center text-sm">🤖</div>
-        <span class="text-sm text-gray-700 flex-1">${ChatUtils.escapeHtml(agent.name)}</span>
+        <span class="agent-name text-sm text-gray-700 flex-1">${ChatUtils.escapeHtml(agent.name)}</span>
         <button onclick="ChatUI.openAgentSettings('${agent.id}')" class="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-purple-600 p-1" title="设置">
           ⚙️
         </button>
-        <span class="w-2 h-2 rounded-full ${agent.status === 'online' ? 'bg-green-500' : 'bg-gray-300'}"></span>
+        <span class="status-dot w-2 h-2 rounded-full ${agent.status === 'online' ? 'bg-green-500' : 'bg-gray-300'}"></span>
       </div>
     `).join('');
   },

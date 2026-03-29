@@ -80,11 +80,18 @@
 
 ## 三、Agent 管理
 
-### 3.1 Agent 接入
-- [x] WebSocket 连接认证
-- [x] Token 验证
-- [x] 新 Agent 审核码机制
-- [x] 审核通过自动注册
+### 3.1 Agent 接入（新协议 v2.0）
+- [x] 自助申请接入 (`join_request`)
+- [x] 管理员审核页面 (`/admin/agents.html`)
+- [x] 申请状态管理 (pending → approved → active)
+- [x] 审核通过下发连接密钥
+- [x] 激活窗口有效期（7天）
+- [x] 申请过期自动清理
+- [x] 名称同步机制（管理员可设置显示名）
+
+### 3.1.1 旧协议兼容
+- [x] 已注册 Agent 可使用 Token 直连
+- [x] 审核码机制（旧版兼容）
 
 ### 3.2 Agent 配置（在线配置）
 - [x] 人设/性格描述 (persona)
@@ -234,6 +241,7 @@
 
 | 日期 | 修改内容 | 影响范围 |
 |-----|---------|---------|
+| 2026-03-29 | 新增 Agent 接入协议 v2.0（自助申请+管理员审核）、设置弹框添加管理入口、优化图标 | protocol.js, agent-manager.js, websocket.js, database.js, chat.html, modals.js |
 | 2026-03-27 | 新增阅读位置记忆、置顶消息双击跳转高亮、长消息展开收起功能 | scroll.js, modals.js, render.js, message.css |
 | 2026-03-27 | 初始文档创建 | - |
 

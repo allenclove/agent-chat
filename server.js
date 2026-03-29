@@ -401,6 +401,15 @@ async function start() {
           // 通知该 Agent 重新加载配置
           agentManager.notifyAgentConfigChanged(agentId);
 
+          // 如果名称变更，广播给所有用户更新 Agent 列表
+          if (filteredSettings.name !== undefined) {
+            chat.broadcast('agent_status', {
+              agent_id: agentId,
+              name: filteredSettings.name,
+              status: agentManager.getAgentStatus().find(a => a.id === agentId)?.status || 'offline'
+            });
+          }
+
           res.writeHead(200, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ success: true, config: updated }));
         } catch (e) {

@@ -477,6 +477,15 @@ function updateAgentSettings(agentId, settings) {
 
   values.push(agentId);
   db.run(`UPDATE agent_configs SET ${updates.join(', ')} WHERE id = ?`, values);
+
+  // 同步名称到 join_requests 表
+  if (settings.name !== undefined) {
+    db.run(
+      `UPDATE join_requests SET display_name = ? WHERE agent_id = ? AND status = 'active'`,
+      [settings.name, agentId]
+    );
+  }
+
   save();
 
   console.log(`[DB] Agent ${agentId} 设置已更新:`, Object.keys(settings).join(', '));
@@ -1146,10 +1155,22 @@ function activateJoinRequest(requestId, sessionId) {
     [sessionId, now, requestId]
   );
 
+  // 同步到 agent_configs 表，使其在聊天页面显示
+  const request = getJoinRequestById(requestId);
+  if (request) {
+    addAgent({
+      id: request.agent_id,
+      name: request.display_name || request.proposed_name,
+      token: request.connection_secret,
+      message_filter: request.receive_mode || 'all',
+      history_limit: 50
+    });
+  }
+
   save();
   console.log(`[DB] Agent 已激活: ${requestId}`);
 
-  return getJoinRequestById(requestId);
+  return request;
 }
 
 // 清理过期的接入申请
