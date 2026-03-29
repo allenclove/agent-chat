@@ -6,7 +6,66 @@ const { v4: uuidv4 } = require('uuid');
 const dbPath = path.join(__dirname, '../../data/chat.db');
 let db = null;
 
-// 初始化数据库
+// ==================== 辅助函数 ====================
+
+/**
+ * 解析 sql.js 返回的单行结果
+ * @param {Array} result - sql.js exec 返回的结果
+ * @returns {Object|null} 解析后的对象或 null
+ */
+function parseSingleResult(result) {
+  if (!result || result.length === 0 || result[0].values.length === 0) return null;
+  const row = {};
+  result[0].columns.forEach((col, i) => row[col] = result[0].values[0][i]);
+  return row;
+}
+
+/**
+ * 解析 sql.js 返回的多行结果
+ * @param {Array} result - sql.js exec 返回的结果
+ * @returns {Array<Object>} 解析后的对象数组
+ */
+function parseMultipleResults(result) {
+  if (!result || result.length === 0) return [];
+  return result[0].values.map(values => {
+    const row = {};
+    result[0].columns.forEach((col, i) => row[col] = values[i]);
+    return row;
+  });
+}
+
+/**
+ * 安全解析 JSON 字段
+ * @param {string} value - JSON 字符串
+ * @param {*} defaultValue - 解析失败时的默认值
+ * @returns {*} 解析后的值或默认值
+ */
+function safeParseJson(value, defaultValue = null) {
+  if (!value) return defaultValue;
+  try {
+    return JSON.parse(value);
+  } catch (e) {
+    return defaultValue;
+  }
+}
+
+/**
+ * 解析结果中的指定 JSON 字段
+ * @param {Object} obj - 要处理的对象
+ * @param {Array<string>} jsonFields - 需要解析的 JSON 字段名列表
+ * @returns {Object} 处理后的对象
+ */
+function parseJsonFields(obj, jsonFields) {
+  if (!obj) return obj;
+  for (const field of jsonFields) {
+    if (obj[field] && typeof obj[field] === 'string') {
+      obj[field] = safeParseJson(obj[field], obj[field]);
+    }
+  }
+  return obj;
+}
+
+// ==================== 数据库初始化 ====================
 async function init() {
   const SQL = await initSqlJs();
 
@@ -224,24 +283,12 @@ function createUser(username, displayName, avatarUrl = null) {
 
 function findUserByUsername(username) {
   const result = db.exec('SELECT * FROM users WHERE username = ?', [username]);
-  if (result.length === 0 || result[0].values.length === 0) return null;
-
-  const columns = result[0].columns;
-  const values = result[0].values[0];
-  const user = {};
-  columns.forEach((col, i) => user[col] = values[i]);
-  return user;
+  return parseSingleResult(result);
 }
 
 function findUserById(id) {
   const result = db.exec('SELECT * FROM users WHERE id = ?', [id]);
-  if (result.length === 0 || result[0].values.length === 0) return null;
-
-  const columns = result[0].columns;
-  const values = result[0].values[0];
-  const user = {};
-  columns.forEach((col, i) => user[col] = values[i]);
-  return user;
+  return parseSingleResult(result);
 }
 
 // 会话相关操作
@@ -264,13 +311,7 @@ function findSessionById(sessionId) {
     WHERE s.id = ? AND s.expires_at > datetime('now')
   `, [sessionId]);
 
-  if (result.length === 0 || result[0].values.length === 0) return null;
-
-  const columns = result[0].columns;
-  const values = result[0].values[0];
-  const session = {};
-  columns.forEach((col, i) => session[col] = values[i]);
-  return session;
+  return parseSingleResult(result);
 }
 
 function deleteSession(sessionId) {
@@ -329,14 +370,9 @@ function getRecentMessages(limit = 50) {
 
   if (result.length === 0) return [];
 
-  const columns = result[0].columns;
-  const messages = result[0].values.reverse().map(values => {
-    const msg = {};
-    columns.forEach((col, i) => msg[col] = values[i]);
-    return msg;
-  });
-
-  return messages;
+  // 反转顺序，使最新消息在底部
+  const messages = parseMultipleResults(result);
+  return messages.reverse();
 }
 
 // 清空所有消息
@@ -366,25 +402,12 @@ function getMessageStats() {
 // Agent配置相关操作
 function getAllAgents() {
   const result = db.exec('SELECT * FROM agent_configs WHERE enabled = 1');
-  if (result.length === 0) return [];
-
-  const columns = result[0].columns;
-  return result[0].values.map(values => {
-    const agent = {};
-    columns.forEach((col, i) => agent[col] = values[i]);
-    return agent;
-  });
+  return parseMultipleResults(result);
 }
 
 function getAgentById(id) {
   const result = db.exec('SELECT * FROM agent_configs WHERE id = ?', [id]);
-  if (result.length === 0 || result[0].values.length === 0) return null;
-
-  const columns = result[0].columns;
-  const values = result[0].values[0];
-  const agent = {};
-  columns.forEach((col, i) => agent[col] = values[i]);
-  return agent;
+  return parseSingleResult(result);
 }
 
 // 添加Agent配置
@@ -427,13 +450,7 @@ function addAgent(config) {
 // 通过token验证Agent
 function getAgentByToken(token) {
   const result = db.exec('SELECT * FROM agent_configs WHERE token = ? AND enabled = 1', [token]);
-  if (result.length === 0 || result[0].values.length === 0) return null;
-
-  const columns = result[0].columns;
-  const values = result[0].values[0];
-  const agent = {};
-  columns.forEach((col, i) => agent[col] = values[i]);
-  return agent;
+  return parseSingleResult(result);
 }
 
 // 更新 Agent 设置（人设、对话模式等）
@@ -498,16 +515,8 @@ function getAgentFullConfig(agentId) {
   if (!agent) return null;
 
   // 解析 JSON 字段
-  try {
-    if (agent.keywords) agent.keywords = JSON.parse(agent.keywords);
-  } catch (e) {
-    agent.keywords = [];
-  }
-  try {
-    if (agent.custom_settings) agent.custom_settings = JSON.parse(agent.custom_settings);
-  } catch (e) {
-    agent.custom_settings = {};
-  }
+  agent.keywords = safeParseJson(agent.keywords, []);
+  agent.custom_settings = safeParseJson(agent.custom_settings, {});
 
   return agent;
 }
@@ -764,15 +773,7 @@ function getTopics(limit = 50, offset = 0) {
       [limit, offset]
     );
 
-    if (result.length === 0) return [];
-
-    const columns = result[0].columns;
-    const topics = result[0].values.map(values => {
-      const topic = {};
-      columns.forEach((col, i) => topic[col] = values[i]);
-      return topic;
-    });
-
+    const topics = parseMultipleResults(result);
     console.log(`[DB] 查询到 ${topics.length} 个话题`);
     return topics;
   } catch (e) {
@@ -791,14 +792,7 @@ function getTopicById(topicId) {
     [topicId]
   );
 
-  if (result.length === 0 || result[0].values.length === 0) return null;
-
-  const columns = result[0].columns;
-  const values = result[0].values[0];
-  const topic = {};
-  columns.forEach((col, i) => topic[col] = values[i]);
-
-  return topic;
+  return parseSingleResult(result);
 }
 
 // 获取话题消息列表
@@ -811,14 +805,7 @@ function getTopicMessages(topicId) {
     [topicId]
   );
 
-  if (result.length === 0) return [];
-
-  const columns = result[0].columns;
-  return result[0].values.map(values => {
-    const msg = {};
-    columns.forEach((col, i) => msg[col] = values[i]);
-    return msg;
-  });
+  return parseMultipleResults(result);
 }
 
 // 添加消息到话题
@@ -917,22 +904,12 @@ function getTopicSummary(topicId) {
     [topicId]
   );
 
-  if (result.length === 0 || result[0].values.length === 0) return null;
+  const summary = parseSingleResult(result);
+  if (!summary) return null;
 
-  const columns = result[0].columns;
-  const values = result[0].values[0];
-  const summary = {};
-  columns.forEach((col, i) => {
-    if (col === 'viewpoints' || col === 'open_questions') {
-      try {
-        summary[col] = JSON.parse(values[i]);
-      } catch (e) {
-        summary[col] = values[i];
-      }
-    } else {
-      summary[col] = values[i];
-    }
-  });
+  // 解析 JSON 字段
+  summary.viewpoints = safeParseJson(summary.viewpoints, summary.viewpoints);
+  summary.open_questions = safeParseJson(summary.open_questions, summary.open_questions);
 
   return summary;
 }
@@ -947,14 +924,7 @@ function getMessagesByIds(messageIds) {
     messageIds
   );
 
-  if (result.length === 0) return [];
-
-  const columns = result[0].columns;
-  return result[0].values.map(values => {
-    const msg = {};
-    columns.forEach((col, i) => msg[col] = values[i]);
-    return msg;
-  });
+  return parseMultipleResults(result);
 }
 
 // ==================== Agent 接入申请相关操作 ====================
@@ -1268,48 +1238,17 @@ function updateJoinRequest(requestId, updates) {
 
 // 解析单个 join_request
 function parseJoinRequest(result) {
-  if (result.length === 0 || result[0].values.length === 0) return null;
+  const request = parseSingleResult(result);
+  if (!request) return null;
 
-  const columns = result[0].columns;
-  const values = result[0].values[0];
-  const request = {};
-
-  columns.forEach((col, i) => {
-    // 解析 JSON 字段
-    if (['capabilities', 'metadata', 'capability_scope'].includes(col) && values[i]) {
-      try {
-        request[col] = JSON.parse(values[i]);
-      } catch (e) {
-        request[col] = values[i];
-      }
-    } else {
-      request[col] = values[i];
-    }
-  });
-
-  return request;
+  // 解析 JSON 字段
+  return parseJsonFields(request, ['capabilities', 'metadata', 'capability_scope']);
 }
 
 // 解析多个 join_requests
 function parseJoinRequests(result) {
-  if (result.length === 0) return [];
-
-  const columns = result[0].columns;
-  return result[0].values.map(values => {
-    const request = {};
-    columns.forEach((col, i) => {
-      if (['capabilities', 'metadata', 'capability_scope'].includes(col) && values[i]) {
-        try {
-          request[col] = JSON.parse(values[i]);
-        } catch (e) {
-          request[col] = values[i];
-        }
-      } else {
-        request[col] = values[i];
-      }
-    });
-    return request;
-  });
+  const requests = parseMultipleResults(result);
+  return requests.map(req => parseJsonFields(req, ['capabilities', 'metadata', 'capability_scope']));
 }
 
 module.exports = {

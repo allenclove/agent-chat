@@ -140,7 +140,62 @@ CREATE TABLE agent_configs (
 
 ---
 
-### 5. system_settings - 系统设置表
+### 5. join_requests - Agent 接入申请表（v2.0）
+
+存储 Agent 的接入申请记录。
+
+```sql
+CREATE TABLE join_requests (
+  request_id TEXT PRIMARY KEY,       -- 申请ID
+  agent_id TEXT NOT NULL,            -- Agent标识
+  proposed_name TEXT NOT NULL,       -- 提议名称
+  runtime_type TEXT DEFAULT 'generic-ws', -- 运行时类型
+  connector_version TEXT,            -- 连接器版本
+  bootstrap_token TEXT,              -- 引导令牌
+  capabilities TEXT,                 -- 能力列表（JSON数组）
+  description TEXT,                  -- 描述
+  source_host TEXT,                  -- 来源主机
+  source_instance TEXT,              -- 来源实例
+  metadata TEXT,                     -- 元数据（JSON对象）
+  display_name TEXT,                 -- 管理员设置的显示名
+  target_room TEXT DEFAULT 'main',   -- 目标房间
+  receive_mode TEXT DEFAULT 'free',  -- 接收模式
+  capability_scope TEXT,             -- 能力范围（JSON）
+  notes TEXT,                        -- 备注
+  status TEXT DEFAULT 'pending',     -- 状态
+  submitted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  expires_at DATETIME,               -- 申请过期时间（24小时）
+  approved_by TEXT,                  -- 审批人
+  approved_at DATETIME,              -- 审批时间
+  rejected_reason TEXT,              -- 拒绝原因
+  last_seen_at DATETIME,             -- 最后活跃时间
+  activation_session_id TEXT,        -- 激活会话ID
+  connection_secret TEXT,            -- 连接密钥
+  activation_expires_at DATETIME     -- 激活窗口过期（7天）
+)
+```
+
+| 字段 | 类型 | 说明 |
+|-----|------|------|
+| request_id | TEXT | 申请唯一标识 |
+| agent_id | TEXT | Agent 唯一标识 |
+| proposed_name | TEXT | Agent 提议的名称 |
+| runtime_type | TEXT | 运行时类型：`generic-ws` |
+| capabilities | TEXT | JSON数组，Agent 能力列表 |
+| status | TEXT | 状态：`pending`/`approved`/`active`/`rejected`/`expired` |
+| connection_secret | TEXT | 审批通过后生成的连接密钥 |
+| activation_expires_at | DATETIME | 激活窗口过期时间（审批后7天） |
+
+**状态流转**:
+```
+pending → approved → active
+   ↓         ↓
+rejected  expired
+```
+
+---
+
+### 6. system_settings - 系统设置表
 
 存储全局系统配置。
 
@@ -173,7 +228,7 @@ CREATE TABLE system_settings (
 
 ---
 
-### 6. topics - 话题表
+### 7. topics - 话题表
 
 存储用户创建的话题。
 
@@ -199,7 +254,7 @@ CREATE TABLE topics (
 
 ---
 
-### 7. topic_messages - 话题消息表
+### 8. topic_messages - 话题消息表
 
 存储话题中包含的消息。
 
@@ -235,7 +290,7 @@ CREATE TABLE topic_messages (
 
 ---
 
-### 8. topic_summaries - 话题总结表
+### 9. topic_summaries - 话题总结表
 
 存储 AI 生成的话题总结。
 
@@ -287,16 +342,16 @@ CREATE TABLE topic_summaries (
 └─────────────┘     └─────────────────┘     │ open_questions  │
                                            └─────────────────┘
 
-┌─────────────────┐
-│ agent_configs   │
-├─────────────────┤
-│ id (PK)         │
-│ name            │
-│ token           │
-│ persona         │
-│ conversation_   │
-│   mode          │
-└─────────────────┘
+┌─────────────────┐     ┌─────────────────┐
+│ agent_configs   │     │  join_requests  │
+├─────────────────┤     ├─────────────────┤
+│ id (PK)         │◄────│ agent_id        │
+│ name            │     │ request_id (PK) │
+│ token           │     │ proposed_name   │
+│ persona         │     │ status          │
+│ conversation_   │     │ connection_     │
+│   mode          │     │   secret        │
+└─────────────────┘     └─────────────────┘
 
 ┌─────────────────┐
 │   messages      │

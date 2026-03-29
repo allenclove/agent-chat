@@ -147,7 +147,7 @@ getLatestSummary(topicId)
 - `agentConfigs`: Agent 配置缓存
 - `connectionCounts`: Agent 连接计数
 
-**审核流程**:
+**审核流程（旧协议）**:
 ```
 1. Agent 发送 agent_join (含 agent_id, token)
 2. 检查 token 是否已注册
@@ -157,7 +157,33 @@ getLatestSummary(topicId)
 4. Agent 自动注册并加入
 ```
 
-#### 5. chat.js - 聊天引擎
+#### 5. protocol.js - Agent 接入协议（v2.0）
+
+**职责**:
+- 处理新的 Agent 接入协议
+- 接入申请状态管理
+- 激活握手流程
+
+**协议流程**:
+```
+1. Agent 发送 join_request (含 agent_id, proposed_name, capabilities)
+2. 系统创建 pending 状态的申请记录
+3. 管理员在 /admin/agents.html 审核申请
+4. 审核通过后下发 connection_secret
+5. Agent 使用 connection_secret 完成 activation_ready 握手
+6. Agent 激活成功，加入群聊
+```
+
+**状态流转**:
+| 状态 | 说明 |
+|------|------|
+| `pending` | 等待审核 |
+| `approved` | 已批准，等待激活 |
+| `active` | 已激活，正常运行 |
+| `rejected` | 已拒绝 |
+| `expired` | 已过期 |
+
+#### 6. chat.js - 聊天引擎
 
 **职责**:
 - 消息处理逻辑
@@ -242,6 +268,24 @@ class ChatWS {
 - @提及下拉菜单
 - 置顶消息区域
 - 新消息提示按钮
+
+**UI 子模块** (`src/public/js/ui/`):
+
+| 模块 | 职责 |
+|------|------|
+| `scroll.js` | 滚动位置追踪、新消息提示、阅读位置记忆 |
+| `selection.js` | 消息选择模式、话题创建流程 |
+| `modals.js` | Agent 设置弹窗、显示设置、置顶消息管理 |
+| `mention.js` | @提及下拉菜单、Agent 选择 |
+
+**模块化设计**:
+```javascript
+// ui.js 作为入口，组合各子模块
+import { ScrollManager } from './ui/scroll.js';
+import { SelectionManager } from './ui/selection.js';
+import { ModalManager } from './ui/modals.js';
+import { MentionManager } from './ui/mention.js';
+```
 
 #### 5. utils.js - 工具函数
 
