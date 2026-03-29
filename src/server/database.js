@@ -74,6 +74,50 @@ async function init() {
   try {
     db.run(`ALTER TABLE agent_configs ADD COLUMN custom_settings TEXT`);
   } catch (e) { /* 列已存在，忽略 */ }
+  try {
+    db.run(`ALTER TABLE agent_configs ADD COLUMN request_id TEXT`);
+  } catch (e) { /* 列已存在，忽略 */ }
+  try {
+    db.run(`ALTER TABLE agent_configs ADD COLUMN runtime_type TEXT DEFAULT 'generic-ws'`);
+  } catch (e) { /* 列已存在，忽略 */ }
+  try {
+    db.run(`ALTER TABLE agent_configs ADD COLUMN capabilities TEXT`);
+  } catch (e) { /* 列已存在，忽略 */ }
+  try {
+    db.run(`ALTER TABLE agent_configs ADD COLUMN receive_mode TEXT DEFAULT 'free'`);
+  } catch (e) { /* 列已存在，忽略 */ }
+
+  // Agent 接入申请表（新协议）
+  db.run(`
+    CREATE TABLE IF NOT EXISTS join_requests (
+      request_id TEXT PRIMARY KEY,
+      agent_id TEXT NOT NULL,
+      proposed_name TEXT NOT NULL,
+      runtime_type TEXT DEFAULT 'generic-ws',
+      connector_version TEXT,
+      bootstrap_token TEXT,
+      capabilities TEXT,
+      description TEXT,
+      source_host TEXT,
+      source_instance TEXT,
+      metadata TEXT,
+      display_name TEXT,
+      target_room TEXT DEFAULT 'main',
+      receive_mode TEXT DEFAULT 'free',
+      capability_scope TEXT,
+      notes TEXT,
+      status TEXT DEFAULT 'pending',
+      submitted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      expires_at DATETIME,
+      approved_by TEXT,
+      approved_at DATETIME,
+      rejected_reason TEXT,
+      last_seen_at DATETIME,
+      activation_session_id TEXT,
+      connection_secret TEXT,
+      activation_expires_at DATETIME
+    )
+  `);
 
   // 系统设置表
   db.run(`
@@ -904,6 +948,329 @@ function getMessagesByIds(messageIds) {
   });
 }
 
+// ==================== Agent 接入申请相关操作 ====================
+
+// 创建接入申请
+function createJoinRequest(request) {
+  const requestId = request.request_id || `req_${uuidv4().replace(/-/g, '').substring(0, 12)}`;
+  const now = formatShanghaiTime(new Date());
+  // 默认 24 小时过期
+  const expiresAt = formatShanghaiTime(new Date(Date.now() + 24 * 60 * 60 * 1000));
+
+  db.run(
+    `INSERT INTO join_requests (
+      request_id, agent_id, proposed_name, runtime_type, connector_version,
+      bootstrap_token, capabilities, description, source_host, source_instance, metadata,
+      status, submitted_at, expires_at, last_seen_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?)`,
+    [
+      requestId,
+      request.agent_id,
+      request.proposed_name || request.agent_id,
+      request.runtime_type || 'generic-ws',
+      request.connector_version || null,
+      request.bootstrap_token || null,
+      request.capabilities ? JSON.stringify(request.capabilities) : null,
+      request.description || null,
+      request.source_host || null,
+      request.source_instance || null,
+      request.metadata ? JSON.stringify(request.metadata) : null,
+      now,
+      expiresAt,
+      now
+    ]
+  );
+
+  save();
+  console.log(`[DB] 创建接入申请: ${requestId} - ${request.proposed_name}`);
+
+  return getJoinRequestById(requestId);
+}
+
+// 通过 ID 获取接入申请
+function getJoinRequestById(requestId) {
+  const result = db.exec('SELECT * FROM join_requests WHERE request_id = ?', [requestId]);
+  if (result.length === 0 || result[0].values.length === 0) return null;
+
+  return parseJoinRequest(result);
+}
+
+// 通过 agent_id 获取接入申请
+function getJoinRequestByAgentId(agentId) {
+  const result = db.exec(
+    "SELECT * FROM join_requests WHERE agent_id = ? AND status IN ('pending', 'approved') ORDER BY submitted_at DESC LIMIT 1",
+    [agentId]
+  );
+  if (result.length === 0 || result[0].values.length === 0) return null;
+
+  return parseJoinRequest(result);
+}
+
+// 获取指定状态的接入申请列表
+function getJoinRequestsByStatus(status, limit = 50) {
+  let query = 'SELECT * FROM join_requests';
+  const params = [];
+
+  if (status) {
+    query += ' WHERE status = ?';
+    params.push(status);
+  }
+
+  query += ' ORDER BY submitted_at DESC LIMIT ?';
+  params.push(limit);
+
+  const result = db.exec(query, params);
+  if (result.length === 0) return [];
+
+  return parseJoinRequests(result);
+}
+
+// 获取所有待审核的接入申请
+function getPendingJoinRequests() {
+  return getJoinRequestsByStatus('pending');
+}
+
+// 获取所有接入申请
+function getAllJoinRequests(limit = 100) {
+  const result = db.exec('SELECT * FROM join_requests ORDER BY submitted_at DESC LIMIT ?', [limit]);
+  if (result.length === 0) return [];
+  return parseJoinRequests(result);
+}
+
+// 更新接入申请状态
+function updateJoinRequestStatus(requestId, status, updates = {}) {
+  const now = formatShanghaiTime(new Date());
+  const fields = ['status = ?', 'last_seen_at = ?'];
+  const values = [status, now];
+
+  if (updates.display_name !== undefined) {
+    fields.push('display_name = ?');
+    values.push(updates.display_name);
+  }
+  if (updates.connection_secret !== undefined) {
+    fields.push('connection_secret = ?');
+    values.push(updates.connection_secret);
+  }
+  if (updates.activation_expires_at !== undefined) {
+    fields.push('activation_expires_at = ?');
+    values.push(updates.activation_expires_at);
+  }
+  if (updates.approved_by !== undefined) {
+    fields.push('approved_by = ?');
+    values.push(updates.approved_by);
+  }
+  if (updates.approved_at !== undefined) {
+    fields.push('approved_at = ?');
+    values.push(updates.approved_at);
+  }
+  if (updates.rejected_reason !== undefined) {
+    fields.push('rejected_reason = ?');
+    values.push(updates.rejected_reason);
+  }
+  if (updates.notes !== undefined) {
+    fields.push('notes = ?');
+    values.push(updates.notes);
+  }
+
+  values.push(requestId);
+  db.run(`UPDATE join_requests SET ${fields.join(', ')} WHERE request_id = ?`, values);
+  save();
+
+  return getJoinRequestById(requestId);
+}
+
+// 批准接入申请
+function approveJoinRequest(requestId, approvedBy, platformConfig = {}) {
+  const now = formatShanghaiTime(new Date());
+  // 生成连接密钥
+  const connectionSecret = `cs_${uuidv4().replace(/-/g, '')}`;
+  // 激活窗口 7 天
+  const activationExpiresAt = formatShanghaiTime(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000));
+
+  db.run(
+    `UPDATE join_requests SET
+      status = 'approved',
+      display_name = ?,
+      target_room = ?,
+      receive_mode = ?,
+      capability_scope = ?,
+      notes = ?,
+      approved_by = ?,
+      approved_at = ?,
+      connection_secret = ?,
+      activation_expires_at = ?,
+      last_seen_at = ?
+    WHERE request_id = ?`,
+    [
+      platformConfig.display_name || null,
+      platformConfig.target_room || 'main',
+      platformConfig.receive_mode || 'free',
+      platformConfig.capability_scope ? JSON.stringify(platformConfig.capability_scope) : null,
+      platformConfig.notes || null,
+      approvedBy,
+      now,
+      connectionSecret,
+      activationExpiresAt,
+      now,
+      requestId
+    ]
+  );
+
+  save();
+  console.log(`[DB] 接入申请已批准: ${requestId} by ${approvedBy}`);
+
+  return getJoinRequestById(requestId);
+}
+
+// 拒绝接入申请
+function rejectJoinRequest(requestId, reason, rejectedBy = 'system') {
+  const now = formatShanghaiTime(new Date());
+
+  db.run(
+    `UPDATE join_requests SET status = 'rejected', rejected_reason = ?, approved_by = ?, approved_at = ?, last_seen_at = ? WHERE request_id = ?`,
+    [reason || '未提供原因', rejectedBy, now, now, requestId]
+  );
+
+  save();
+  console.log(`[DB] 接入申请已拒绝: ${requestId} - ${reason}`);
+
+  return getJoinRequestById(requestId);
+}
+
+// 激活 Agent（完成最终握手）
+function activateJoinRequest(requestId, sessionId) {
+  const now = formatShanghaiTime(new Date());
+
+  db.run(
+    `UPDATE join_requests SET status = 'active', activation_session_id = ?, last_seen_at = ? WHERE request_id = ?`,
+    [sessionId, now, requestId]
+  );
+
+  save();
+  console.log(`[DB] Agent 已激活: ${requestId}`);
+
+  return getJoinRequestById(requestId);
+}
+
+// 清理过期的接入申请
+function cleanExpiredJoinRequests() {
+  const now = formatShanghaiTime(new Date());
+
+  // 获取即将过期的申请
+  const expiredResult = db.exec(
+    "SELECT request_id, agent_id, proposed_name FROM join_requests WHERE status IN ('pending', 'approved') AND expires_at < ?",
+    [now]
+  );
+
+  if (expiredResult.length > 0) {
+    expiredResult[0].values.forEach(row => {
+      console.log(`[DB] 接入申请已过期: ${row[0]} - ${row[2]}`);
+    });
+  }
+
+  // 标记为过期
+  db.run(
+    "UPDATE join_requests SET status = 'expired' WHERE status IN ('pending', 'approved') AND expires_at < ?",
+    [now]
+  );
+
+  // 清理激活窗口过期的
+  const activationExpiredResult = db.exec(
+    "SELECT request_id, agent_id FROM join_requests WHERE status = 'approved' AND activation_expires_at < ?",
+    [now]
+  );
+
+  if (activationExpiredResult.length > 0) {
+    activationExpiredResult[0].values.forEach(row => {
+      console.log(`[DB] 激活窗口已过期: ${row[0]} - ${row[1]}`);
+    });
+  }
+
+  db.run(
+    "UPDATE join_requests SET status = 'expired' WHERE status = 'approved' AND activation_expires_at < ?",
+    [now]
+  );
+
+  save();
+
+  return {
+    expired: expiredResult.length > 0 ? expiredResult[0].values.length : 0,
+    activationExpired: activationExpiredResult.length > 0 ? activationExpiredResult[0].values.length : 0
+  };
+}
+
+// 更新 last_seen_at
+function updateJoinRequestLastSeen(requestId) {
+  const now = formatShanghaiTime(new Date());
+  db.run('UPDATE join_requests SET last_seen_at = ? WHERE request_id = ?', [now, requestId]);
+  // 不立即 save，由调用方决定
+}
+
+// 通用更新函数
+function updateJoinRequest(requestId, updates) {
+  const fields = [];
+  const values = [];
+
+  for (const [key, value] of Object.entries(updates)) {
+    fields.push(`${key} = ?`);
+    values.push(value);
+  }
+
+  if (fields.length === 0) return null;
+
+  values.push(requestId);
+  db.run(`UPDATE join_requests SET ${fields.join(', ')} WHERE request_id = ?`, values);
+  save();
+
+  return getJoinRequestById(requestId);
+}
+
+// 解析单个 join_request
+function parseJoinRequest(result) {
+  if (result.length === 0 || result[0].values.length === 0) return null;
+
+  const columns = result[0].columns;
+  const values = result[0].values[0];
+  const request = {};
+
+  columns.forEach((col, i) => {
+    // 解析 JSON 字段
+    if (['capabilities', 'metadata', 'capability_scope'].includes(col) && values[i]) {
+      try {
+        request[col] = JSON.parse(values[i]);
+      } catch (e) {
+        request[col] = values[i];
+      }
+    } else {
+      request[col] = values[i];
+    }
+  });
+
+  return request;
+}
+
+// 解析多个 join_requests
+function parseJoinRequests(result) {
+  if (result.length === 0) return [];
+
+  const columns = result[0].columns;
+  return result[0].values.map(values => {
+    const request = {};
+    columns.forEach((col, i) => {
+      if (['capabilities', 'metadata', 'capability_scope'].includes(col) && values[i]) {
+        try {
+          request[col] = JSON.parse(values[i]);
+        } catch (e) {
+          request[col] = values[i];
+        }
+      } else {
+        request[col] = values[i];
+      }
+    });
+    return request;
+  });
+}
+
 module.exports = {
   init,
   formatShanghaiTime,
@@ -946,5 +1313,17 @@ module.exports = {
   updateTopic,
   deleteTopic,
   saveTopicSummary,
-  getTopicSummary
+  getTopicSummary,
+  // Agent 接入申请相关
+  createJoinRequest,
+  getJoinRequestById,
+  getJoinRequestsByStatus,
+  getAllJoinRequests,
+  updateJoinRequestStatus,
+  updateJoinRequest,
+  approveJoinRequest,
+  rejectJoinRequest,
+  activateJoinRequest,
+  cleanExpiredJoinRequests,
+  updateJoinRequestLastSeen
 };

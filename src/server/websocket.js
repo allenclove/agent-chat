@@ -61,7 +61,19 @@ function setupWebSocket(server) {
         return;
       }
 
-      // 处理Agent消息
+      // 处理Agent消息 - 新协议
+      if (type === 'join_request') {
+        handleJoinRequest(ws, msg);
+        return;
+      }
+
+      // 处理Agent激活就绪 - 新协议
+      if (type === 'activation_ready') {
+        handleActivationReady(ws, msg);
+        return;
+      }
+
+      // 处理Agent消息 - 旧协议（兼容）
       if (type === 'agent_join') {
         handleAgentJoin(ws, msg);
         return;
@@ -245,6 +257,39 @@ function setupWebSocket(server) {
       } else {
         sendError(ws, result.error);
         ws.close();
+      }
+    }
+
+    // 处理新的接入申请 (join_request)
+    function handleJoinRequest(ws, msg) {
+      const result = agentManager.handleJoinRequest(ws, msg.payload);
+
+      if (result.success) {
+        // 申请创建成功，等待审核
+        isAgent = true;
+        agentId = msg.payload.agent_id;
+        console.log(`[WS] 新接入申请: ${agentId} (${result.request.request_id})`);
+      } else if (result.useFastTrack) {
+        // 已注册的Agent，使用快速通道
+        isAgent = true;
+        agentId = msg.payload.agent_id;
+        console.log(`[WS] Agent快速通道: ${agentId}`);
+      } else {
+        sendError(ws, result.error);
+        if (!result.pending) {
+          ws.close();
+        }
+      }
+    }
+
+    // 处理激活就绪 (activation_ready)
+    function handleActivationReady(ws, msg) {
+      const result = agentManager.handleActivationReady(ws, msg.payload);
+
+      if (result && result.success) {
+        console.log(`[WS] Agent激活成功`);
+      } else {
+        sendError(ws, result?.error || '激活失败');
       }
     }
 

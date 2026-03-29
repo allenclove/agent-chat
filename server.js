@@ -168,6 +168,188 @@ async function start() {
 
     // ==================== Agent 配置 API ====================
 
+    // ==================== 管理员 API ====================
+
+    // 获取所有接入申请
+    if (req.url.startsWith('/api/admin/join-requests') && req.method === 'GET') {
+      const urlObj = new URL(req.url, `http://localhost:${PORT}`);
+      const status = urlObj.searchParams.get('status') || 'all';
+
+      let requests;
+      if (status === 'all') {
+        requests = db.getAllJoinRequests();
+      } else {
+        requests = db.getJoinRequestsByStatus(status);
+      }
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        success: true,
+        requests: requests || [],
+        count: requests ? requests.length : 0
+      }));
+      return true;
+    }
+
+    // 获取接入申请统计
+    if (req.url === '/api/admin/join-requests/stats' && req.method === 'GET') {
+      const pending = db.getJoinRequestsByStatus('pending');
+      const approved = db.getJoinRequestsByStatus('approved');
+      const rejected = db.getJoinRequestsByStatus('rejected');
+      const active = db.getJoinRequestsByStatus('active');
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        success: true,
+        stats: {
+          pending: pending ? pending.length : 0,
+          approved: approved ? approved.length : 0,
+          rejected: rejected ? rejected.length : 0,
+          active: active ? active.length : 0
+        }
+      }));
+      return true;
+    }
+
+    // 批准接入申请
+    const approveMatch = req.url.match(/^\/api\/admin\/join-requests\/([^/]+)\/approve$/);
+    if (approveMatch && req.method === 'POST') {
+      const requestId = approveMatch[1];
+      let body = '';
+      req.on('data', chunk => body += chunk);
+      req.on('end', () => {
+        try {
+          const platformConfig = body ? JSON.parse(body) : {};
+          const result = agentManager.approveJoinRequest(requestId, platformConfig, 'admin');
+
+          if (result.success) {
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({
+              success: true,
+              message: `Agent "${result.displayName}" 已批准`,
+              display_name: result.displayName
+            }));
+          } else {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ success: false, error: result.error }));
+          }
+        } catch (e) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: false, error: '无效的请求数据' }));
+        }
+      });
+      return true;
+    }
+
+    // 拒绝接入申请
+    const rejectMatch = req.url.match(/^\/api\/admin\/join-requests\/([^/]+)\/reject$/);
+    if (rejectMatch && req.method === 'POST') {
+      const requestId = rejectMatch[1];
+      let body = '';
+      req.on('data', chunk => body += chunk);
+      req.on('end', () => {
+        try {
+          const { reason = '不符合接入要求' } = JSON.parse(body || '{}');
+          const result = agentManager.rejectJoinRequest(requestId, reason);
+
+          if (result.success) {
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ success: true, message: '申请已拒绝' }));
+          } else {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ success: false, error: result.error }));
+          }
+        } catch (e) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: false, error: '无效的请求数据' }));
+        }
+      });
+      return true;
+    }
+
+    // 延长激活窗口
+    const extendMatch = req.url.match(/^\/api\/admin\/join-requests\/([^/]+)\/extend$/);
+    if (extendMatch && req.method === 'POST') {
+      const requestId = extendMatch[1];
+      let body = '';
+      req.on('data', chunk => body += chunk);
+      req.on('end', () => {
+        try {
+          const { days = 7 } = JSON.parse(body || '{}');
+          const request = db.getJoinRequestById(requestId);
+
+          if (!request) {
+            res.writeHead(404, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ success: false, error: '申请不存在' }));
+            return;
+          }
+
+          if (request.status !== 'approved') {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ success: false, error: '只有已批准的申请可以延长激活窗口' }));
+            return;
+          }
+
+          const newExpiresAt = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
+          db.updateJoinRequest(requestId, {
+            activation_expires_at: db.formatShanghaiTime(newExpiresAt)
+          });
+
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({
+            success: true,
+            message: `激活窗口已延长 ${days} 天`,
+            new_expires_at: db.formatShanghaiTime(newExpiresAt)
+          }));
+        } catch (e) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: false, error: '无效的请求数据' }));
+        }
+      });
+      return true;
+    }
+
+    // 获取旧协议待审核列表
+    if (req.url === '/api/admin/pending-agents' && req.method === 'GET') {
+      const pending = agentManager.getPendingAgents();
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: true, pending }));
+      return true;
+    }
+
+    // 通过审核码批准 Agent（旧协议）
+    if (req.url === '/api/admin/approve-agent' && req.method === 'POST') {
+      let body = '';
+      req.on('data', chunk => body += chunk);
+      req.on('end', () => {
+        try {
+          const { code } = JSON.parse(body);
+          if (!code) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ success: false, error: '缺少审核码' }));
+            return;
+          }
+
+          const result = agentManager.approveAgentByCode(code);
+          if (result.success) {
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({
+              success: true,
+              message: `Agent "${result.agentName}" 已成功加入群聊`,
+              agent_name: result.agentName
+            }));
+          } else {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ success: false, error: result.error }));
+          }
+        } catch (e) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: false, error: '无效的请求数据' }));
+        }
+      });
+      return true;
+    }
+
     // 获取单个 Agent 配置
     const agentConfigMatch = req.url.match(/^\/api\/agents\/([^/]+)\/config$/);
     if (agentConfigMatch && req.method === 'GET') {

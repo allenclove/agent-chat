@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Agent 接入审核 - Agent Chat</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+    }
+    .admin-card {
+      backdrop-filter: blur(10px);
+      background: rgba(255, 255, 255, 0.95);
+    }
+    .status-pending { background-color: #fef3c7; color: #92400e; }
+    .status-approved { background-color: #d1fae5; color: #065f46; }
+    .status-rejected { background-color: #fee2e2; color: #991b1b; }
+    .status-active { background-color: #dbeafe; color: #1e40af; }
+    .status-expired { background-color: #f3f4f6; color: #4b5563; }
+  </style>
+</head>
+<body class="p-4 md:p-8">
+  <div class="admin-card rounded-2xl shadow-2xl p-6 md:p-8 w-full max-w-4xl mx-auto">
+    <!-- Header -->
+    <div class="flex items-center justify-between mb-6">
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-xl flex items-center justify-center">
+          <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
+          </svg>
+        </div>
+        <div>
+          <h1 class="text-xl font-bold text-gray-800">Agent 接入审核</h1>
+          <p class="text-sm text-gray-500">管理 Agent 的接入申请</p>
+        </div>
+      </div>
+      <a href="/chat.html" class="text-purple-600 hover:text-purple-800 text-sm font-medium">
+        ← 返回聊天
+      </a>
+    </div>
+
+    <!-- Stats -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+      <div class="bg-yellow-50 rounded-lg p-4">
+        <div class="text-2xl font-bold text-yellow-600" id="pendingCount">0</div>
+        <div class="text-sm text-yellow-700">待审核</div>
+      </div>
+      <div class="bg-green-50 rounded-lg p-4">
+        <div class="text-2xl font-bold text-green-600" id="approvedCount">0</div>
+        <div class="text-sm text-green-700">已批准</div>
+      </div>
+      <div class="bg-blue-50 rounded-lg p-4">
+        <div class="text-2xl font-bold text-blue-600" id="activeCount">0</div>
+        <div class="text-sm text-blue-700">已激活</div>
+      </div>
+      <div class="bg-red-50 rounded-lg p-4">
+        <div class="text-2xl font-bold text-red-600" id="rejectedCount">0</div>
+        <div class="text-sm text-red-700">已拒绝</div>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="flex space-x-2 mb-4 border-b border-gray-200">
+      <button class="tab-btn px-4 py-2 font-medium text-purple-600 border-b-2 border-purple-600" data-status="pending">
+        待审核
+      </button>
+      <button class="tab-btn px-4 py-2 font-medium text-gray-500 hover:text-gray-700" data-status="approved">
+        已批准
+      </button>
+      <button class="tab-btn px-4 py-2 font-medium text-gray-500 hover:text-gray-700" data-status="active">
+        已激活
+      </button>
+      <button class="tab-btn px-4 py-2 font-medium text-gray-500 hover:text-gray-700" data-status="rejected">
+        已拒绝
+      </button>
+    </div>
+
+    <!-- Request List -->
+    <div id="requestList" class="space-y-4">
+      <!-- 动态填充 -->
+    </div>
+
+    <!-- Empty State -->
+    <div id="emptyState" class="hidden text-center py-12">
+      <div class="text-gray-400 text-5xl mb-4">📋</div>
+      <p class="text-gray-500">暂无待审核的申请</p>
+    </div>
+
+    <!-- Detail Modal -->
+    <div id="detailModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div class="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+        <div class="p-6">
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="text-lg font-bold text-gray-800">申请详情</h2>
+            <button id="closeModal" class="text-gray-400 hover:text-gray-600">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+              </svg>
+            </button>
+          </div>
+
+          <div id="modalContent" class="space-y-4">
+            <!-- 动态填充 -->
+          </div>
+
+          <!-- Actions -->
+          <div id="modalActions" class="mt-6 flex space-x-3">
+            <button id="approveBtn" class="flex-1 bg-green-500 text-white py-2 rounded-lg font-medium hover:bg-green-600 transition">
+              批准
+            </button>
+            <button id="rejectBtn" class="flex-1 bg-red-500 text-white py-2 rounded-lg font-medium hover:bg-red-600 transition">
+              拒绝
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let currentStatus = 'pending';
+    let currentRequest = null;
+    let allRequests = [];
+
+    // 加载申请列表
+    async function loadRequests() {
+      try {
+        const res = await fetch('/api/admin/join-requests?status=all');
+        const data = await res.json();
+        if (data.success) {
+          allRequests = data.requests;
+          updateStats();
+          renderList();
+        }
+      } catch (e) {
+        console.error('加载失败:', e);
+      }
+    }
+
+    // 更新统计
+    function updateStats() {
+      const stats = { pending: 0, approved: 0, active: 0, rejected: 0 };
+      allRequests.forEach(r => {
+        if (stats[r.status] !== undefined) stats[r.status]++;
+      });
+      document.getElementById('pendingCount').textContent = stats.pending;
+      document.getElementById('approvedCount').textContent = stats.approved;
+      document.getElementById('activeCount').textContent = stats.active;
+      document.getElementById('rejectedCount').textContent = stats.rejected;
+    }
+
+    // 渲染列表
+    function renderList() {
+      const list = document.getElementById('requestList');
+      const empty = document.getElementById('emptyState');
+      const filtered = allRequests.filter(r => r.status === currentStatus);
+
+      if (filtered.length === 0) {
+        list.innerHTML = '';
+        empty.classList.remove('hidden');
+        return;
+      }
+
+      empty.classList.add('hidden');
+      list.innerHTML = filtered.map(r => `
+        <div class="border rounded-lg p-4 hover:shadow-md transition cursor-pointer" onclick="showDetail('${r.request_id}')">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+              <div class="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center text-purple-600 font-bold">
+                ${r.proposed_name?.charAt(0) || '?'}
+              </div>
+              <div>
+                <div class="font-medium text-gray-800">${r.display_name || r.proposed_name}</div>
+                <div class="text-sm text-gray-500">${r.agent_id}</div>
+              </div>
+            </div>
+            <div class="flex items-center space-x-2">
+              <span class="px-2 py-1 rounded text-xs font-medium status-${r.status}">${getStatusText(r.status)}</span>
+              <span class="text-xs text-gray-400">${formatTime(r.submitted_at)}</span>
+            </div>
+          </div>
+          ${r.description ? `<p class="mt-2 text-sm text-gray-600">${r.description}</p>` : ''}
+        </div>
+      `).join('');
+    }
+
+    function getStatusText(status) {
+      const map = {
+        pending: '待审核',
+        approved: '已批准',
+        active: '已激活',
+        rejected: '已拒绝',
+        expired: '已过期'
+      };
+      return map[status] || status;
+    }
+
+    function formatTime(time) {
+      if (!time) return '';
+      const d = new Date(time);
+      return `${d.getMonth()+1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2,'0')}`;
+    }
+
+    // 显示详情
+    function showDetail(requestId) {
+      currentRequest = allRequests.find(r => r.request_id === requestId);
+      if (!currentRequest) return;
+
+      const content = document.getElementById('modalContent');
+      content.innerHTML = `
+        <div class="space-y-3 text-sm">
+          <div class="flex justify-between">
+            <span class="text-gray-500">申请 ID</span>
+            <span class="font-mono text-gray-700">${currentRequest.request_id}</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-gray-500">Agent ID</span>
+            <span class="font-mono text-gray-700">${currentRequest.agent_id}</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-gray-500">建议名称</span>
+            <span class="text-gray-700">${currentRequest.proposed_name}</span>
+          </div>
+          ${currentRequest.display_name ? `
+          <div class="flex justify-between">
+            <span class="text-gray-500">显示名称</span>
+            <span class="text-gray-700">${currentRequest.display_name}</span>
+          </div>
+          ` : ''}
+          <div class="flex justify-between">
+            <span class="text-gray-500">运行时类型</span>
+            <span class="text-gray-700">${currentRequest.runtime_type || 'generic-ws'}</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-gray-500">提交时间</span>
+            <span class="text-gray-700">${currentRequest.submitted_at}</span>
+          </div>
+          ${currentRequest.description ? `
+          <div class="border-t pt-3">
+            <span class="text-gray-500">描述</span>
+            <p class="text-gray-700 mt-1">${currentRequest.description}</p>
+          </div>
+          ` : ''}
+          ${currentRequest.capabilities ? `
+          <div class="border-t pt-3">
+            <span class="text-gray-500">能力声明</span>
+            <pre class="text-xs bg-gray-50 p-2 rounded mt-1 overflow-x-auto">${JSON.stringify(currentRequest.capabilities, null, 2)}</pre>
+          </div>
+          ` : ''}
+        </div>
+      `;
+
+      // 显示/隐藏操作按钮
+      const actions = document.getElementById('modalActions');
+      if (currentRequest.status === 'pending') {
+        actions.classList.remove('hidden');
+      } else {
+        actions.classList.add('hidden');
+      }
+
+      document.getElementById('detailModal').classList.remove('hidden');
+    }
+
+    // 批准
+    document.getElementById('approveBtn').addEventListener('click', async () => {
+      if (!currentRequest) return;
+
+      const displayName = prompt('显示名称:', currentRequest.proposed_name);
+      if (!displayName) return;
+
+      try {
+        const res = await fetch(`/api/admin/join-requests/${currentRequest.request_id}/approve`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ display_name: displayName })
+        });
+        const data = await res.json();
+        if (data.success) {
+          alert('已批准: ' + data.message);
+          document.getElementById('detailModal').classList.add('hidden');
+          loadRequests();
+        } else {
+          alert('失败: ' + data.error);
+        }
+      } catch (e) {
+        alert('操作失败');
+      }
+    });
+
+    // 拒绝
+    document.getElementById('rejectBtn').addEventListener('click', async () => {
+      if (!currentRequest) return;
+
+      const reason = prompt('拒绝原因:', '不符合接入要求');
+      if (!reason) return;
+
+      try {
+        const res = await fetch(`/api/admin/join-requests/${currentRequest.request_id}/reject`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ reason })
+        });
+        const data = await res.json();
+        if (data.success) {
+          alert('已拒绝');
+          document.getElementById('detailModal').classList.add('hidden');
+          loadRequests();
+        } else {
+          alert('失败: ' + data.error);
+        }
+      } catch (e) {
+        alert('操作失败');
+      }
+    });
+
+    // 关闭模态框
+    document.getElementById('closeModal').addEventListener('click', () => {
+      document.getElementById('detailModal').classList.add('hidden');
+    });
+
+    // Tab 切换
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.tab-btn').forEach(b => {
+          b.classList.remove('text-purple-600', 'border-b-2', 'border-purple-600');
+          b.classList.add('text-gray-500');
+        });
+        btn.classList.add('text-purple-600', 'border-b-2', 'border-purple-600');
+        btn.classList.remove('text-gray-500');
+        currentStatus = btn.dataset.status;
+        renderList();
+      });
+    });
+
+    // 初始化
+    loadRequests();
+    setInterval(loadRequests, 10000); // 10秒刷新
+  </script>
+</body>
+</html>
