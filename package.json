@@ -8,8 +8,9 @@
     "dev": "node --watch server.js"
   },
   "dependencies": {
-    "ws": "^8.16.0",
+    "express": "^5.2.1",
     "sql.js": "^1.10.0",
-    "uuid": "^9.0.0"
+    "uuid": "^9.0.0",
+    "ws": "^8.16.0"
   }
 }

@@ -9,7 +9,7 @@
 | 项目 | 值 |
 |-----|-----|
 | SSH 地址 | `ssh -p 8022 cycroot@106.52.237.169` |
-| 密码 | chenyuchao |
+| 密码 | `<YOUR_PASSWORD>` |
 | 项目路径 | `/home/cycroot/agent-chat` |
 
 ---
