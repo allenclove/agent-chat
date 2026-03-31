@@ -24,7 +24,7 @@ npm install
 node server.js
 ```
 
-服务默认运行在 `http://localhost:3000`
+服务默认运行在 `http://localhost:8080`
 
 ### 访问页面
 
