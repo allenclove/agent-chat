@@ -107,18 +107,38 @@
 
           <!-- Actions -->
           <div id="modalActions" class="mt-6 flex space-x-3">
-            <button id="approveBtn" class="flex-1 bg-green-500 text-white py-2 rounded-lg font-medium hover:bg-green-600 transition">
-              批准
+            <button id="approveBtn" class="flex-1 bg-green-500 text-white py-2 rounded-lg font-medium hover:bg-green-600 transition disabled:opacity-50 disabled:cursor-not-allowed">
+              <span id="approveBtnText">批准</span>
+              <span id="approveBtnLoading" class="hidden">处理中...</span>
             </button>
-            <button id="rejectBtn" class="flex-1 bg-red-500 text-white py-2 rounded-lg font-medium hover:bg-red-600 transition">
-              拒绝
+            <button id="rejectBtn" class="flex-1 bg-red-500 text-white py-2 rounded-lg font-medium hover:bg-red-600 transition disabled:opacity-50 disabled:cursor-not-allowed">
+              <span id="rejectBtnText">拒绝</span>
+              <span id="rejectBtnLoading" class="hidden">处理中...</span>
             </button>
+          </div>
+
+          <!-- Approved Actions (延长激活窗口) -->
+          <div id="approvedActions" class="mt-6 hidden">
+            <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
+              <p class="text-sm text-yellow-800">此 Agent 已批准但尚未激活。Agent 需要在激活窗口内完成连接。</p>
+              <p class="text-xs text-yellow-600 mt-1">激活截止: <span id="activationExpires">-</span></p>
+            </div>
+            <div class="flex space-x-3">
+              <button id="extendBtn" class="flex-1 bg-blue-500 text-white py-2 rounded-lg font-medium hover:bg-blue-600 transition disabled:opacity-50">
+                <span id="extendBtnText">延长 7 天</span>
+                <span id="extendBtnLoading" class="hidden">处理中...</span>
+              </button>
+              <button id="rejectApprovedBtn" class="flex-1 bg-red-500 text-white py-2 rounded-lg font-medium hover:bg-red-600 transition">
+                取消批准
+              </button>
+            </div>
           </div>
 
           <!-- Delete Action (for active agents) -->
           <div id="deleteActions" class="mt-6 hidden">
-            <button id="deleteBtn" class="w-full bg-red-500 text-white py-2 rounded-lg font-medium hover:bg-red-600 transition">
-              🗑️ 删除 Agent（一键下线）
+            <button id="deleteBtn" class="w-full bg-red-500 text-white py-2 rounded-lg font-medium hover:bg-red-600 transition disabled:opacity-50">
+              <span id="deleteBtnText">🗑️ 删除 Agent（一键下线）</span>
+              <span id="deleteBtnLoading" class="hidden">处理中...</span>
             </button>
             <p class="text-xs text-gray-400 mt-2 text-center">删除后将清除所有相关数据，Agent 需重新申请接入</p>
           </div>
@@ -214,7 +234,10 @@
     // 显示详情
     function showDetail(requestId) {
       currentRequest = allRequests.find(r => r.request_id === requestId);
-      if (!currentRequest) return;
+      if (!currentRequest) {
+        alert('未找到申请信息');
+        return;
+      }
 
       const content = document.getElementById('modalContent');
       content.innerHTML = `
@@ -242,9 +265,19 @@
             <span class="text-gray-700">${currentRequest.runtime_type || 'generic-ws'}</span>
           </div>
           <div class="flex justify-between">
+            <span class="text-gray-500">状态</span>
+            <span class="px-2 py-1 rounded text-xs font-medium status-${currentRequest.status}">${getStatusText(currentRequest.status)}</span>
+          </div>
+          <div class="flex justify-between">
             <span class="text-gray-500">提交时间</span>
             <span class="text-gray-700">${currentRequest.submitted_at}</span>
           </div>
+          ${currentRequest.activation_expires_at ? `
+          <div class="flex justify-between">
+            <span class="text-gray-500">激活截止</span>
+            <span class="text-gray-700 ${new Date(currentRequest.activation_expires_at) < new Date() ? 'text-red-600 font-bold' : ''}">${currentRequest.activation_expires_at}</span>
+          </div>
+          ` : ''}
           ${currentRequest.description ? `
           <div class="border-t pt-3">
             <span class="text-gray-500">描述</span>
@@ -263,19 +296,39 @@
       // 显示/隐藏操作按钮
       const actions = document.getElementById('modalActions');
       const deleteActions = document.getElementById('deleteActions');
+      const approvedActions = document.getElementById('approvedActions');
+
+      // 重置所有按钮状态
+      actions.classList.add('hidden');
+      deleteActions.classList.add('hidden');
+      approvedActions.classList.add('hidden');
 
       if (currentRequest.status === 'pending') {
         actions.classList.remove('hidden');
-        deleteActions.classList.add('hidden');
+      } else if (currentRequest.status === 'approved') {
+        approvedActions.classList.remove('hidden');
+        document.getElementById('activationExpires').textContent = currentRequest.activation_expires_at || '未设置';
       } else if (currentRequest.status === 'active') {
-        actions.classList.add('hidden');
         deleteActions.classList.remove('hidden');
-      } else {
-        actions.classList.add('hidden');
-        deleteActions.classList.add('hidden');
       }
 
       document.getElementById('detailModal').classList.remove('hidden');
+    }
+
+    // 辅助函数：设置按钮 loading 状态
+    function setButtonLoading(btnId, loading) {
+      const btn = document.getElementById(btnId);
+      const textEl = document.getElementById(btnId + 'Text');
+      const loadingEl = document.getElementById(btnId + 'Loading');
+      if (loading) {
+        btn.disabled = true;
+        if (textEl) textEl.classList.add('hidden');
+        if (loadingEl) loadingEl.classList.remove('hidden');
+      } else {
+        btn.disabled = false;
+        if (textEl) textEl.classList.remove('hidden');
+        if (loadingEl) loadingEl.classList.add('hidden');
+      }
     }
 
     // 批准
@@ -285,6 +338,7 @@
       const displayName = prompt('显示名称:', currentRequest.proposed_name);
       if (!displayName) return;
 
+      setButtonLoading('approveBtn', true);
       try {
         const res = await fetch(`/api/admin/join-requests/${currentRequest.request_id}/approve`, {
           method: 'POST',
@@ -293,14 +347,17 @@
         });
         const data = await res.json();
         if (data.success) {
-          alert('已批准: ' + data.message);
+          alert('✅ 已批准: ' + data.message);
           document.getElementById('detailModal').classList.add('hidden');
           loadRequests();
         } else {
-          alert('失败: ' + data.error);
+          alert('❌ 失败: ' + data.error);
         }
       } catch (e) {
-        alert('操作失败');
+        alert('❌ 网络错误，请重试');
+        console.error(e);
+      } finally {
+        setButtonLoading('approveBtn', false);
       }
     });
 
@@ -311,6 +368,7 @@
       const reason = prompt('拒绝原因:', '不符合接入要求');
       if (!reason) return;
 
+      setButtonLoading('rejectBtn', true);
       try {
         const res = await fetch(`/api/admin/join-requests/${currentRequest.request_id}/reject`, {
           method: 'POST',
@@ -319,14 +377,74 @@
         });
         const data = await res.json();
         if (data.success) {
-          alert('已拒绝');
+          alert('✅ 已拒绝');
           document.getElementById('detailModal').classList.add('hidden');
           loadRequests();
         } else {
-          alert('失败: ' + data.error);
+          alert('❌ 失败: ' + data.error);
         }
       } catch (e) {
-        alert('操作失败');
+        alert('❌ 网络错误，请重试');
+        console.error(e);
+      } finally {
+        setButtonLoading('rejectBtn', false);
+      }
+    });
+
+    // 延长激活窗口
+    document.getElementById('extendBtn').addEventListener('click', async () => {
+      if (!currentRequest) return;
+
+      const days = prompt('延长天数:', '7');
+      if (!days || isNaN(days)) return;
+
+      setButtonLoading('extendBtn', true);
+      try {
+        const res = await fetch(`/api/admin/join-requests/${currentRequest.request_id}/extend`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ days: parseInt(days) })
+        });
+        const data = await res.json();
+        if (data.success) {
+          alert('✅ ' + data.message + '\n新截止时间: ' + data.new_expires_at);
+          document.getElementById('detailModal').classList.add('hidden');
+          loadRequests();
+        } else {
+          alert('❌ 失败: ' + data.error);
+        }
+      } catch (e) {
+        alert('❌ 网络错误，请重试');
+        console.error(e);
+      } finally {
+        setButtonLoading('extendBtn', false);
+      }
+    });
+
+    // 取消批准
+    document.getElementById('rejectApprovedBtn').addEventListener('click', async () => {
+      if (!currentRequest) return;
+
+      const name = currentRequest.display_name || currentRequest.proposed_name;
+      if (!confirm(`确定要取消 "${name}" 的批准状态吗？\n\nAgent 将需要重新申请接入。`)) return;
+
+      try {
+        const res = await fetch(`/api/admin/join-requests/${currentRequest.request_id}/reject`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ reason: '管理员取消批准' })
+        });
+        const data = await res.json();
+        if (data.success) {
+          alert('✅ 已取消批准');
+          document.getElementById('detailModal').classList.add('hidden');
+          loadRequests();
+        } else {
+          alert('❌ 失败: ' + data.error);
+        }
+      } catch (e) {
+        alert('❌ 网络错误，请重试');
+        console.error(e);
       }
     });
 
@@ -337,20 +455,24 @@
       const name = currentRequest.display_name || currentRequest.proposed_name;
       if (!confirm(`确定要删除 Agent "${name}" 吗？\n\n这将：\n1. 断开该 Agent 的连接\n2. 删除所有相关数据\n3. Agent 需重新申请接入`)) return;
 
+      setButtonLoading('deleteBtn', true);
       try {
         const res = await fetch(`/api/admin/agents/${currentRequest.agent_id}`, {
           method: 'DELETE'
         });
         const data = await res.json();
         if (data.success) {
-          alert(data.message);
+          alert('✅ ' + data.message);
           document.getElementById('detailModal').classList.add('hidden');
           loadRequests();
         } else {
-          alert('失败: ' + data.error);
+          alert('❌ 失败: ' + data.error);
         }
       } catch (e) {
-        alert('操作失败');
+        alert('❌ 网络错误，请重试');
+        console.error(e);
+      } finally {
+        setButtonLoading('deleteBtn', false);
       }
     });
 

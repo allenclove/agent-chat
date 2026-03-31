@@ -67,7 +67,7 @@ router.post('/join-requests/:id/reject', (req, res) => {
   const { id: requestId } = req.params;
   const { reason = '不符合接入要求' } = req.body || {};
 
-  const result = agentManager.rejectJoinRequest(requestId, reason);
+  const result = agentManager.rejectJoinRequest(requestId, reason, 'admin');
 
   if (result.success) {
     res.json({ success: true, message: '申请已拒绝' });
@@ -94,7 +94,9 @@ router.post('/join-requests/:id/extend', (req, res) => {
   const currentExpiry = new Date(request.activation_expires_at || Date.now());
   const newExpiry = new Date(currentExpiry.getTime() + days * 24 * 60 * 60 * 1000);
 
-  db.updateJoinRequestActivationExpiry(requestId, db.formatShanghaiTime(newExpiry));
+  db.updateJoinRequest(requestId, {
+    activation_expires_at: db.formatShanghaiTime(newExpiry)
+  });
 
   res.json({
     success: true,
