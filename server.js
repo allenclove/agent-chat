@@ -26,6 +26,10 @@ async function start() {
   // 创建 Express 应用
   const app = express();
 
+  // 请求体解析
+  app.use(express.json());
+  app.use(express.urlencoded({ extended: true }));
+
   // 静态文件服务
   app.use(express.static(path.join(__dirname, 'src/public')));
 
