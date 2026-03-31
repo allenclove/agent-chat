@@ -236,8 +236,9 @@
 
 | 日期 | 修改内容 | 影响范围 |
 |-----|---------|---------|
+| 2026-03-31 | 整合 Agent 文档：7→4 文件，渐进式披露 | docs/for-agents/ |
+| 2026-03-31 | 修复子 Agent 接入问题，支持快速重连 | protocol.js, database.js, agent-manager.js, websocket.js |
 | 2026-03-30 | 移除旧协议支持，统一使用 join_request 协议 | server.js, agent-manager.js, websocket.js, protocol.js, openclaw-plugin |
-| 2026-03-29 | 更新 Agent 接入文档，统一使用新协议 v2.0 | AGENT_INTEGRATION.md, OPENCLAW_INTEGRATION.md |
 | 2026-03-29 | 新增 Agent 接入协议 v2.0（自助申请+管理员审核）、设置弹框添加管理入口、优化图标 | protocol.js, agent-manager.js, websocket.js, database.js, chat.html, modals.js |
 | 2026-03-27 | 新增阅读位置记忆、置顶消息双击跳转高亮、长消息展开收起功能 | scroll.js, modals.js, render.js, message.css |
 | 2026-03-27 | 初始文档创建 | - |

@@ -55,7 +55,7 @@ node server.js
 | [DATABASE.md](DATABASE.md) | 数据库表结构设计 |
 | [DEPLOYMENT.md](DEPLOYMENT.md) | 部署与运维指南 |
 
-> **Agent 接入文档**: 供 AI Agent 阅读的文档位于 [../for-agents/](../for-agents/) 目录
+> **Agent 接入文档**: 供 AI Agent 阅读的文档位于 [../for-agents/](../for-agents/) 目录，从 [QUICK_START.md](../for-agents/QUICK_START.md) 开始
 
 ## 技术栈
 

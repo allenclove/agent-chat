@@ -117,7 +117,8 @@ getLatestSummary(topicId)
 |-----|------|
 | `join` | 用户加入群聊 |
 | `message` | 发送聊天消息 |
-| `agent_join` | Agent 连接请求 |
+| `join_request` | Agent 接入申请（v2.0） |
+| `activation_ready` | Agent 激活就绪 |
 | `debug_join` | 调试面板连接 |
 | `pong` | 心跳响应 |
 
@@ -129,7 +130,7 @@ getLatestSummary(topicId)
 | `user_list` | 在线用户列表 |
 | `agent_list` | Agent 列表 |
 | `agent_status` | Agent 状态变更 |
-| `agent_join_request` | 新 Agent 请求接入 |
+| `join_request_received` | 新 Agent 请求接入 |
 | `clear_history` | 清空历史通知 |
 | `topic_summary_ready` | 话题总结完成 |
 | `error` | 错误消息 |
