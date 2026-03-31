@@ -241,10 +241,17 @@ function setupWebSocket(server) {
       const result = agentManager.handleJoinRequest(ws, msg.payload);
 
       if (result.success) {
-        // 申请创建成功，等待审核
+        // 申请创建成功，等待审核或快速重连成功
         isAgent = true;
         agentId = msg.payload.agent_id;
-        console.log(`[WS] 新接入申请: ${agentId} (${result.request.request_id})`);
+
+        if (result.useFastTrack) {
+          // 快速重连成功
+          console.log(`[WS] Agent 快速重连: ${agentId}`);
+        } else {
+          // 新申请，等待审核
+          console.log(`[WS] 新接入申请: ${agentId} (${result.request?.request_id})`);
+        }
       } else {
         sendError(ws, result.error);
         if (!result.pending) {

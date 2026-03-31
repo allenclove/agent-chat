@@ -24,7 +24,7 @@ const agentManager = {
    * 处理新的接入申请 (join_request)
    */
   handleJoinRequest(ws, payload) {
-    const result = protocol.handleJoinRequest(ws, payload, pendingConnections);
+    const result = protocol.handleJoinRequest(ws, payload, pendingConnections, connectedAgents);
 
     // 如果需要使用快速通道（已注册的 Agent）
     if (result.useFastTrack) {
@@ -169,10 +169,11 @@ const agentManager = {
   // ==================== 通用方法 ====================
 
   /**
-   * 批准Agent连接
+   * 批准Agent连接（快速重连）
    */
   approveAgentConnection(ws, agentConfig) {
     const agent_id = agentConfig.id;
+    const request_id = agentConfig.request_id;
 
     if (connectedAgents.has(agent_id)) {
       const existing = connectedAgents.get(agent_id);
@@ -183,7 +184,7 @@ const agentManager = {
       connectedAgents.delete(agent_id);
     }
 
-    console.log(`[Agent] ${agentConfig.name} 已连接`);
+    console.log(`[Agent] ${agentConfig.name} 快速重连成功`);
 
     connectedAgents.set(agent_id, {
       ws,
@@ -191,7 +192,86 @@ const agentManager = {
       lastPing: Date.now()
     });
 
-    this.sendWelcomeMessage(ws, agentConfig);
+    // 使用新协议发送激活成功消息
+    ws.send(JSON.stringify({
+      type: 'join_ack',
+      payload: {
+        request_id: request_id,
+        status: 'active',
+        platform_id: 'agent-chat-v2',
+        activated_at: db.formatShanghaiTime(new Date())
+      }
+    }));
+
+    // 发送平台信息
+    const onlineUsers = chat.getOnlineUsers();
+    const allAgents = db.getAllAgents().map(a => ({
+      id: a.id,
+      name: a.name,
+      type: 'agent'
+    }));
+
+    ws.send(JSON.stringify({
+      type: 'platform_info',
+      payload: {
+        platform_id: 'agent-chat-v2',
+        platform_name: 'Agent Chat',
+        protocol_version: '2.0',
+        your_name: agentConfig.name,
+        your_id: agent_id,
+        capabilities: {
+          text: true,
+          image: false,
+          file: false,
+          threads: false,
+          message_edit: false,
+          message_revoke: false,
+          history_read: true
+        }
+      }
+    }));
+
+    // 发送成员列表
+    ws.send(JSON.stringify({
+      type: 'participants_sync',
+      payload: {
+        room_id: 'main',
+        participants: [
+          ...onlineUsers.map(u => ({
+            participant_id: u.session_id,
+            display_name: u.display_name || u.username,
+            type: 'human',
+            status: 'online'
+          })),
+          ...allAgents.map(a => ({
+            participant_id: a.id,
+            display_name: a.name,
+            type: 'agent',
+            status: connectedAgents.has(a.id) ? 'online' : 'offline'
+          }))
+        ],
+        synced_at: db.formatShanghaiTime(new Date())
+      }
+    }));
+
+    // 发送历史消息
+    const history = chat.getHistory(50);
+    ws.send(JSON.stringify({
+      type: 'history_sync',
+      payload: {
+        room_id: 'main',
+        messages: history.map(m => ({
+          message_id: m.id,
+          sender_id: m.sender_id,
+          sender_name: m.sender_name,
+          sender_type: m.sender_type,
+          content: m.content,
+          created_at: m.created_at
+        })),
+        has_more: false,
+        synced_at: db.formatShanghaiTime(new Date())
+      }
+    }));
 
     chat.broadcast('agent_status', {
       agent_id: agentConfig.id,
@@ -361,17 +441,23 @@ const agentManager = {
    */
   cleanExpiredPending() {
     const now = Date.now();
-    for (const [agentId, pending] of pendingAgents) {
-      if (now - pending.timestamp > PENDING_TIMEOUT) {
-        if (pending.ws.readyState === 1) {
+    const PENDING_TIMEOUT = 24 * 60 * 60 * 1000; // 24小时
+
+    for (const [requestId, pending] of pendingConnections) {
+      // 只清理 pending 状态的请求
+      if (pending.request && pending.request.status !== 'pending') continue;
+
+      const submittedAt = new Date(pending.request?.submitted_at || pending.connectedAt).getTime();
+      if (now - submittedAt > PENDING_TIMEOUT) {
+        if (pending.ws && pending.ws.readyState === 1) {
           pending.ws.send(JSON.stringify({
-            type: 'agent_join_error',
-            payload: { error: '审核超时，请重新连接' }
+            type: 'join_rejected',
+            payload: { request_id: requestId, status: 'rejected', reason: '审核超时，请重新连接' }
           }));
           pending.ws.close();
         }
-        pendingAgents.delete(agentId);
-        console.log(`[Agent] 待审核请求已过期: ${pending.name}`);
+        pendingConnections.delete(requestId);
+        console.log(`[Agent] 待审核请求已过期: ${pending.request?.proposed_name || requestId}`);
       }
     }
   },

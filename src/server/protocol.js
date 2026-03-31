@@ -45,7 +45,7 @@ const protocol = {
   /**
    * 处理新的接入申请
    */
-  handleJoinRequest(ws, payload, pendingConnections) {
+  handleJoinRequest(ws, payload, pendingConnections, activeAgents) {
     const {
       request_id,
       agent_id,
@@ -68,8 +68,49 @@ const protocol = {
 
     // 检查是否已有同 agent_id 的活跃连接
     const existingAgent = db.getAgentById(agent_id);
+    console.log(`[Protocol] handleJoinRequest: agent_id=${agent_id}, existingAgent=${existingAgent ? 'yes' : 'no'}`);
+
     if (existingAgent) {
-      // 已存在该 agent_id
+      // 检查该 Agent 是否当前在线
+      const isActive = activeAgents.has(agent_id);
+      console.log(`[Protocol] isActive=${isActive}`);
+
+      if (isActive) {
+        // 已在线，拒绝重复连接
+        return {
+          success: false,
+          error: '该 agent_id 当前在线，请勿重复连接'
+        };
+      }
+
+      // 已注册但离线，允许快速重连
+      const activeRequest = db.getActiveJoinRequestByAgentId(agent_id);
+      console.log(`[Protocol] activeRequest=${activeRequest ? activeRequest.request_id : 'null'}`);
+
+      if (activeRequest) {
+        // 存储待审核连接（用于重连）
+        pendingConnections.set(activeRequest.request_id, {
+          ws,
+          request: activeRequest,
+          connectedAt: db.formatShanghaiTime(new Date()),
+          isReconnect: true
+        });
+
+        // 更新 last_seen_at
+        db.updateJoinRequestLastSeen(activeRequest.request_id);
+
+        return {
+          success: true,
+          useFastTrack: true,
+          existingConfig: {
+            id: existingAgent.id,
+            name: existingAgent.name,
+            request_id: activeRequest.request_id
+          }
+        };
+      }
+
+      // 有配置但无活跃申请记录，需要重新申请
       return {
         success: false,
         error: '该 agent_id 已被使用，请使用不同的 ID'

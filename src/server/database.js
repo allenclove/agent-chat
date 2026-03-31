@@ -974,10 +974,21 @@ function getJoinRequestById(requestId) {
   return parseJoinRequest(result);
 }
 
-// 通过 agent_id 获取接入申请
+// 通过 agent_id 获取接入申请（pending 或 approved 状态）
 function getJoinRequestByAgentId(agentId) {
   const result = db.exec(
     "SELECT * FROM join_requests WHERE agent_id = ? AND status IN ('pending', 'approved') ORDER BY submitted_at DESC LIMIT 1",
+    [agentId]
+  );
+  if (result.length === 0 || result[0].values.length === 0) return null;
+
+  return parseJoinRequest(result);
+}
+
+// 通过 agent_id 获取活跃状态的接入申请（用于快速重连）
+function getActiveJoinRequestByAgentId(agentId) {
+  const result = db.exec(
+    "SELECT * FROM join_requests WHERE agent_id = ? AND status = 'active' ORDER BY approved_at DESC LIMIT 1",
     [agentId]
   );
   if (result.length === 0 || result[0].values.length === 0) return null;
@@ -1251,8 +1262,36 @@ function parseJoinRequests(result) {
   return requests.map(req => parseJsonFields(req, ['capabilities', 'metadata', 'capability_scope']));
 }
 
+// 清理非 active 状态的 join_requests
+function cleanupJoinRequests() {
+  db.run("DELETE FROM join_requests WHERE status != 'active'");
+  save();
+  console.log('[DB] 已清理非 active 状态的 join_requests');
+}
+
+// 清理孤立的 join_requests（对应的 agent_config 已删除）
+function cleanupOrphanJoinRequests() {
+  const agents = module.exports.getAllAgents();
+  const agentIds = new Set(agents.map(a => a.id));
+
+  const requests = module.exports.getAllJoinRequests();
+  let deleted = 0;
+  for (const r of requests) {
+    if (!agentIds.has(r.agent_id)) {
+      db.run('DELETE FROM join_requests WHERE request_id = ?', [r.request_id]);
+      deleted++;
+    }
+  }
+  if (deleted > 0) {
+    save();
+    console.log(`[DB] 已清理 ${deleted} 条孤立的 join_requests`);
+  }
+  return deleted;
+}
+
 module.exports = {
   init,
+  save,
   formatShanghaiTime,
   // 用户
   createUser,
@@ -1297,6 +1336,8 @@ module.exports = {
   // Agent 接入申请相关
   createJoinRequest,
   getJoinRequestById,
+  getJoinRequestByAgentId,
+  getActiveJoinRequestByAgentId,
   getJoinRequestsByStatus,
   getAllJoinRequests,
   updateJoinRequestStatus,
@@ -1306,5 +1347,7 @@ module.exports = {
   activateJoinRequest,
   cleanExpiredJoinRequests,
   updateJoinRequestLastSeen,
+  cleanupJoinRequests,
+  cleanupOrphanJoinRequests,
   deleteAgent
 };
