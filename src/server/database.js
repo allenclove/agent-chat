@@ -2,6 +2,7 @@ const initSqlJs = require('sql.js');
 const path = require('path');
 const fs = require('fs');
 const { v4: uuidv4 } = require('uuid');
+const { traceStore, EVENT_TYPES } = require('./trace-store');
 
 const dbPath = path.join(__dirname, '../../data/chat.db');
 let db = null;
@@ -338,8 +339,22 @@ function createMessage(senderId, senderName, senderType, content) {
 
   save();
 
+  // 创建追踪记录
+  const traceId = traceStore.createTrace(id, {
+    sender_id: senderId,
+    sender_name: senderName,
+    sender_type: senderType
+  });
+
+  // 记录消息创建事件
+  traceStore.addEvent(traceId, EVENT_TYPES.MESSAGE_CREATED, {
+    content_length: content.length,
+    content_preview: content.substring(0, 100)
+  });
+
   return {
     id,
+    trace_id: traceId,
     sender_id: senderId,
     sender_name: senderName,
     sender_type: senderType,

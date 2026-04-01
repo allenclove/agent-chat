@@ -7,6 +7,7 @@
 const db = require('./database');
 const chat = require('./chat');
 const protocol = require('./protocol');
+const { traceStore, EVENT_TYPES } = require('./trace-store');
 
 // 存储已连接的Agent
 const connectedAgents = new Map();
@@ -397,6 +398,16 @@ const agentManager = {
    * 转发消息给Agent
    */
   forwardToAgents(message) {
+    const agentCount = connectedAgents.size;
+
+    // 记录转发事件（如果有 trace_id）
+    if (message && message.trace_id) {
+      traceStore.addEvent(message.trace_id, EVENT_TYPES.SERVER_FORWARD_AGENT, {
+        agent_count: agentCount,
+        message_id: message.id
+      });
+    }
+
     for (const [, agent] of connectedAgents) {
       if (agent.ws.readyState !== 1) continue;
 

@@ -2,6 +2,7 @@ const WebSocket = require('ws');
 const db = require('./database');
 const chat = require('./chat');
 const agentManager = require('./agent-manager');
+const { traceStore, EVENT_TYPES } = require('./trace-store');
 
 function setupWebSocket(server) {
   const wss = new WebSocket.Server({ server });
@@ -289,6 +290,14 @@ function setupWebSocket(server) {
       // 正常消息处理
       const message = chat.handleUserMessage(sessionId, trimmedContent);
       if (message) {
+        // 记录服务端接收事件
+        if (message.trace_id) {
+          traceStore.addEvent(message.trace_id, EVENT_TYPES.SERVER_RECEIVED, {
+            from_session: sessionId,
+            content_length: trimmedContent.length
+          });
+        }
+
         // 广播给所有用户
         chat.broadcast('message', message);
 

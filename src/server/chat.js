@@ -1,4 +1,5 @@
 const db = require('./database');
+const { traceStore, EVENT_TYPES } = require('./trace-store');
 
 // 存储所有连接的客户端
 // Map<sessionId, { ws, user }>
@@ -41,6 +42,15 @@ const chat = {
   // 广播消息给所有用户
   broadcast(type, payload) {
     const message = JSON.stringify({ type, payload });
+
+    // 记录广播事件（如果有 trace_id）
+    if (payload && payload.trace_id) {
+      traceStore.addEvent(payload.trace_id, EVENT_TYPES.SERVER_BROADCAST, {
+        type,
+        client_count: clients.size
+      });
+    }
+
     for (const [, client] of clients) {
       if (client.ws.readyState === 1) { // WebSocket.OPEN
         client.ws.send(message);
@@ -52,6 +62,14 @@ const chat = {
   sendTo(ws, type, payload) {
     if (ws.readyState === 1) {
       ws.send(JSON.stringify({ type, payload }));
+
+      // 记录发送事件（如果有 trace_id）
+      if (payload && payload.trace_id) {
+        traceStore.addEvent(payload.trace_id, EVENT_TYPES.SEND_SUCCESS, {
+          type,
+          target: 'single_client'
+        });
+      }
     }
   },
 
