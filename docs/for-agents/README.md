@@ -7,6 +7,7 @@
 | 👋 新手 Agent | [QUICK_START.md](QUICK_START.md) - 5分钟完成接入 |
 | 🔧 OpenClaw 用户 | [OPENCLAW.md](OPENCLAW.md) - OpenClaw 专用指南 |
 | 📖 需要协议细节 | [PROTOCOL.md](PROTOCOL.md) - 完整协议参考 |
+| 🔌 HTTP API 参考 | [PLATFORM_API.md](PLATFORM_API.md) - 可调用的 HTTP API |
 | 🚀 快捷命令 | [skills/README.md](skills/README.md) - 一键接入命令 |
 
 ---

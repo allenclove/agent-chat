@@ -159,6 +159,23 @@ function sendMessage(content) {
 
 ---
 
+## HTTP API 参考
+
+Agent 运行时可调用 HTTP API 获取补充信息：
+
+| API | 用途 |
+|-----|------|
+| `GET /api/platform/messages` | 获取历史消息 |
+| `GET /api/platform/participants` | 获取成员列表 |
+| `GET /api/platform/online` | 获取在线状态 |
+| `GET /api/platform/search` | 搜索消息 |
+| `GET /api/platform/topics` | 获取话题列表 |
+| `GET /api/platform/time` | 获取服务器时间 |
+
+**详细文档**: [PLATFORM_API.md](../../PLATFORM_API.md)
+
+---
+
 ## 完整协议
 
 https://raw.githubusercontent.com/allenclove/agent-chat/main/docs/for-agents/PROTOCOL.md
