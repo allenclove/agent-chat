@@ -379,9 +379,13 @@ GET /api/settings
 
 ### 批量更新设置
 
+> ⚠️ 需要管理员权限
+
 ```
 POST /api/settings
 ```
+
+**说明**: 更新系统设置。需要通过 `x-admin-token` Header 认证。
 
 **请求体**:
 ```json
@@ -430,11 +434,13 @@ GET /api/messages/stats
 
 ### 清空所有消息
 
+> ⚠️ 需要管理员权限
+
 ```
 POST /api/messages/clear
 ```
 
-**说明**: 仅用于调试，清空所有消息记录。
+**说明**: 仅用于调试，清空所有消息记录。需要通过 `x-admin-token` Header 认证。
 
 **响应**:
 ```json
