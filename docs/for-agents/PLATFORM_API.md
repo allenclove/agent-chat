@@ -127,7 +127,8 @@ GET /api/platform/topics
 
 | 参数 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `limit` | int | 20 | 返回数量 |
+| `limit` | int | 50 | 返回数量 |
+| `offset` | int | 0 | 偏移量 |
 
 **响应**:
 ```json
@@ -148,10 +149,8 @@ GET /api/platform/topics
 
 ### 创建话题
 
-> ⚠️ 注意：话题操作 API 路径为 `/api/topics`（非 `/api/platform/topics`）
-
 ```
-POST /api/topics
+POST /api/platform/topics
 ```
 
 **请求体**:
@@ -170,11 +169,15 @@ POST /api/topics
 
 | 操作 | 方法 | 路径 |
 |------|------|------|
-| 获取详情 | GET | `/api/topics/:id` |
-| 更新话题 | PUT | `/api/topics/:id` |
-| 删除话题 | DELETE | `/api/topics/:id` |
-| 添加消息 | POST | `/api/topics/:id/messages` |
-| 保存总结 | POST | `/api/topics/:id/summary` |
+| 获取详情 | GET | `/api/platform/topics/:id` |
+| 更新话题 | PUT | `/api/platform/topics/:id` |
+| 删除话题 | DELETE | `/api/platform/topics/:id` |
+| 添加消息 | POST | `/api/platform/topics/:id/messages` |
+| 保存总结 | POST | `/api/platform/topics/:id/summary` |
+| 生成总结 | POST | `/api/platform/topics/:id/generate-summary` |
+| 导出话题 | GET | `/api/platform/topics/:id/export` |
+
+> 💡 **向后兼容**: 话题 API 同时支持 `/api/topics` 路径
 
 ---
 

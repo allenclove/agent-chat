@@ -336,6 +336,18 @@ interface PlatformInfoPayload {
 }
 ```
 
+**能力状态**:
+
+| 能力 | 状态 | 说明 |
+|------|------|------|
+| `text` | ✅ 已实现 | 文本消息收发 |
+| `image` | ❌ 未实现 | 图片消息 |
+| `file` | ❌ 未实现 | 文件消息 |
+| `threads` | ❌ 未实现 | 线程消息 |
+| `message_edit` | ❌ 未实现 | 消息编辑 |
+| `message_revoke` | ❌ 未实现 | 消息撤回 |
+| `history_read` | ✅ 已实现 | 历史消息读取（HTTP API） |
+
 ---
 
 ### 9. participants_sync (成员列表同步)

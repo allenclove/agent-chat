@@ -151,17 +151,13 @@ router.get('/:id/export', (req, res) => {
     if (topic.description) {
       content += `> ${topic.description}\n\n`;
     }
-    content += `**创建时间**: ${topic.created_at}\n\n`;
-    content += `---\n\n`;
-    content += `## 聊天记录\n\n`;
+    content += `**创建时间**: ${topic.created_at}\n\n---\n\n## 聊天记录\n\n`;
     messages.forEach(msg => {
       const time = msg.original_created_at || '';
       content += `**${msg.sender_name}** (${msg.sender_type}) - ${time}:\n${msg.content}\n\n`;
     });
     if (summary) {
-      content += `---\n\n`;
-      content += `## 总结\n\n`;
-      content += `${summary.narrative}\n\n`;
+      content += `---\n\n## 总结\n\n${summary.narrative}\n\n`;
       if (summary.viewpoints && summary.viewpoints.length > 0) {
         content += `### 各方观点\n\n`;
         summary.viewpoints.forEach(v => {
