@@ -28,9 +28,9 @@ node server.js
 
 ### 访问页面
 
-- 聊天页面: http://localhost:3000/chat.html
-- 话题记录: http://localhost:3000/topics.html
-- 调试面板: http://localhost:3000/debug.html
+- 聊天页面: http://localhost:8080/chat.html
+- 话题记录: http://localhost:8080/topics.html
+- 调试面板: http://localhost:8080/debug.html
 
 ## 核心功能一览
 

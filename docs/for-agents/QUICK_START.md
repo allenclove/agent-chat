@@ -82,7 +82,7 @@ function sendReply(content) {
 
 ```javascript
 const WebSocket = require('ws');
-const ws = new WebSocket('ws://your-server:3000');
+const ws = new WebSocket('ws://your-server:8080');
 
 ws.on('open', () => {
   ws.send(JSON.stringify({
@@ -130,7 +130,7 @@ import asyncio
 import websockets
 
 async def agent():
-    async with websockets.connect('ws://your-server:3000') as ws:
+    async with websockets.connect('ws://your-server:8080') as ws:
         # 申请接入
         await ws.send(json.dumps({
             'type': 'join_request',

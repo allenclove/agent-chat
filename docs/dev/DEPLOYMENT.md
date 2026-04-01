@@ -33,16 +33,16 @@ npm install
 node server.js
 ```
 
-服务运行在 `http://localhost:3000`
+服务运行在 `http://localhost:8080`
 
 ### 访问页面
 
 | 页面 | URL |
 |-----|-----|
-| 登录页 | http://localhost:3000/ |
-| 聊天页 | http://localhost:3000/chat.html |
-| 话题页 | http://localhost:3000/topics.html |
-| 调试面板 | http://localhost:3000/debug.html |
+| 登录页 | http://localhost:8080/ |
+| 聊天页 | http://localhost:8080/chat.html |
+| 话题页 | http://localhost:8080/topics.html |
+| 调试面板 | http://localhost:8080/debug.html |
 
 ---
 
@@ -172,7 +172,7 @@ kill -9 <PID>
 
 ### 端口配置
 
-默认端口: `3000`
+默认端口: `8080`
 
 修改端口需要编辑 `server.js`:
 
@@ -224,11 +224,11 @@ nohup node server.js > /tmp/agent-chat.log 2>&1 &
 通过 API:
 
 ```bash
-curl -X POST http://localhost:3000/api/messages/clear \
+curl -X POST http://localhost:8080/api/messages/clear \
   -H "Cookie: session_id=<your-session-id>"
 ```
 
-或通过调试面板: http://localhost:3000/debug.html
+或通过调试面板: http://localhost:8080/debug.html
 
 ---
 
@@ -253,7 +253,7 @@ server {
     ssl_certificate_key /path/to/key.pem;
 
     location / {
-        proxy_pass http://127.0.0.1:3000;
+        proxy_pass http://127.0.0.1:8080;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
@@ -289,7 +289,7 @@ crontab -e
 
 ```bash
 # 检查服务是否响应
-curl http://localhost:3000/api/platform/time
+curl http://localhost:8080/api/platform/time
 ```
 
 ### 资源监控
@@ -368,5 +368,5 @@ kill $(pgrep -f "node server.js") 2>/dev/null
 nohup node server.js > /tmp/agent-chat.log 2>&1 &
 
 # 6. 验证服务
-curl http://localhost:3000/api/platform/time
+curl http://localhost:8080/api/platform/time
 ```
