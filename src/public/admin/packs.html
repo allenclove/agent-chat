@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>能力包管理 - Agent Chat</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+    }
+    .admin-card {
+      backdrop-filter: blur(10px);
+      background: rgba(255, 255, 255, 0.95);
+    }
+    .pack-enabled { background-color: #d1fae5; color: #065f46; }
+    .pack-disabled { background-color: #fee2e2; color: #991b1b; }
+  </style>
+</head>
+<body class="p-4 md:p-8">
+  <div class="admin-card rounded-2xl shadow-2xl p-6 md:p-8 w-full max-w-5xl mx-auto">
+    <!-- Header -->
+    <div class="flex items-center justify-between mb-6">
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-xl flex items-center justify-center">
+          <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+          </svg>
+        </div>
+        <div>
+          <h1 class="text-xl font-bold text-gray-800">能力包管理</h1>
+          <p class="text-sm text-gray-500">管理场景能力包</p>
+        </div>
+      </div>
+      <div class="flex items-center space-x-3">
+        <a href="/admin/rules.html" class="text-purple-600 hover:text-purple-800 text-sm font-medium">规则管理</a>
+        <a href="/admin/skills.html" class="text-purple-600 hover:text-purple-800 text-sm font-medium">技能管理</a>
+        <a href="/admin/context.html" class="text-purple-600 hover:text-purple-800 text-sm font-medium">上下文</a>
+        <a href="/chat.html" class="text-purple-600 hover:text-purple-800 text-sm font-medium">返回聊天</a>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="grid grid-cols-3 gap-4 mb-6">
+      <div class="bg-purple-50 rounded-lg p-4">
+        <div class="text-2xl font-bold text-purple-600" id="totalPacks">0</div>
+        <div class="text-sm text-purple-700">总能力包数</div>
+      </div>
+      <div class="bg-green-50 rounded-lg p-4">
+        <div class="text-2xl font-bold text-green-600" id="enabledPacks">0</div>
+        <div class="text-sm text-green-700">已启用</div>
+      </div>
+      <div class="bg-blue-50 rounded-lg p-4">
+        <div class="text-2xl font-bold text-blue-600" id="activeScenes">0</div>
+        <div class="text-sm text-blue-700">活跃场景</div>
+      </div>
+    </div>
+
+    <!-- Actions -->
+    <div class="flex justify-between items-center mb-4">
+      <h2 class="text-lg font-semibold text-gray-800">能力包列表</h2>
+      <button id="addPackBtn" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition">
+        + 新增能力包
+      </button>
+    </div>
+
+    <!-- Packs Grid -->
+    <div id="packsGrid" class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <!-- 动态填充 -->
+    </div>
+
+    <!-- Empty State -->
+    <div id="emptyState" class="hidden text-center py-12">
+      <div class="text-gray-400 text-5xl mb-4">📦</div>
+      <p class="text-gray-500">暂无能力包</p>
+    </div>
+
+    <!-- Pack Modal -->
+    <div id="packModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div class="bg-white rounded-xl shadow-xl w-full max-w-lg">
+        <div class="p-6">
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="text-lg font-bold text-gray-800" id="modalTitle">新增能力包</h2>
+            <button id="closeModal" class="text-gray-400 hover:text-gray-600">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+              </svg>
+            </button>
+          </div>
+
+          <form id="packForm" class="space-y-4">
+            <input type="hidden" id="packId">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">能力包 ID</label>
+              <input type="text" id="packIdInput" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" placeholder="例如: story_chain" required>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">名称</label>
+              <input type="text" id="packName" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" placeholder="例如: 故事接龙" required>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">目标</label>
+              <textarea id="packGoal" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" rows="2" placeholder="描述能力包的目标和用途"></textarea>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">包含技能 (JSON数组)</label>
+              <input type="text" id="packSkills" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono" placeholder='["search", "summarize"]'>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">触发关键词 (JSON数组)</label>
+              <input type="text" id="packKeywords" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono" placeholder='["开始故事接龙", "故事接龙"]'>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">状态字段 (JSON)</label>
+              <textarea id="packStateFields" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono" rows="2" placeholder='{"chapter": 1, "open_hooks": []}'></textarea>
+            </div>
+            <div class="flex justify-end space-x-3 pt-4">
+              <button type="button" id="cancelBtn" class="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50">取消</button>
+              <button type="submit" class="px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700">保存</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const API_BASE = '/api/platform';
+    let packs = [];
+
+    // 加载能力包
+    async function loadPacks() {
+      try {
+        const res = await fetch(`${API_BASE}/packs`);
+        const data = await res.json();
+        if (data.success) {
+          packs = data.packs;
+          renderPacks();
+          updateStats();
+        }
+      } catch (err) {
+        console.error('加载能力包失败:', err);
+      }
+    }
+
+    // 加载活跃场景
+    async function loadActiveScenes() {
+      try {
+        const res = await fetch(`${API_BASE}/scenes`);
+        const data = await res.json();
+        if (data.success) {
+          document.getElementById('activeScenes').textContent = data.scenes.length;
+        }
+      } catch (err) {
+        console.error('加载场景失败:', err);
+      }
+    }
+
+    // 渲染能力包卡片
+    function renderPacks() {
+      const grid = document.getElementById('packsGrid');
+      const emptyState = document.getElementById('emptyState');
+
+      if (packs.length === 0) {
+        grid.innerHTML = '';
+        emptyState.classList.remove('hidden');
+        return;
+      }
+
+      emptyState.classList.add('hidden');
+      grid.innerHTML = packs.map(pack => `
+        <div class="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition">
+          <div class="flex items-start justify-between mb-2">
+            <div>
+              <h3 class="font-semibold text-gray-800">${pack.name}</h3>
+              <span class="text-xs font-mono text-gray-500">${pack.id}</span>
+            </div>
+            <span class="pack-${pack.enabled ? 'enabled' : 'disabled'} px-2 py-1 rounded text-xs font-medium">
+              ${pack.enabled ? '已启用' : '已禁用'}
+            </span>
+          </div>
+          <p class="text-sm text-gray-600 mb-3">${pack.goal || '暂无目标描述'}</p>
+          <div class="mb-2">
+            <span class="text-xs text-gray-500">技能: </span>
+            ${(pack.skills || []).map(s => `<span class="bg-purple-100 text-purple-700 px-2 py-0.5 rounded text-xs mr-1">${s}</span>`).join('')}
+          </div>
+          <div class="mb-3">
+            <span class="text-xs text-gray-500">触发词: </span>
+            ${(pack.trigger_keywords || []).map(k => `<span class="bg-gray-100 text-gray-600 px-2 py-0.5 rounded text-xs mr-1">${k}</span>`).join('')}
+          </div>
+          <div class="flex items-center justify-end space-x-3">
+            <button onclick="togglePack('${pack.id}', ${!pack.enabled})" class="text-xs text-purple-600 hover:text-purple-800">
+              ${pack.enabled ? '禁用' : '启用'}
+            </button>
+            <button onclick="editPack('${pack.id}')" class="text-xs text-blue-600 hover:text-blue-800">编辑</button>
+            <button onclick="deletePack('${pack.id}')" class="text-xs text-red-600 hover:text-red-800">删除</button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    // 更新统计
+    function updateStats() {
+      const total = packs.length;
+      const enabled = packs.filter(p => p.enabled !== false).length;
+
+      document.getElementById('totalPacks').textContent = total;
+      document.getElementById('enabledPacks').textContent = enabled;
+    }
+
+    // 打开新增模态框
+    document.getElementById('addPackBtn').addEventListener('click', () => {
+      document.getElementById('modalTitle').textContent = '新增能力包';
+      document.getElementById('packForm').reset();
+      document.getElementById('packId').value = '';
+      document.getElementById('packIdInput').disabled = false;
+      document.getElementById('packModal').classList.remove('hidden');
+    });
+
+    // 编辑能力包
+    function editPack(id) {
+      const pack = packs.find(p => p.id === id);
+      if (!pack) return;
+
+      document.getElementById('modalTitle').textContent = '编辑能力包';
+      document.getElementById('packId').value = pack.id;
+      document.getElementById('packIdInput').value = pack.id;
+      document.getElementById('packIdInput').disabled = true;
+      document.getElementById('packName').value = pack.name;
+      document.getElementById('packGoal').value = pack.goal || '';
+      document.getElementById('packSkills').value = pack.skills ? JSON.stringify(pack.skills) : '';
+      document.getElementById('packKeywords').value = pack.trigger_keywords ? JSON.stringify(pack.trigger_keywords) : '';
+      document.getElementById('packStateFields').value = pack.state_fields ? JSON.stringify(pack.state_fields) : '';
+      document.getElementById('packModal').classList.remove('hidden');
+    }
+
+    // 切换能力包状态
+    async function togglePack(id, enable) {
+      try {
+        const res = await fetch(`${API_BASE}/packs/${id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ enabled: enable })
+        });
+        const data = await res.json();
+        if (data.success) {
+          loadPacks();
+        }
+      } catch (err) {
+        console.error('更新能力包失败:', err);
+      }
+    }
+
+    // 删除能力包
+    async function deletePack(id) {
+      if (!confirm(`确定要删除能力包 "${id}" 吗？`)) return;
+
+      try {
+        const res = await fetch(`${API_BASE}/packs/${id}`, { method: 'DELETE' });
+        const data = await res.json();
+        if (data.success) {
+          loadPacks();
+        } else {
+          alert('删除失败: ' + data.error);
+        }
+      } catch (err) {
+        console.error('删除能力包失败:', err);
+      }
+    }
+
+    // 关闭模态框
+    document.getElementById('closeModal').addEventListener('click', () => {
+      document.getElementById('packModal').classList.add('hidden');
+    });
+    document.getElementById('cancelBtn').addEventListener('click', () => {
+      document.getElementById('packModal').classList.add('hidden');
+    });
+
+    // 提交表单
+    document.getElementById('packForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const id = document.getElementById('packId').value || document.getElementById('packIdInput').value;
+      const isEdit = !!document.getElementById('packId').value;
+
+      try {
+        const skillsStr = document.getElementById('packSkills').value.trim();
+        const keywordsStr = document.getElementById('packKeywords').value.trim();
+        const stateFieldsStr = document.getElementById('packStateFields').value.trim();
+
+        const payload = {
+          id,
+          name: document.getElementById('packName').value,
+          goal: document.getElementById('packGoal').value,
+          skills: skillsStr ? JSON.parse(skillsStr) : [],
+          trigger_keywords: keywordsStr ? JSON.parse(keywordsStr) : [],
+          state_fields: stateFieldsStr ? JSON.parse(stateFieldsStr) : {}
+        };
+
+        const url = `${API_BASE}/packs${isEdit ? '/' + id : ''}`;
+        const method = isEdit ? 'PUT' : 'POST';
+
+        const res = await fetch(url, {
+          method,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (data.success) {
+          document.getElementById('packModal').classList.add('hidden');
+          loadPacks();
+        } else {
+          alert('保存失败: ' + data.error);
+        }
+      } catch (err) {
+        alert('JSON 格式错误: ' + err.message);
+      }
+    });
+
+    // 初始化
+    loadPacks();
+    loadActiveScenes();
+  </script>
+</body>
+</html>

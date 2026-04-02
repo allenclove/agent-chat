@@ -3,6 +3,10 @@ const router = express.Router();
 const db = require('../database');
 const chat = require('../chat');
 const agentManager = require('../agent-manager');
+const rules = require('../rules');
+const skills = require('../skills');
+const packs = require('../packs');
+const context = require('../context');
 
 // GET /api/platform/messages - 获取历史消息
 router.get('/messages', (req, res) => {
@@ -250,6 +254,338 @@ router.get('/topics/:id/export', (req, res) => {
   res.setHeader('Content-Type', contentType);
   res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
   res.send(content);
+});
+
+// ==================== 规则 API ====================
+
+// GET /api/platform/rules - 获取规则列表
+router.get('/rules', (req, res) => {
+  const rulesList = db.getAllRules();
+  res.json({ success: true, rules: rulesList, version: context.getRulesVersion() });
+});
+
+// GET /api/platform/rules/:id - 获取规则详情
+router.get('/rules/:id', (req, res) => {
+  const rule = db.getRuleById(req.params.id);
+  if (!rule) {
+    return res.status(404).json({ error: '规则不存在' });
+  }
+  res.json({ success: true, rule });
+});
+
+// POST /api/platform/rules - 新增规则
+router.post('/rules', (req, res) => {
+  const { id, summary, trigger, must, must_not, priority, version } = req.body;
+
+  if (!id || !summary || !trigger) {
+    return res.status(400).json({ error: 'id、summary 和 trigger 必填' });
+  }
+
+  try {
+    const rule = db.createRule({ id, summary, trigger, must, must_not, priority, version });
+    console.log(`[API] 创建规则: ${id}`);
+    res.json({ success: true, rule });
+  } catch (e) {
+    res.status(400).json({ error: '创建失败: ' + e.message });
+  }
+});
+
+// PUT /api/platform/rules/:id - 更新规则
+router.put('/rules/:id', (req, res) => {
+  const { id } = req.params;
+  const updates = req.body;
+
+  try {
+    const rule = db.updateRule(id, updates);
+    if (!rule) {
+      return res.status(404).json({ error: '规则不存在' });
+    }
+    console.log(`[API] 更新规则: ${id}`);
+    res.json({ success: true, rule });
+  } catch (e) {
+    res.status(400).json({ error: '更新失败: ' + e.message });
+  }
+});
+
+// DELETE /api/platform/rules/:id - 删除规则
+router.delete('/rules/:id', (req, res) => {
+  const { id } = req.params;
+  db.deleteRule(id);
+  console.log(`[API] 删除规则: ${id}`);
+  res.json({ success: true });
+});
+
+// GET /api/platform/rules/audit - 获取规则审计日志
+router.get('/rules/audit', (req, res) => {
+  const limit = parseInt(req.query.limit) || 100;
+  const logs = db.getRuleAuditLogs(limit);
+  res.json({ success: true, logs });
+});
+
+// ==================== 技能 API ====================
+
+// GET /api/platform/skills - 获取技能列表
+router.get('/skills', (req, res) => {
+  const skillsList = skills.getAvailableSkills();
+  res.json({ success: true, skills: skillsList });
+});
+
+// GET /api/platform/skills/:id - 获取技能详情
+router.get('/skills/:id', (req, res) => {
+  const skill = skills.getSkillDetail(req.params.id);
+  if (!skill) {
+    return res.status(404).json({ error: '技能不存在' });
+  }
+  res.json({ success: true, skill });
+});
+
+// POST /api/platform/skills - 新增技能
+router.post('/skills', (req, res) => {
+  const { id, name, description, category, input_schema, output_schema, usage_hint } = req.body;
+
+  if (!id || !name) {
+    return res.status(400).json({ error: 'id 和 name 必填' });
+  }
+
+  try {
+    const skill = skills.registerSkill({ id, name, description, category, input_schema, output_schema, usage_hint });
+    console.log(`[API] 创建技能: ${id}`);
+    res.json({ success: true, skill });
+  } catch (e) {
+    res.status(400).json({ error: '创建失败: ' + e.message });
+  }
+});
+
+// PUT /api/platform/skills/:id - 更新技能
+router.put('/skills/:id', (req, res) => {
+  const { id } = req.params;
+  const updates = req.body;
+
+  try {
+    const skill = skills.updateSkill(id, updates);
+    console.log(`[API] 更新技能: ${id}`);
+    res.json({ success: true, skill });
+  } catch (e) {
+    res.status(400).json({ error: '更新失败: ' + e.message });
+  }
+});
+
+// DELETE /api/platform/skills/:id - 删除技能
+router.delete('/skills/:id', (req, res) => {
+  const { id } = req.params;
+  try {
+    skills.unregisterSkill(id);
+    console.log(`[API] 删除技能: ${id}`);
+    res.json({ success: true });
+  } catch (e) {
+    res.status(400).json({ error: '删除失败: ' + e.message });
+  }
+});
+
+// POST /api/platform/skills/call - 调用技能
+router.post('/skills/call', async (req, res) => {
+  const { skill_id, input } = req.body;
+
+  if (!skill_id) {
+    return res.status(400).json({ error: 'skill_id 必填' });
+  }
+
+  try {
+    const result = await skills.executeSkill(
+      { payload: { skill_id, input } },
+      { id: 'http-api' }
+    );
+    if (result.status === 'failed') {
+      return res.status(400).json({ error: result.error, message: result.message });
+    }
+    res.json({ success: true, ...result });
+  } catch (e) {
+    res.status(500).json({ error: '执行失败: ' + e.message });
+  }
+});
+
+// GET /api/platform/skills/logs - 获取技能调用日志
+router.get('/skills/logs', (req, res) => {
+  const limit = parseInt(req.query.limit) || 100;
+  const logs = db.getSkillCallLogs(limit);
+  res.json({ success: true, logs });
+});
+
+// ==================== 能力包 API ====================
+
+// GET /api/platform/packs - 获取能力包列表
+router.get('/packs', (req, res) => {
+  const packsList = packs.getAvailablePacks();
+  res.json({ success: true, packs: packsList });
+});
+
+// GET /api/platform/packs/:id - 获取能力包详情
+router.get('/packs/:id', (req, res) => {
+  const pack = packs.getPackDetail(req.params.id);
+  if (!pack) {
+    return res.status(404).json({ error: '能力包不存在' });
+  }
+  res.json({ success: true, pack });
+});
+
+// POST /api/platform/packs - 新增能力包
+router.post('/packs', (req, res) => {
+  const { id, name, goal, skills, state_fields, trigger_keywords } = req.body;
+
+  if (!id || !name) {
+    return res.status(400).json({ error: 'id 和 name 必填' });
+  }
+
+  try {
+    const pack = packs.createPack({ id, name, goal, skills, state_fields, trigger_keywords });
+    console.log(`[API] 创建能力包: ${id}`);
+    res.json({ success: true, pack });
+  } catch (e) {
+    res.status(400).json({ error: '创建失败: ' + e.message });
+  }
+});
+
+// PUT /api/platform/packs/:id - 更新能力包
+router.put('/packs/:id', (req, res) => {
+  const { id } = req.params;
+  const updates = req.body;
+
+  try {
+    const pack = packs.updatePack(id, updates);
+    console.log(`[API] 更新能力包: ${id}`);
+    res.json({ success: true, pack });
+  } catch (e) {
+    res.status(400).json({ error: '更新失败: ' + e.message });
+  }
+});
+
+// DELETE /api/platform/packs/:id - 删除能力包
+router.delete('/packs/:id', (req, res) => {
+  const { id } = req.params;
+  try {
+    packs.deletePack(id);
+    console.log(`[API] 删除能力包: ${id}`);
+    res.json({ success: true });
+  } catch (e) {
+    res.status(400).json({ error: '删除失败: ' + e.message });
+  }
+});
+
+// ==================== 场景 API ====================
+
+// GET /api/platform/scenes - 获取活跃场景列表
+router.get('/scenes', (req, res) => {
+  const scenes = packs.getActiveScenes();
+  res.json({ success: true, scenes });
+});
+
+// POST /api/platform/scenes/activate - 激活场景
+router.post('/scenes/activate', (req, res) => {
+  const { pack_id, participants } = req.body;
+
+  if (!pack_id) {
+    return res.status(400).json({ error: 'pack_id 必填' });
+  }
+
+  try {
+    const scene = packs.activateScene(pack_id, participants || []);
+    console.log(`[API] 激活场景: ${scene.scene_id}`);
+    res.json({ success: true, scene });
+  } catch (e) {
+    res.status(400).json({ error: '激活失败: ' + e.message });
+  }
+});
+
+// GET /api/platform/scenes/:id - 获取场景状态
+router.get('/scenes/:id', (req, res) => {
+  const scene = packs.getSceneState(req.params.id);
+  if (!scene) {
+    return res.status(404).json({ error: '场景不存在或已结束' });
+  }
+  res.json({ success: true, scene });
+});
+
+// PUT /api/platform/scenes/:id - 更新场景状态
+router.put('/scenes/:id', (req, res) => {
+  const { id } = req.params;
+  const { state_data } = req.body;
+
+  try {
+    const scene = packs.updateSceneState(id, state_data);
+    res.json({ success: true, scene });
+  } catch (e) {
+    res.status(400).json({ error: '更新失败: ' + e.message });
+  }
+});
+
+// POST /api/platform/scenes/:id/end - 结束场景
+router.post('/scenes/:id/end', (req, res) => {
+  const { id } = req.params;
+  const { reason } = req.body;
+  packs.endScene(id, reason);
+  console.log(`[API] 结束场景: ${id}`);
+  res.json({ success: true });
+});
+
+// ==================== 上下文 API ====================
+
+// GET /api/platform/context - 获取平台上下文
+router.get('/context', (req, res) => {
+  const agentId = req.query.agent_id;
+
+  if (agentId) {
+    const fullContext = context.getFullContext(agentId);
+    res.json({ success: true, context: fullContext });
+  } else {
+    // 返回全局上下文信息
+    res.json({
+      success: true,
+      context: {
+        rules_version: context.getRulesVersion(),
+        available_packs: packs.getAvailablePacks().map(p => p.id),
+        available_skills: skills.getAvailableSkills().map(s => s.id)
+      }
+    });
+  }
+});
+
+// GET /api/platform/context/runtime - 获取运行时状态
+router.get('/context/runtime', (req, res) => {
+  const agentId = req.query.agent_id;
+  if (!agentId) {
+    return res.status(400).json({ error: 'agent_id 必填' });
+  }
+
+  const runtimeState = context.getRuntimeState(null, agentId);
+  res.json({ success: true, runtime_state: runtimeState });
+});
+
+// ==================== Agent 能力声明 API ====================
+
+// GET /api/platform/agents/:id/skills - 获取 Agent 技能声明
+router.get('/agents/:id/skills', (req, res) => {
+  const { id } = req.params;
+  const declaration = db.getAgentSkillDeclaration(id);
+
+  res.json({
+    success: true,
+    agent_id: id,
+    declared_skills: declaration?.declared_skills || []
+  });
+});
+
+// PUT /api/platform/agents/:id/skills - 更新 Agent 技能声明
+router.put('/agents/:id/skills', (req, res) => {
+  const { id } = req.params;
+  const { declared_skills } = req.body;
+
+  if (!Array.isArray(declared_skills)) {
+    return res.status(400).json({ error: 'declared_skills 应为数组' });
+  }
+
+  const declaration = db.setAgentSkillDeclaration(id, declared_skills);
+  console.log(`[API] 更新 Agent ${id} 技能声明: ${declared_skills.join(', ')}`);
+  res.json({ success: true, declaration });
 });
 
 module.exports = router;

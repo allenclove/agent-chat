@@ -3,6 +3,10 @@ const db = require('./database');
 const chat = require('./chat');
 const agentManager = require('./agent-manager');
 const { traceStore, EVENT_TYPES } = require('./trace-store');
+const rules = require('./rules');
+const skills = require('./skills');
+const packs = require('./packs');
+const context = require('./context');
 
 function setupWebSocket(server) {
   const wss = new WebSocket.Server({ server });
@@ -94,6 +98,30 @@ function setupWebSocket(server) {
       // 处理Agent返回的总结响应
       if (type === 'summary_response' && isAgent) {
         agentManager.handleSummaryResponse(msg);
+        return;
+      }
+
+      // 处理Agent调用技能
+      if (type === 'skill_call' && isAgent) {
+        handleSkillCall(ws, msg, agentId);
+        return;
+      }
+
+      // 处理Agent能力声明更新
+      if (type === 'capability_update' && isAgent) {
+        handleCapabilityUpdate(ws, msg, agentId);
+        return;
+      }
+
+      // 处理场景激活请求
+      if (type === 'scene_activate_request' && isAgent) {
+        handleSceneActivateRequest(ws, msg, agentId);
+        return;
+      }
+
+      // 处理场景状态更新
+      if (type === 'scene_state_update' && isAgent) {
+        handleSceneStateUpdate(ws, msg, agentId);
         return;
       }
 
@@ -336,6 +364,148 @@ function sendError(ws, message) {
 
 function broadcastUserList() {
   chat.broadcast('user_list', { users: chat.getOnlineUsers() });
+}
+
+// ==================== 平台治理相关处理 ====================
+
+/**
+ * 处理Agent调用技能
+ */
+async function handleSkillCall(ws, msg, agentId) {
+  const { payload } = msg;
+  const agent = agentManager.getAgentStatus().find(a => a.id === agentId);
+
+  try {
+    const result = await skills.executeSkill(
+      payload,
+      { id: agentId, name: agent?.name }
+    );
+
+    ws.send(JSON.stringify({
+      type: 'skill_result',
+      payload: {
+        skill_id: payload.skill_id,
+        ...result
+      }
+    }));
+  } catch (err) {
+    ws.send(JSON.stringify({
+      type: 'skill_result',
+      payload: {
+        skill_id: payload.skill_id,
+        status: 'failed',
+        error: 'EXECUTION_ERROR',
+        message: err.message
+      }
+    }));
+  }
+}
+
+/**
+ * 处理Agent能力声明更新
+ */
+function handleCapabilityUpdate(ws, msg, agentId) {
+  const { declared_skills } = msg.payload || {};
+
+  if (!Array.isArray(declared_skills)) {
+    sendError(ws, 'declared_skills 应为数组');
+    return;
+  }
+
+  try {
+    db.setAgentSkillDeclaration(agentId, declared_skills);
+    ws.send(JSON.stringify({
+      type: 'capability_update_ack',
+      payload: {
+        success: true,
+        agent_id: agentId,
+        declared_skills
+      }
+    }));
+    console.log(`[WS] Agent ${agentId} 更新能力声明: ${declared_skills.join(', ')}`);
+  } catch (err) {
+    sendError(ws, '更新能力声明失败: ' + err.message);
+  }
+}
+
+/**
+ * 处理场景激活请求
+ */
+function handleSceneActivateRequest(ws, msg, agentId) {
+  const { pack_id, participants } = msg.payload || {};
+
+  if (!pack_id) {
+    sendError(ws, 'pack_id 必填');
+    return;
+  }
+
+  try {
+    // 默认参与者为请求者自己
+    const sceneParticipants = participants || [agentId];
+    const scene = packs.activateScene(pack_id, sceneParticipants);
+
+    // 通知所有参与者场景激活
+    const activationMsg = context.assembleSceneActivation(scene, agentId);
+    for (const participantId of sceneParticipants) {
+      agentManager.sendToAgent(participantId, activationMsg);
+    }
+
+    ws.send(JSON.stringify({
+      type: 'scene_activate_ack',
+      payload: {
+        success: true,
+        scene
+      }
+    }));
+  } catch (err) {
+    sendError(ws, '场景激活失败: ' + err.message);
+  }
+}
+
+/**
+ * 处理场景状态更新
+ */
+function handleSceneStateUpdate(ws, msg, agentId) {
+  const { scene_id, state_data } = msg.payload || {};
+
+  if (!scene_id) {
+    sendError(ws, 'scene_id 必填');
+    return;
+  }
+
+  try {
+    const scene = packs.updateSceneState(scene_id, state_data);
+    if (!scene) {
+      sendError(ws, '场景不存在或已结束');
+      return;
+    }
+
+    // 通知其他参与者状态更新
+    const participants = scene.participants || [];
+    for (const participantId of participants) {
+      if (participantId !== agentId) {
+        agentManager.sendToAgent(participantId, {
+          type: 'scene_state_sync',
+          payload: {
+            scene_id,
+            state_data: scene.state_data,
+            updated_by: agentId
+          }
+        });
+      }
+    }
+
+    ws.send(JSON.stringify({
+      type: 'scene_state_update_ack',
+      payload: {
+        success: true,
+        scene_id,
+        state_data: scene.state_data
+      }
+    }));
+  } catch (err) {
+    sendError(ws, '场景状态更新失败: ' + err.message);
+  }
 }
 
 module.exports = { setupWebSocket };

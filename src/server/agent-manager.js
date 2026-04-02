@@ -651,6 +651,44 @@ const agentManager = {
     return null;
   },
 
+  /**
+   * 发送消息给特定 Agent
+   * @param {string} agentId - Agent ID
+   * @param {Object} message - 消息对象
+   * @returns {boolean} 是否发送成功
+   */
+  sendToAgent(agentId, message) {
+    const agent = connectedAgents.get(agentId);
+    if (!agent || agent.ws.readyState !== 1) {
+      return false;
+    }
+
+    try {
+      agent.ws.send(JSON.stringify(message));
+      return true;
+    } catch (err) {
+      console.error(`[Agent] 发送消息给 ${agentId} 失败:`, err.message);
+      return false;
+    }
+  },
+
+  /**
+   * 广播消息给所有在线 Agent
+   * @param {Object} message - 消息对象
+   */
+  broadcastToAgents(message) {
+    const messageStr = JSON.stringify(message);
+    for (const [agentId, agent] of connectedAgents) {
+      if (agent.ws.readyState === 1) {
+        try {
+          agent.ws.send(messageStr);
+        } catch (err) {
+          console.error(`[Agent] 广播给 ${agentId} 失败:`, err.message);
+        }
+      }
+    }
+  },
+
   // ==================== 暴露给 protocol 模块 ====================
 
   getConnectedAgents() {

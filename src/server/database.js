@@ -245,6 +245,137 @@ async function init() {
     )
   `);
 
+  // ==================== 平台治理相关表 ====================
+
+  // 平台规则表
+  db.run(`
+    CREATE TABLE IF NOT EXISTS platform_rules (
+      id TEXT PRIMARY KEY,
+      summary TEXT NOT NULL,
+      trigger TEXT NOT NULL,
+      must TEXT,
+      must_not TEXT,
+      priority INTEGER DEFAULT 100,
+      version TEXT DEFAULT '1.0',
+      enabled INTEGER DEFAULT 1,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  // 平台技能表
+  db.run(`
+    CREATE TABLE IF NOT EXISTS platform_skills (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      description TEXT,
+      category TEXT,
+      input_schema TEXT,
+      output_schema TEXT,
+      usage_hint TEXT,
+      version TEXT DEFAULT '1.0',
+      enabled INTEGER DEFAULT 1,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  // 能力包表
+  db.run(`
+    CREATE TABLE IF NOT EXISTS capability_packs (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      goal TEXT,
+      skills TEXT,
+      state_fields TEXT,
+      trigger_keywords TEXT,
+      version TEXT DEFAULT '1.0',
+      enabled INTEGER DEFAULT 1,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  // Agent 技能声明表
+  db.run(`
+    CREATE TABLE IF NOT EXISTS agent_skill_declarations (
+      agent_id TEXT PRIMARY KEY,
+      declared_skills TEXT,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (agent_id) REFERENCES agent_configs(id) ON DELETE CASCADE
+    )
+  `);
+
+  // 规则审计日志表
+  db.run(`
+    CREATE TABLE IF NOT EXISTS rule_audit_logs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      rule_id TEXT NOT NULL,
+      message_id INTEGER,
+      agent_id TEXT,
+      trigger_context TEXT,
+      action_taken TEXT,
+      result TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  // 技能调用日志表
+  db.run(`
+    CREATE TABLE IF NOT EXISTS skill_call_logs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      skill_id TEXT NOT NULL,
+      caller_id TEXT NOT NULL,
+      input_params TEXT,
+      output_result TEXT,
+      status TEXT,
+      duration_ms INTEGER,
+      error_message TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  // 场景状态表
+  db.run(`
+    CREATE TABLE IF NOT EXISTS scene_states (
+      scene_id TEXT PRIMARY KEY,
+      pack_id TEXT NOT NULL,
+      status TEXT DEFAULT 'active',
+      participants TEXT,
+      state_data TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      expires_at DATETIME
+    )
+  `);
+
+  // 治理提案表
+  db.run(`
+    CREATE TABLE IF NOT EXISTS governance_proposals (
+      id TEXT PRIMARY KEY,
+      target_type TEXT NOT NULL,
+      target_id TEXT,
+      action TEXT NOT NULL,
+      content TEXT NOT NULL,
+      status TEXT DEFAULT 'pending',
+      proposer TEXT NOT NULL,
+      reviewed_by TEXT,
+      reviewed_at DATETIME,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  // 变更历史表
+  db.run(`
+    CREATE TABLE IF NOT EXISTS governance_changelog (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      entity_type TEXT NOT NULL,
+      entity_id TEXT NOT NULL,
+      action TEXT NOT NULL,
+      old_value TEXT,
+      new_value TEXT,
+      changed_by TEXT NOT NULL,
+      changed_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
   // 初始化默认设置
   initDefaultSettings();
 
@@ -1304,6 +1435,422 @@ function cleanupOrphanJoinRequests() {
   return deleted;
 }
 
+// ==================== 平台治理相关操作 ====================
+
+// 解析规则 JSON 字段
+function parseRule(rule) {
+  if (!rule) return null;
+  return parseJsonFields(rule, ['trigger', 'must', 'must_not']);
+}
+
+// 解析技能 JSON 字段
+function parseSkill(skill) {
+  if (!skill) return null;
+  return parseJsonFields(skill, ['input_schema', 'output_schema']);
+}
+
+// 解析能力包 JSON 字段
+function parsePack(pack) {
+  if (!pack) return null;
+  return parseJsonFields(pack, ['skills', 'state_fields', 'trigger_keywords']);
+}
+
+// ===== 规则 CRUD =====
+
+function getAllRules() {
+  const result = db.exec('SELECT * FROM platform_rules ORDER BY priority DESC');
+  return parseMultipleResults(result).map(parseRule);
+}
+
+function getRuleById(id) {
+  const result = db.exec('SELECT * FROM platform_rules WHERE id = ?', [id]);
+  return parseRule(parseSingleResult(result));
+}
+
+function getActiveRules() {
+  const result = db.exec('SELECT * FROM platform_rules WHERE enabled = 1 ORDER BY priority DESC');
+  return parseMultipleResults(result).map(parseRule);
+}
+
+function createRule(rule) {
+  const now = formatShanghaiTime(new Date());
+  db.run(
+    `INSERT INTO platform_rules (id, summary, trigger, must, must_not, priority, version, enabled, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`,
+    [rule.id, rule.summary, JSON.stringify(rule.trigger),
+     rule.must ? JSON.stringify(rule.must) : null,
+     rule.must_not ? JSON.stringify(rule.must_not) : null,
+     rule.priority || 100, rule.version || '1.0', now, now]
+  );
+  save();
+  return getRuleById(rule.id);
+}
+
+function updateRule(id, updates) {
+  const fields = [];
+  const values = [];
+  if (updates.summary) { fields.push('summary = ?'); values.push(updates.summary); }
+  if (updates.trigger) { fields.push('trigger = ?'); values.push(JSON.stringify(updates.trigger)); }
+  if (updates.must) { fields.push('must = ?'); values.push(JSON.stringify(updates.must)); }
+  if (updates.must_not) { fields.push('must_not = ?'); values.push(JSON.stringify(updates.must_not)); }
+  if (updates.priority) { fields.push('priority = ?'); values.push(updates.priority); }
+  if (updates.enabled !== undefined) { fields.push('enabled = ?'); values.push(updates.enabled ? 1 : 0); }
+  fields.push('updated_at = ?');
+  values.push(formatShanghaiTime(new Date()));
+  values.push(id);
+
+  if (fields.length > 1) {
+    db.run(`UPDATE platform_rules SET ${fields.join(', ')} WHERE id = ?`, values);
+    save();
+  }
+  return getRuleById(id);
+}
+
+function deleteRule(id) {
+  db.run('DELETE FROM platform_rules WHERE id = ?', [id]);
+  save();
+}
+
+// ===== 技能 CRUD =====
+
+function getAllSkills() {
+  const result = db.exec('SELECT * FROM platform_skills ORDER BY category, name');
+  return parseMultipleResults(result).map(parseSkill);
+}
+
+function getSkillById(id) {
+  const result = db.exec('SELECT * FROM platform_skills WHERE id = ?', [id]);
+  return parseSkill(parseSingleResult(result));
+}
+
+function getActiveSkills() {
+  const result = db.exec('SELECT * FROM platform_skills WHERE enabled = 1 ORDER BY category, name');
+  return parseMultipleResults(result).map(parseSkill);
+}
+
+function createSkill(skill) {
+  const now = formatShanghaiTime(new Date());
+  try {
+    db.run(
+      `INSERT INTO platform_skills (id, name, description, category, input_schema, output_schema, usage_hint, version, enabled, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?)`,
+      [skill.id, skill.name, skill.description || null, skill.category || null,
+       skill.input_schema ? JSON.stringify(skill.input_schema) : null,
+       skill.output_schema ? JSON.stringify(skill.output_schema) : null,
+       skill.usage_hint || null, skill.version || '1.0', now]
+    );
+    save();
+    return getSkillById(skill.id);
+  } catch (e) {
+    console.error('[DB] createSkill error:', e.message);
+    throw e;
+  }
+}
+
+function updateSkill(id, updates) {
+  const fields = [];
+  const values = [];
+  if (updates.name) { fields.push('name = ?'); values.push(updates.name); }
+  if (updates.description) { fields.push('description = ?'); values.push(updates.description); }
+  if (updates.category) { fields.push('category = ?'); values.push(updates.category); }
+  if (updates.input_schema) { fields.push('input_schema = ?'); values.push(JSON.stringify(updates.input_schema)); }
+  if (updates.output_schema) { fields.push('output_schema = ?'); values.push(JSON.stringify(updates.output_schema)); }
+  if (updates.usage_hint) { fields.push('usage_hint = ?'); values.push(updates.usage_hint); }
+  if (updates.enabled !== undefined) { fields.push('enabled = ?'); values.push(updates.enabled ? 1 : 0); }
+  if (fields.length > 0) {
+    db.run(`UPDATE platform_skills SET ${fields.join(', ')} WHERE id = ?`, [...values, id]);
+    save();
+  }
+  return getSkillById(id);
+}
+
+function deleteSkill(id) {
+  db.run('DELETE FROM platform_skills WHERE id = ?', [id]);
+  save();
+}
+
+// ===== 能力包 CRUD =====
+
+function getAllPacks() {
+  const result = db.exec('SELECT * FROM capability_packs ORDER BY name');
+  return parseMultipleResults(result).map(parsePack);
+}
+
+function getPackById(id) {
+  const result = db.exec('SELECT * FROM capability_packs WHERE id = ?', [id]);
+  return parsePack(parseSingleResult(result));
+}
+
+function getActivePacks() {
+  const result = db.exec('SELECT * FROM capability_packs WHERE enabled = 1 ORDER BY name');
+  return parseMultipleResults(result).map(parsePack);
+}
+
+function createPack(pack) {
+  const now = formatShanghaiTime(new Date());
+  db.run(
+    `INSERT INTO capability_packs (id, name, goal, skills, state_fields, trigger_keywords, version, enabled, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)`,
+    [pack.id, pack.name, pack.goal,
+     pack.skills ? JSON.stringify(pack.skills) : null,
+     pack.state_fields ? JSON.stringify(pack.state_fields) : null,
+     pack.trigger_keywords ? JSON.stringify(pack.trigger_keywords) : null,
+     pack.version || '1.0', now]
+  );
+  save();
+  return getPackById(pack.id);
+}
+
+function updatePack(id, updates) {
+  const fields = [];
+  const values = [];
+  if (updates.name) { fields.push('name = ?'); values.push(updates.name); }
+  if (updates.goal) { fields.push('goal = ?'); values.push(updates.goal); }
+  if (updates.skills) { fields.push('skills = ?'); values.push(JSON.stringify(updates.skills)); }
+  if (updates.state_fields) { fields.push('state_fields = ?'); values.push(JSON.stringify(updates.state_fields)); }
+  if (updates.trigger_keywords) { fields.push('trigger_keywords = ?'); values.push(JSON.stringify(updates.trigger_keywords)); }
+  if (updates.enabled !== undefined) { fields.push('enabled = ?'); values.push(updates.enabled ? 1 : 0); }
+  if (fields.length > 0) {
+    db.run(`UPDATE capability_packs SET ${fields.join(', ')} WHERE id = ?`, [...values, id]);
+    save();
+  }
+  return getPackById(id);
+}
+
+function deletePack(id) {
+  db.run('DELETE FROM capability_packs WHERE id = ?', [id]);
+  save();
+}
+
+// ===== Agent 技能声明 =====
+
+function getAgentSkillDeclaration(agentId) {
+  const result = db.exec('SELECT * FROM agent_skill_declarations WHERE agent_id = ?', [agentId]);
+  const row = parseSingleResult(result);
+  if (!row) return null;
+  return parseJsonFields(row, ['declared_skills']);
+}
+
+function setAgentSkillDeclaration(agentId, skills) {
+  const existing = getAgentSkillDeclaration(agentId);
+  const now = formatShanghaiTime(new Date());
+  if (existing) {
+    db.run(
+      'UPDATE agent_skill_declarations SET declared_skills = ?, updated_at = ? WHERE agent_id = ?',
+      [JSON.stringify(skills), now, agentId]
+    );
+  } else {
+    db.run(
+      'INSERT INTO agent_skill_declarations (agent_id, declared_skills, updated_at) VALUES (?, ?, ?)',
+      [agentId, JSON.stringify(skills), now]
+    );
+  }
+  save();
+  return getAgentSkillDeclaration(agentId);
+}
+
+// ===== 规则审计日志 =====
+
+function logRuleAudit(log) {
+  const now = formatShanghaiTime(new Date());
+  db.run(
+    `INSERT INTO rule_audit_logs (rule_id, message_id, agent_id, trigger_context, action_taken, result, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [log.rule_id, log.message_id, log.agent_id,
+     log.trigger_context ? JSON.stringify(log.trigger_context) : null,
+     log.action_taken ? JSON.stringify(log.action_taken) : null,
+     log.result, now]
+  );
+  save();
+}
+
+function getRuleAuditLogs(limit = 100) {
+  const result = db.exec('SELECT * FROM rule_audit_logs ORDER BY created_at DESC LIMIT ?', [limit]);
+  return parseMultipleResults(result).map(log => parseJsonFields(log, ['trigger_context', 'action_taken']));
+}
+
+function getRuleAuditLogsByRule(ruleId, limit = 50) {
+  const result = db.exec('SELECT * FROM rule_audit_logs WHERE rule_id = ? ORDER BY created_at DESC LIMIT ?', [ruleId, limit]);
+  return parseMultipleResults(result).map(log => parseJsonFields(log, ['trigger_context', 'action_taken']));
+}
+
+// ===== 技能调用日志 =====
+
+function logSkillCall(log) {
+  const now = formatShanghaiTime(new Date());
+  db.run(
+    `INSERT INTO skill_call_logs (skill_id, caller_id, input_params, output_result, status, duration_ms, error_message, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    [log.skill_id, log.caller_id,
+     log.input_params ? JSON.stringify(log.input_params) : null,
+     log.output_result ? JSON.stringify(log.output_result) : null,
+     log.status, log.duration_ms, log.error_message, now]
+  );
+  save();
+}
+
+function getSkillCallLogs(limit = 100) {
+  const result = db.exec('SELECT * FROM skill_call_logs ORDER BY created_at DESC LIMIT ?', [limit]);
+  return parseMultipleResults(result).map(log => parseJsonFields(log, ['input_params', 'output_result']));
+}
+
+function getSkillCallLogsBySkill(skillId, limit = 50) {
+  const result = db.exec('SELECT * FROM skill_call_logs WHERE skill_id = ? ORDER BY created_at DESC LIMIT ?', [skillId, limit]);
+  return parseMultipleResults(result).map(log => parseJsonFields(log, ['input_params', 'output_result']));
+}
+
+// ===== 场景状态 =====
+
+function parseSceneState(scene) {
+  if (!scene) return null;
+  return parseJsonFields(scene, ['participants', 'state_data']);
+}
+
+function getActiveScene(sceneId) {
+  const result = db.exec('SELECT * FROM scene_states WHERE scene_id = ? AND status = ?', [sceneId, 'active']);
+  return parseSceneState(parseSingleResult(result));
+}
+
+function getActiveScenes() {
+  const result = db.exec('SELECT * FROM scene_states WHERE status = ?', ['active']);
+  return parseMultipleResults(result).map(parseSceneState);
+}
+
+function createSceneState(scene) {
+  const now = formatShanghaiTime(new Date());
+  const expiresAt = scene.expires_at || formatShanghaiTime(new Date(Date.now() + 30 * 60 * 1000)); // 30分钟默认
+  db.run(
+    `INSERT INTO scene_states (scene_id, pack_id, status, participants, state_data, created_at, expires_at)
+     VALUES (?, ?, 'active', ?, ?, ?, ?)`,
+    [scene.scene_id, scene.pack_id,
+     scene.participants ? JSON.stringify(scene.participants) : null,
+     scene.state_data ? JSON.stringify(scene.state_data) : null,
+     now, expiresAt]
+  );
+  save();
+  return getActiveScene(scene.scene_id);
+}
+
+function updateSceneState(sceneId, updates) {
+  const fields = [];
+  const values = [];
+  if (updates.status) { fields.push('status = ?'); values.push(updates.status); }
+  if (updates.participants) { fields.push('participants = ?'); values.push(JSON.stringify(updates.participants)); }
+  if (updates.state_data) { fields.push('state_data = ?'); values.push(JSON.stringify(updates.state_data)); }
+  if (updates.expires_at) { fields.push('expires_at = ?'); values.push(updates.expires_at); }
+  if (fields.length > 0) {
+    db.run(`UPDATE scene_states SET ${fields.join(', ')} WHERE scene_id = ?`, [...values, sceneId]);
+    save();
+  }
+  return getActiveScene(sceneId);
+}
+
+function endScene(sceneId) {
+  db.run('UPDATE scene_states SET status = ? WHERE scene_id = ?', ['completed', sceneId]);
+  save();
+}
+
+// ===== 治理提案 =====
+
+function parseProposal(proposal) {
+  if (!proposal) return null;
+  return parseJsonFields(proposal, ['content']);
+}
+
+function getAllProposals() {
+  const result = db.exec('SELECT * FROM governance_proposals ORDER BY created_at DESC');
+  return parseMultipleResults(result).map(parseProposal);
+}
+
+function getProposalById(id) {
+  const result = db.exec('SELECT * FROM governance_proposals WHERE id = ?', [id]);
+  return parseProposal(parseSingleResult(result));
+}
+
+function getPendingProposals() {
+  const result = db.exec('SELECT * FROM governance_proposals WHERE status = ? ORDER BY created_at DESC', ['pending']);
+  return parseMultipleResults(result).map(parseProposal);
+}
+
+function createProposal(proposal) {
+  const now = formatShanghaiTime(new Date());
+  const id = proposal.id || uuidv4();
+  db.run(
+    `INSERT INTO governance_proposals (id, target_type, target_id, action, content, status, proposer, created_at)
+     VALUES (?, ?, ?, ?, ?, 'pending', ?, ?)`,
+    [id, proposal.target_type, proposal.target_id, proposal.action,
+     JSON.stringify(proposal.content), proposal.proposer, now]
+  );
+  save();
+  return getProposalById(id);
+}
+
+function reviewProposal(id, reviewedBy, approved) {
+  const now = formatShanghaiTime(new Date());
+  const status = approved ? 'approved' : 'rejected';
+  db.run(
+    'UPDATE governance_proposals SET status = ?, reviewed_by = ?, reviewed_at = ? WHERE id = ?',
+    [status, reviewedBy, now, id]
+  );
+  save();
+  return getProposalById(id);
+}
+
+// ===== 变更历史 =====
+
+function logGovernanceChange(change) {
+  const now = formatShanghaiTime(new Date());
+  db.run(
+    `INSERT INTO governance_changelog (entity_type, entity_id, action, old_value, new_value, changed_by, changed_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [change.entity_type, change.entity_id, change.action,
+     change.old_value ? JSON.stringify(change.old_value) : null,
+     change.new_value ? JSON.stringify(change.new_value) : null,
+     change.changed_by, now]
+  );
+  save();
+}
+
+function getGovernanceChangelog(entityType, entityId, limit = 50) {
+  const result = db.exec(
+    'SELECT * FROM governance_changelog WHERE entity_type = ? AND entity_id = ? ORDER BY changed_at DESC LIMIT ?',
+    [entityType, entityId, limit]
+  );
+  return parseMultipleResults(result).map(change => parseJsonFields(change, ['old_value', 'new_value']));
+}
+
+// ===== 初始化默认数据 =====
+
+function initDefaultGovernanceData() {
+  // 检查是否已有规则
+  const existingRules = db.exec('SELECT COUNT(*) FROM platform_rules');
+  if (existingRules[0].values[0][0] > 0) return;
+
+  // 添加初始规则集
+  const defaultRules = [
+    { id: 'mention_reply', summary: '被@点名必须回应', trigger: { mentioned: true }, must: { set: { reply_required: true } }, priority: 100 },
+    { id: 'fact_lock', summary: '有人声明在查，其他人不抢', trigger: { 'locks.fact_check': 'exists' }, must: { add_action: 'wait' }, priority: 90 },
+    { id: 'cooldown', summary: '回复冷却时间', trigger: { 'cooldown_active': true }, must: { add_action: 'delay' }, priority: 80 }
+  ];
+
+  for (const rule of defaultRules) {
+    createRule(rule);
+  }
+
+  // 添加初始技能集
+  const defaultSkills = [
+    { id: 'search', name: '搜索', category: 'information', description: '搜索相关信息' },
+    { id: 'summarize', name: '总结', category: 'information', description: '总结内容要点' },
+    { id: 'translate', name: '翻译', category: 'communication', description: '翻译内容' }
+  ];
+
+  for (const skill of defaultSkills) {
+    createSkill(skill);
+  }
+
+  console.log('[DB] 已初始化默认治理数据');
+}
+
 module.exports = {
   init,
   save,
@@ -1364,5 +1911,55 @@ module.exports = {
   updateJoinRequestLastSeen,
   cleanupJoinRequests,
   cleanupOrphanJoinRequests,
-  deleteAgent
+  deleteAgent,
+  // ===== 平台治理相关 =====
+  // 规则
+  getAllRules,
+  getRuleById,
+  getActiveRules,
+  createRule,
+  updateRule,
+  deleteRule,
+  // 技能
+  getAllSkills,
+  getSkillById,
+  getActiveSkills,
+  createSkill,
+  updateSkill,
+  deleteSkill,
+  // 能力包
+  getAllPacks,
+  getPackById,
+  getActivePacks,
+  createPack,
+  updatePack,
+  deletePack,
+  // Agent技能声明
+  getAgentSkillDeclaration,
+  setAgentSkillDeclaration,
+  // 规则审计日志
+  logRuleAudit,
+  getRuleAuditLogs,
+  getRuleAuditLogsByRule,
+  // 技能调用日志
+  logSkillCall,
+  getSkillCallLogs,
+  getSkillCallLogsBySkill,
+  // 场景状态
+  getActiveScene,
+  getActiveScenes,
+  createSceneState,
+  updateSceneState,
+  endScene,
+  // 治理提案
+  getAllProposals,
+  getProposalById,
+  getPendingProposals,
+  createProposal,
+  reviewProposal,
+  // 变更历史
+  logGovernanceChange,
+  getGovernanceChangelog,
+  // 初始化默认数据
+  initDefaultGovernanceData
 };

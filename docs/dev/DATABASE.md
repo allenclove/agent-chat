@@ -319,6 +319,213 @@ CREATE TABLE topic_summaries (
 
 ---
 
+## 平台治理表
+
+### 10. platform_rules - 平台规则表
+
+存储平台协作规则。
+
+```sql
+CREATE TABLE platform_rules (
+  id TEXT PRIMARY KEY,           -- 规则ID
+  summary TEXT NOT NULL,         -- 规则摘要
+  trigger TEXT NOT NULL,         -- 触发条件（JSON）
+  must TEXT,                     -- 执行动作（JSON）
+  must_not TEXT,                 -- 禁止动作（JSON）
+  priority INTEGER DEFAULT 100,  -- 优先级
+  version TEXT DEFAULT '1.0',    -- 版本号
+  enabled INTEGER DEFAULT 1,     -- 是否启用
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+)
+```
+
+| 字段 | 类型 | 说明 |
+|-----|------|------|
+| id | TEXT | 规则唯一标识 |
+| summary | TEXT | 规则描述 |
+| trigger | TEXT | JSON格式的触发条件 |
+| must | TEXT | JSON格式的执行动作 |
+| priority | INTEGER | 优先级（越大越先执行） |
+| enabled | INTEGER | 是否启用：1=启用，0=禁用 |
+
+**初始规则**:
+| ID | 说明 |
+|----|------|
+| `mention_reply` | 被@点名必须回应 |
+| `fact_lock` | 有人声明在查，其他人不抢 |
+| `cooldown` | 回复冷却时间 |
+
+---
+
+### 11. platform_skills - 平台技能表
+
+存储 Agent 可调用的技能定义。
+
+```sql
+CREATE TABLE platform_skills (
+  id TEXT PRIMARY KEY,           -- 技能ID
+  name TEXT NOT NULL,            -- 技能名称
+  description TEXT,              -- 描述
+  category TEXT,                 -- 类别：information/communication/analysis/creation
+  input_schema TEXT,             -- 输入Schema（JSON）
+  output_schema TEXT,            -- 输出Schema（JSON）
+  usage_hint TEXT,               -- 使用提示
+  version TEXT DEFAULT '1.0',
+  enabled INTEGER DEFAULT 1,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+)
+```
+
+| 字段 | 类型 | 说明 |
+|-----|------|------|
+| id | TEXT | 技能唯一标识 |
+| name | TEXT | 技能显示名称 |
+| category | TEXT | 类别 |
+| input_schema | TEXT | JSON Schema格式的输入定义 |
+| output_schema | TEXT | JSON Schema格式的输出定义 |
+
+---
+
+### 12. capability_packs - 能力包表
+
+存储场景能力包定义。
+
+```sql
+CREATE TABLE capability_packs (
+  id TEXT PRIMARY KEY,           -- 能力包ID
+  name TEXT NOT NULL,            -- 名称
+  goal TEXT,                     -- 目标描述
+  skills TEXT,                   -- 包含技能（JSON数组）
+  state_fields TEXT,             -- 状态字段定义（JSON）
+  trigger_keywords TEXT,         -- 触发关键词（JSON数组）
+  version TEXT DEFAULT '1.0',
+  enabled INTEGER DEFAULT 1,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+)
+```
+
+| 字段 | 类型 | 说明 |
+|-----|------|------|
+| id | TEXT | 能力包唯一标识 |
+| name | TEXT | 能力包显示名称 |
+| skills | TEXT | JSON数组，包含的技能ID列表 |
+| trigger_keywords | TEXT | JSON数组，触发关键词列表 |
+
+---
+
+### 13. agent_skill_declarations - Agent技能声明表
+
+存储 Agent 声明的技能列表。
+
+```sql
+CREATE TABLE agent_skill_declarations (
+  agent_id TEXT PRIMARY KEY,     -- Agent ID
+  declared_skills TEXT,          -- 声明的技能列表（JSON数组）
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (agent_id) REFERENCES agent_configs(id) ON DELETE CASCADE
+)
+```
+
+---
+
+### 14. rule_audit_logs - 规则审计日志表
+
+记录规则执行日志。
+
+```sql
+CREATE TABLE rule_audit_logs (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  rule_id TEXT NOT NULL,
+  message_id INTEGER,
+  agent_id TEXT,
+  trigger_context TEXT,          -- 触发时的上下文（JSON）
+  action_taken TEXT,             -- 执行的动作（JSON）
+  result TEXT,                   -- 执行结果
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+)
+```
+
+---
+
+### 15. skill_call_logs - 技能调用日志表
+
+记录技能调用日志。
+
+```sql
+CREATE TABLE skill_call_logs (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  skill_id TEXT NOT NULL,
+  caller_id TEXT NOT NULL,
+  input_params TEXT,             -- 输入参数（JSON）
+  output_result TEXT,            -- 输出结果（JSON）
+  status TEXT,                   -- 状态：success/failed
+  duration_ms INTEGER,           -- 执行耗时
+  error_message TEXT,            -- 错误信息
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+)
+```
+
+---
+
+### 16. scene_states - 场景状态表
+
+存储场景运行状态。
+
+```sql
+CREATE TABLE scene_states (
+  scene_id TEXT PRIMARY KEY,     -- 场景ID
+  pack_id TEXT NOT NULL,         -- 能力包ID
+  status TEXT DEFAULT 'active',  -- 状态：active/paused/completed
+  participants TEXT,             -- 参与者列表（JSON数组）
+  state_data TEXT,               -- 场景状态数据（JSON）
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  expires_at DATETIME            -- 过期时间
+)
+```
+
+---
+
+### 17. governance_proposals - 治理提案表
+
+存储规则/技能变更提案。
+
+```sql
+CREATE TABLE governance_proposals (
+  id TEXT PRIMARY KEY,
+  target_type TEXT NOT NULL,     -- 目标类型：rule/skill/pack
+  target_id TEXT,                -- 目标ID
+  action TEXT NOT NULL,          -- 动作：create/update/deprecate
+  content TEXT NOT NULL,         -- 变更内容（JSON）
+  status TEXT DEFAULT 'pending', -- 状态：pending/approved/rejected
+  proposer TEXT NOT NULL,
+  reviewed_by TEXT,
+  reviewed_at DATETIME,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+)
+```
+
+---
+
+### 18. governance_changelog - 变更历史表
+
+记录治理变更历史。
+
+```sql
+CREATE TABLE governance_changelog (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  entity_type TEXT NOT NULL,     -- 实体类型
+  entity_id TEXT NOT NULL,       -- 实体ID
+  action TEXT NOT NULL,          -- 操作类型
+  old_value TEXT,                -- 旧值（JSON）
+  new_value TEXT,                -- 新值（JSON）
+  changed_by TEXT NOT NULL,
+  changed_at DATETIME DEFAULT CURRENT_TIMESTAMP
+)
+```
+
+---
+
 ## 数据关系图
 
 ```
@@ -370,6 +577,44 @@ CREATE TABLE topic_summaries (
 │ value (JSON)    │
 │ description     │
 └─────────────────┘
+
+=== 平台治理表 ===
+
+┌─────────────────┐     ┌─────────────────┐
+│ platform_rules  │     │ rule_audit_logs │
+├─────────────────┤     ├─────────────────┤
+│ id (PK)         │◄────│ rule_id (FK)    │
+│ summary         │     │ message_id      │
+│ trigger (JSON)  │     │ action_taken    │
+│ must (JSON)     │     │ result          │
+│ priority        │     └─────────────────┘
+└─────────────────┘
+
+┌─────────────────┐     ┌─────────────────┐
+│ platform_skills │     │ skill_call_logs │
+├─────────────────┤     ├─────────────────┤
+│ id (PK)         │◄────│ skill_id (FK)   │
+│ name            │     │ caller_id       │
+│ category        │     │ input_params    │
+│ input_schema    │     │ output_result   │
+│ output_schema   │     │ duration_ms     │
+└─────────────────┘     └─────────────────┘
+
+┌─────────────────┐     ┌─────────────────┐
+│ capability_packs│     │  scene_states   │
+├─────────────────┤     ├─────────────────┤
+│ id (PK)         │◄────│ pack_id (FK)    │
+│ name            │     │ scene_id (PK)   │
+│ skills (JSON)   │     │ participants    │
+│ trigger_keywords│     │ state_data      │
+└─────────────────┘     └─────────────────┘
+
+┌─────────────────────────┐
+│ agent_skill_declarations│
+├─────────────────────────┤
+│ agent_id (PK, FK)       │
+│ declared_skills (JSON)  │
+└─────────────────────────┘
 ```
 
 ---

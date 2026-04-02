@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>平台技能管理 - Agent Chat</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+    }
+    .admin-card {
+      backdrop-filter: blur(10px);
+      background: rgba(255, 255, 255, 0.95);
+    }
+    .skill-enabled { background-color: #d1fae5; color: #065f46; }
+    .skill-disabled { background-color: #fee2e2; color: #991b1b; }
+    .category-information { background-color: #dbeafe; color: #1e40af; }
+    .category-communication { background-color: #fef3c7; color: #92400e; }
+    .category-analysis { background-color: #f3e8ff; color: #6b21a8; }
+    .category-creation { background-color: #d1fae5; color: #065f46; }
+  </style>
+</head>
+<body class="p-4 md:p-8">
+  <div class="admin-card rounded-2xl shadow-2xl p-6 md:p-8 w-full max-w-5xl mx-auto">
+    <!-- Header -->
+    <div class="flex items-center justify-between mb-6">
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-xl flex items-center justify-center">
+          <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+          </svg>
+        </div>
+        <div>
+          <h1 class="text-xl font-bold text-gray-800">平台技能管理</h1>
+          <p class="text-sm text-gray-500">管理 Agent 可调用的技能</p>
+        </div>
+      </div>
+      <div class="flex items-center space-x-3">
+        <a href="/admin/rules.html" class="text-purple-600 hover:text-purple-800 text-sm font-medium">规则管理</a>
+        <a href="/admin/packs.html" class="text-purple-600 hover:text-purple-800 text-sm font-medium">能力包</a>
+        <a href="/chat.html" class="text-purple-600 hover:text-purple-800 text-sm font-medium">返回聊天</a>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="grid grid-cols-3 gap-4 mb-6">
+      <div class="bg-purple-50 rounded-lg p-4">
+        <div class="text-2xl font-bold text-purple-600" id="totalSkills">0</div>
+        <div class="text-sm text-purple-700">总技能数</div>
+      </div>
+      <div class="bg-green-50 rounded-lg p-4">
+        <div class="text-2xl font-bold text-green-600" id="enabledSkills">0</div>
+        <div class="text-sm text-green-700">已启用</div>
+      </div>
+      <div class="bg-blue-50 rounded-lg p-4">
+        <div class="text-2xl font-bold text-blue-600" id="callCount">-</div>
+        <div class="text-sm text-blue-700">今日调用</div>
+      </div>
+    </div>
+
+    <!-- Actions -->
+    <div class="flex justify-between items-center mb-4">
+      <h2 class="text-lg font-semibold text-gray-800">技能列表</h2>
+      <div class="flex space-x-2">
+        <button id="showLogsBtn" class="border border-purple-600 text-purple-600 hover:bg-purple-50 px-4 py-2 rounded-lg text-sm font-medium transition">
+          查看调用日志
+        </button>
+        <button id="addSkillBtn" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition">
+          + 新增技能
+        </button>
+      </div>
+    </div>
+
+    <!-- Skills Grid -->
+    <div id="skillsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <!-- 动态填充 -->
+    </div>
+
+    <!-- Empty State -->
+    <div id="emptyState" class="hidden text-center py-12">
+      <div class="text-gray-400 text-5xl mb-4">⚡</div>
+      <p class="text-gray-500">暂无技能</p>
+    </div>
+
+    <!-- Skill Modal -->
+    <div id="skillModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div class="bg-white rounded-xl shadow-xl w-full max-w-lg">
+        <div class="p-6">
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="text-lg font-bold text-gray-800" id="modalTitle">新增技能</h2>
+            <button id="closeModal" class="text-gray-400 hover:text-gray-600">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+              </svg>
+            </button>
+          </div>
+
+          <form id="skillForm" class="space-y-4">
+            <input type="hidden" id="skillId">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">技能 ID</label>
+              <input type="text" id="skillIdInput" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" placeholder="例如: search" required>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">技能名称</label>
+              <input type="text" id="skillName" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" placeholder="例如: 搜索" required>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">类别</label>
+              <select id="skillCategory" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                <option value="information">信息处理</option>
+                <option value="communication">通信交流</option>
+                <option value="analysis">分析推理</option>
+                <option value="creation">内容创作</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">描述</label>
+              <textarea id="skillDescription" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" rows="2" placeholder="简要描述技能功能"></textarea>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">输入 Schema (JSON)</label>
+              <textarea id="skillInputSchema" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono" rows="3" placeholder='{"type": "object", "properties": {...}}'></textarea>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">输出 Schema (JSON)</label>
+              <textarea id="skillOutputSchema" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono" rows="3" placeholder='{"type": "object", "properties": {...}}'></textarea>
+            </div>
+            <div class="flex justify-end space-x-3 pt-4">
+              <button type="button" id="cancelBtn" class="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50">取消</button>
+              <button type="submit" class="px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700">保存</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- Logs Modal -->
+    <div id="logsModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div class="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[80vh] overflow-y-auto">
+        <div class="p-6">
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="text-lg font-bold text-gray-800">技能调用日志</h2>
+            <button id="closeLogsModal" class="text-gray-400 hover:text-gray-600">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+              </svg>
+            </button>
+          </div>
+          <div id="skillLogs" class="space-y-2">
+            <!-- 动态填充 -->
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const API_BASE = '/api/platform';
+    let skills = [];
+
+    // 加载技能
+    async function loadSkills() {
+      try {
+        const res = await fetch(`${API_BASE}/skills`);
+        const data = await res.json();
+        if (data.success) {
+          skills = data.skills;
+          renderSkills();
+          updateStats();
+        }
+      } catch (err) {
+        console.error('加载技能失败:', err);
+      }
+    }
+
+    // 渲染技能卡片
+    function renderSkills() {
+      const grid = document.getElementById('skillsGrid');
+      const emptyState = document.getElementById('emptyState');
+
+      if (skills.length === 0) {
+        grid.innerHTML = '';
+        emptyState.classList.remove('hidden');
+        return;
+      }
+
+      emptyState.classList.add('hidden');
+      grid.innerHTML = skills.map(skill => `
+        <div class="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition">
+          <div class="flex items-start justify-between mb-2">
+            <div>
+              <h3 class="font-semibold text-gray-800">${skill.name}</h3>
+              <span class="text-xs font-mono text-gray-500">${skill.id}</span>
+            </div>
+            <span class="category-${skill.category || 'information'} px-2 py-1 rounded text-xs font-medium">
+              ${getCategoryLabel(skill.category)}
+            </span>
+          </div>
+          <p class="text-sm text-gray-600 mb-3">${skill.description || '暂无描述'}</p>
+          <div class="flex items-center justify-between">
+            <span class="text-xs ${skill.enabled ? 'text-green-600' : 'text-red-600'}">
+              ${skill.enabled ? '● 已启用' : '○ 已禁用'}
+            </span>
+            <div class="flex space-x-2">
+              <button onclick="toggleSkill('${skill.id}', ${!skill.enabled})" class="text-xs text-purple-600 hover:text-purple-800">
+                ${skill.enabled ? '禁用' : '启用'}
+              </button>
+              <button onclick="editSkill('${skill.id}')" class="text-xs text-blue-600 hover:text-blue-800">编辑</button>
+              <button onclick="deleteSkill('${skill.id}')" class="text-xs text-red-600 hover:text-red-800">删除</button>
+            </div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function getCategoryLabel(category) {
+      const labels = {
+        information: '信息处理',
+        communication: '通信交流',
+        analysis: '分析推理',
+        creation: '内容创作'
+      };
+      return labels[category] || category;
+    }
+
+    // 更新统计
+    function updateStats() {
+      const total = skills.length;
+      const enabled = skills.filter(s => s.enabled !== false).length;
+
+      document.getElementById('totalSkills').textContent = total;
+      document.getElementById('enabledSkills').textContent = enabled;
+    }
+
+    // 打开新增模态框
+    document.getElementById('addSkillBtn').addEventListener('click', () => {
+      document.getElementById('modalTitle').textContent = '新增技能';
+      document.getElementById('skillForm').reset();
+      document.getElementById('skillId').value = '';
+      document.getElementById('skillIdInput').disabled = false;
+      document.getElementById('skillModal').classList.remove('hidden');
+    });
+
+    // 编辑技能
+    function editSkill(id) {
+      const skill = skills.find(s => s.id === id);
+      if (!skill) return;
+
+      document.getElementById('modalTitle').textContent = '编辑技能';
+      document.getElementById('skillId').value = skill.id;
+      document.getElementById('skillIdInput').value = skill.id;
+      document.getElementById('skillIdInput').disabled = true;
+      document.getElementById('skillName').value = skill.name;
+      document.getElementById('skillCategory').value = skill.category || 'information';
+      document.getElementById('skillDescription').value = skill.description || '';
+      document.getElementById('skillInputSchema').value = skill.input_schema ? JSON.stringify(skill.input_schema, null, 2) : '';
+      document.getElementById('skillOutputSchema').value = skill.output_schema ? JSON.stringify(skill.output_schema, null, 2) : '';
+      document.getElementById('skillModal').classList.remove('hidden');
+    }
+
+    // 切换技能状态
+    async function toggleSkill(id, enable) {
+      try {
+        const res = await fetch(`${API_BASE}/skills/${id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ enabled: enable })
+        });
+        const data = await res.json();
+        if (data.success) {
+          loadSkills();
+        }
+      } catch (err) {
+        console.error('更新技能失败:', err);
+      }
+    }
+
+    // 删除技能
+    async function deleteSkill(id) {
+      if (!confirm(`确定要删除技能 "${id}" 吗？`)) return;
+
+      try {
+        const res = await fetch(`${API_BASE}/skills/${id}`, { method: 'DELETE' });
+        const data = await res.json();
+        if (data.success) {
+          loadSkills();
+        }
+      } catch (err) {
+        console.error('删除技能失败:', err);
+      }
+    }
+
+    // 关闭模态框
+    document.getElementById('closeModal').addEventListener('click', () => {
+      document.getElementById('skillModal').classList.add('hidden');
+    });
+    document.getElementById('cancelBtn').addEventListener('click', () => {
+      document.getElementById('skillModal').classList.add('hidden');
+    });
+
+    // 提交表单
+    document.getElementById('skillForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const id = document.getElementById('skillId').value || document.getElementById('skillIdInput').value;
+      const isEdit = !!document.getElementById('skillId').value;
+
+      try {
+        const inputSchemaStr = document.getElementById('skillInputSchema').value.trim();
+        const outputSchemaStr = document.getElementById('skillOutputSchema').value.trim();
+
+        const payload = {
+          id,
+          name: document.getElementById('skillName').value,
+          category: document.getElementById('skillCategory').value,
+          description: document.getElementById('skillDescription').value,
+          input_schema: inputSchemaStr ? JSON.parse(inputSchemaStr) : null,
+          output_schema: outputSchemaStr ? JSON.parse(outputSchemaStr) : null
+        };
+
+        const url = `${API_BASE}/skills${isEdit ? '/' + id : ''}`;
+        const method = isEdit ? 'PUT' : 'POST';
+
+        const res = await fetch(url, {
+          method,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (data.success) {
+          document.getElementById('skillModal').classList.add('hidden');
+          loadSkills();
+        } else {
+          alert('保存失败: ' + data.error);
+        }
+      } catch (err) {
+        alert('JSON 格式错误: ' + err.message);
+      }
+    });
+
+    // 查看调用日志
+    document.getElementById('showLogsBtn').addEventListener('click', async () => {
+      try {
+        const res = await fetch(`${API_BASE}/skills/logs`);
+        const data = await res.json();
+        if (data.success) {
+          const container = document.getElementById('skillLogs');
+          if (data.logs.length === 0) {
+            container.innerHTML = '<p class="text-gray-500 text-center py-4">暂无调用日志</p>';
+          } else {
+            container.innerHTML = data.logs.slice(0, 20).map(log => `
+              <div class="bg-gray-50 rounded p-3 text-sm">
+                <div class="flex justify-between text-gray-600 mb-1">
+                  <span class="font-mono">${log.skill_id}</span>
+                  <span>${log.created_at}</span>
+                </div>
+                <div class="text-gray-800">
+                  状态: <span class="${log.status === 'success' ? 'text-green-600' : 'text-red-600'}">${log.status}</span>
+                  ${log.duration_ms ? ` | 耗时: ${log.duration_ms}ms` : ''}
+                </div>
+                ${log.error_message ? `<div class="text-red-500 mt-1">${log.error_message}</div>` : ''}
+              </div>
+            `).join('');
+          }
+          document.getElementById('logsModal').classList.remove('hidden');
+        }
+      } catch (err) {
+        console.error('加载日志失败:', err);
+      }
+    });
+
+    document.getElementById('closeLogsModal').addEventListener('click', () => {
+      document.getElementById('logsModal').classList.add('hidden');
+    });
+
+    // 初始化
+    loadSkills();
+  </script>
+</body>
+</html>

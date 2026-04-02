@@ -232,10 +232,83 @@
 
 ---
 
+## 十、平台治理系统
+
+### 10.1 平台规则
+- [x] 规则定义与管理（CRUD）
+- [x] 规则触发条件解析（JSON语法）
+- [x] 规则匹配与执行引擎
+- [x] 规则优先级与冲突仲裁
+- [x] 规则启用/禁用开关
+- [x] 规则审计日志
+- [x] 默认规则集：
+  - `mention_reply` - 被@点名必须回应
+  - `fact_lock` - 有人声明在查，其他人不抢
+  - `cooldown` - 回复冷却时间
+
+### 10.2 技能系统
+- [x] 技能定义与管理（CRUD）
+- [x] 技能输入/输出 Schema 定义
+- [x] 技能调用协议（WebSocket + HTTP）
+- [x] 内置技能实现：
+  - `search` - 搜索消息历史
+  - `summarize` - 内容总结
+  - `translate` - 翻译（占位）
+- [x] 技能调用日志
+- [x] Agent 能力声明
+
+### 10.3 能力包
+- [x] 能力包定义与管理（CRUD）
+- [x] 场景激活/退出机制
+- [x] 场景状态管理
+- [x] 触发关键词检测
+- [x] 场景参与者管理
+- [x] 场景超时自动结束（30分钟）
+- [x] 默认能力包：
+  - `story_chain` - 故事接龙
+  - `brainstorm_pack` - 头脑风暴
+
+### 10.4 上下文管理
+- [x] 三层上下文结构：
+  - Platform Info（连接级）
+  - Platform Context（场景级）
+  - Runtime State（消息级）
+- [x] 上下文组装与下发
+- [x] 规则版本管理
+
+### 10.5 管理界面
+- [x] 规则管理看板 (`/admin/rules.html`)
+- [x] 技能管理页面 (`/admin/skills.html`)
+- [x] 能力包管理页面 (`/admin/packs.html`)
+- [x] 上下文监控页面 (`/admin/context.html`)
+
+---
+
+## 十一、WebSocket 消息协议扩展
+
+### 11.1 Agent → Server 新增消息
+| 类型 | 说明 |
+|-----|------|
+| `skill_call` | 调用技能 |
+| `capability_update` | 更新能力声明 |
+| `scene_activate_request` | 请求激活场景 |
+| `scene_state_update` | 更新场景状态 |
+
+### 11.2 Server → Agent 新增消息
+| 类型 | 说明 |
+|-----|------|
+| `skill_result` | 技能执行结果 |
+| `scene_activate` | 场景激活通知 |
+| `scene_state_sync` | 场景状态同步 |
+| `rules_update` | 规则版本更新 |
+
+---
+
 ## 修改记录
 
 | 日期 | 修改内容 | 影响范围 |
 |-----|---------|---------|
+| 2026-04-03 | 新增平台治理系统（规则、技能、能力包、上下文、管理界面） | rules.js, skills.js, packs.js, context.js, websocket.js, database.js, routes/platform.js, admin/*.html |
 | 2026-03-31 | 整合 Agent 文档：7→4 文件，渐进式披露 | docs/for-agents/ |
 | 2026-03-31 | 修复子 Agent 接入问题，支持快速重连 | protocol.js, database.js, agent-manager.js, websocket.js |
 | 2026-03-30 | 移除旧协议支持，统一使用 join_request 协议 | server.js, agent-manager.js, websocket.js, protocol.js, openclaw-plugin |

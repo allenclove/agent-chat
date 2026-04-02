@@ -42,20 +42,26 @@
 
 ### 服务端模块
 
-#### 1. server.js - 入口文件
+#### 1. app.js - Express 应用入口
 
 **职责**:
-- 创建 HTTP 服务器
-- 静态文件服务
-- API 路由定义
-- WebSocket 服务器初始化
+- Express 应用配置
+- 路由注册
+- 中间件配置
 
-**关键代码位置**:
-- HTTP 服务器: `createServer()`
-- API 路由: `/api/*` 路径处理
-- 静态文件: `serveFile()` 函数
+#### 2. routes/ - 路由模块
 
-#### 2. database.js - 数据库操作层
+| 文件 | 职责 |
+|------|------|
+| `auth.js` | 用户认证（登录/登出） |
+| `admin.js` | 管理员 API |
+| `platform.js` | 平台 API（消息、话题、规则、技能、能力包） |
+| `settings.js` | 系统设置 |
+| `messages.js` | 消息管理 |
+| `topics.js` | 话题管理 |
+| `agents.js` | Agent 配置 |
+
+#### 3. database.js - 数据库操作层
 
 **职责**:
 - SQLite 数据库初始化
@@ -121,6 +127,10 @@ getLatestSummary(topicId)
 | `activation_ready` | Agent 激活就绪 |
 | `debug_join` | 调试面板连接 |
 | `pong` | 心跳响应 |
+| `skill_call` | Agent 调用技能 |
+| `capability_update` | Agent 更新能力声明 |
+| `scene_activate_request` | Agent 请求激活场景 |
+| `scene_state_update` | Agent 更新场景状态 |
 
 服务器 → 客户端:
 | 类型 | 说明 |
@@ -134,6 +144,11 @@ getLatestSummary(topicId)
 | `clear_history` | 清空历史通知 |
 | `topic_summary_ready` | 话题总结完成 |
 | `error` | 错误消息 |
+| `skill_result` | 技能执行结果 |
+| `scene_activate` | 场景激活通知 |
+| `scene_state_sync` | 场景状态同步 |
+| `rules_update` | 规则版本更新 |
+| `context_sync` | 上下文同步 |
 
 #### 4. agent-manager.js - Agent 连接管理
 
@@ -179,6 +194,93 @@ getLatestSummary(topicId)
 - 消息处理逻辑
 - Agent 回复策略
 - 命令解析
+
+#### 7. rules.js - 规则引擎
+
+**职责**:
+- 规则匹配与执行
+- 触发条件解析
+- 冲突仲裁
+- 状态变更
+
+**核心函数**:
+```javascript
+// 解析触发条件
+evaluateTrigger(trigger, context)
+
+// 处理规则
+processRules(message, runtimeContext)
+```
+
+**触发条件语法**:
+```json
+// 简单条件
+{"mentioned": true}
+
+// 比较操作
+{"message_count": {"gt": 5}}
+
+// 逻辑组合
+{"and": [{"mentioned": true}, {"sender_type": "human"}]}
+```
+
+#### 8. skills.js - 技能系统
+
+**职责**:
+- 技能定义管理
+- 技能调用执行
+- 输入验证
+- 调用日志记录
+
+**核心函数**:
+```javascript
+// 执行技能
+executeSkill(skillCall, callerAgent, context)
+
+// 验证输入
+validateInput(input, schema)
+```
+
+**内置技能**:
+| ID | 功能 |
+|----|------|
+| `search` | 搜索消息历史 |
+| `summarize` | 内容总结 |
+| `translate` | 翻译 |
+
+#### 9. packs.js - 能力包管理
+
+**职责**:
+- 能力包定义管理
+- 场景激活/退出
+- 场景状态管理
+- 触发关键词检测
+
+**核心函数**:
+```javascript
+// 激活场景
+activateScene(packId, participants)
+
+// 更新场景状态
+updateSceneState(sceneId, updates)
+
+// 检测触发关键词
+detectTrigger(content)
+```
+
+#### 10. context.js - 上下文组装
+
+**职责**:
+- 三层上下文组装
+- 上下文下发
+- 场景通知组装
+
+**三层上下文**:
+| 层次 | 生命周期 | 说明 |
+|------|---------|------|
+| Platform Info | 连接级 | 平台信息、能力列表 |
+| Platform Context | 场景级 | 当前场景、可用能力包 |
+| Runtime State | 消息级 | 实时状态、推荐动作 |
 
 ---
 
