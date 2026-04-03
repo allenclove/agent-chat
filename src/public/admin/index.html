@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>平台治理中心 - Agent Chat</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body {
+      background: #f3f4f6;
+      min-height: 100vh;
+    }
+    .sidebar-item.active {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+    .sidebar-item:not(.active):hover {
+      background: #e5e7eb;
+    }
+    .content-section { display: none; }
+    .content-section.active { display: block; }
+    .stat-card {
+      backdrop-filter: blur(10px);
+      background: rgba(255, 255, 255, 0.95);
+    }
+    .badge-enabled { background-color: #d1fae5; color: #065f46; }
+    .badge-disabled { background-color: #fee2e2; color: #991b1b; }
+    .badge-category-information { background-color: #dbeafe; color: #1e40af; }
+    .badge-category-communication { background-color: #fef3c7; color: #92400e; }
+    .badge-category-analysis { background-color: #f3e8ff; color: #6b21a8; }
+    .badge-status-active { background-color: #d1fae5; color: #065f46; }
+    .badge-status-completed { background-color: #f3f4f6; color: #4b5563; }
+    .modal-overlay {
+      background: rgba(0, 0, 0, 0.5);
+    }
+  </style>
+</head>
+<body class="flex">
+  <!-- 侧边栏 -->
+  <aside class="w-64 bg-white shadow-lg h-screen fixed left-0 top-0 flex flex-col">
+    <!-- Logo -->
+    <div class="p-4 border-b border-gray-200">
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-xl flex items-center justify-center">
+          <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+          </svg>
+        </div>
+        <div>
+          <h1 class="text-lg font-bold text-gray-800">治理中心</h1>
+          <p class="text-xs text-gray-500">Platform Governance</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- 导航菜单 -->
+    <nav class="flex-1 p-3 space-y-1">
+      <div class="sidebar-item active rounded-lg px-4 py-3 cursor-pointer flex items-center space-x-3 transition" data-section="overview">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path>
+        </svg>
+        <span class="font-medium">概览</span>
+      </div>
+
+      <div class="sidebar-item rounded-lg px-4 py-3 cursor-pointer flex items-center space-x-3 transition" data-section="rules">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+        </svg>
+        <span class="font-medium">规则管理</span>
+      </div>
+
+      <div class="sidebar-item rounded-lg px-4 py-3 cursor-pointer flex items-center space-x-3 transition" data-section="skills">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+        </svg>
+        <span class="font-medium">技能管理</span>
+      </div>
+
+      <div class="sidebar-item rounded-lg px-4 py-3 cursor-pointer flex items-center space-x-3 transition" data-section="packs">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
+        </svg>
+        <span class="font-medium">能力包</span>
+      </div>
+
+      <div class="sidebar-item rounded-lg px-4 py-3 cursor-pointer flex items-center space-x-3 transition" data-section="scenes">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+        </svg>
+        <span class="font-medium">场景监控</span>
+      </div>
+
+      <div class="sidebar-item rounded-lg px-4 py-3 cursor-pointer flex items-center space-x-3 transition" data-section="agents">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+        </svg>
+        <span class="font-medium">Agent管理</span>
+      </div>
+    </nav>
+
+    <!-- 底部链接 -->
+    <div class="p-4 border-t border-gray-200">
+      <a href="/chat.html" class="text-purple-600 hover:text-purple-800 text-sm flex items-center space-x-2">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
+        </svg>
+        <span>返回聊天</span>
+      </a>
+    </div>
+  </aside>
+
+  <!-- 主内容区 -->
+  <main class="ml-64 flex-1 p-6">
+    <!-- 概览 -->
+    <section id="overview" class="content-section active">
+      <div class="mb-6">
+        <h2 class="text-2xl font-bold text-gray-800">平台治理概览</h2>
+        <p class="text-gray-500 mt-1">实时监控平台规则、技能、场景状态</p>
+      </div>
+
+      <!-- 统计卡片 -->
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <div class="stat-card rounded-xl p-5 shadow-sm">
+          <div class="text-3xl font-bold text-purple-600" id="statRules">0</div>
+          <div class="text-sm text-gray-500 mt-1">规则总数</div>
+        </div>
+        <div class="stat-card rounded-xl p-5 shadow-sm">
+          <div class="text-3xl font-bold text-blue-600" id="statSkills">0</div>
+          <div class="text-sm text-gray-500 mt-1">技能总数</div>
+        </div>
+        <div class="stat-card rounded-xl p-5 shadow-sm">
+          <div class="text-3xl font-bold text-green-600" id="statPacks">0</div>
+          <div class="text-sm text-gray-500 mt-1">能力包</div>
+        </div>
+        <div class="stat-card rounded-xl p-5 shadow-sm">
+          <div class="text-3xl font-bold text-orange-600" id="statScenes">0</div>
+          <div class="text-sm text-gray-500 mt-1">活跃场景</div>
+        </div>
+      </div>
+
+      <!-- 快捷操作 -->
+      <div class="stat-card rounded-xl p-5 shadow-sm mb-6">
+        <h3 class="font-semibold text-gray-800 mb-4">快捷操作</h3>
+        <div class="flex flex-wrap gap-3">
+          <button onclick="switchSection('rules')" class="bg-purple-100 text-purple-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-purple-200 transition">
+            + 新增规则
+          </button>
+          <button onclick="switchSection('skills')" class="bg-blue-100 text-blue-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-200 transition">
+            + 新增技能
+          </button>
+          <button onclick="switchSection('packs')" class="bg-green-100 text-green-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-200 transition">
+            + 新增能力包
+          </button>
+          <button onclick="switchSection('scenes')" class="bg-orange-100 text-orange-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-orange-200 transition">
+            激活场景
+          </button>
+        </div>
+      </div>
+
+      <!-- 上下文 JSON -->
+      <div class="stat-card rounded-xl p-5 shadow-sm">
+        <h3 class="font-semibold text-gray-800 mb-4">平台上下文</h3>
+        <div class="bg-gray-900 rounded-lg p-4 overflow-auto max-h-64">
+          <pre id="contextJson" class="text-green-400 text-sm font-mono">{}</pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- 规则管理 -->
+    <section id="rules" class="content-section">
+      <div class="flex justify-between items-center mb-6">
+        <div>
+          <h2 class="text-2xl font-bold text-gray-800">规则管理</h2>
+          <p class="text-gray-500 mt-1">版本: <span id="rulesVersion">-</span></p>
+        </div>
+        <button onclick="openRuleModal()" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition">
+          + 新增规则
+        </button>
+      </div>
+
+      <!-- 规则统计 -->
+      <div class="grid grid-cols-3 gap-4 mb-6">
+        <div class="stat-card rounded-xl p-4 shadow-sm">
+          <div class="text-2xl font-bold text-purple-600" id="rulesTotal">0</div>
+          <div class="text-sm text-gray-500">总数</div>
+        </div>
+        <div class="stat-card rounded-xl p-4 shadow-sm">
+          <div class="text-2xl font-bold text-green-600" id="rulesEnabled">0</div>
+          <div class="text-sm text-gray-500">已启用</div>
+        </div>
+        <div class="stat-card rounded-xl p-4 shadow-sm">
+          <div class="text-2xl font-bold text-red-600" id="rulesDisabled">0</div>
+          <div class="text-sm text-gray-500">已禁用</div>
+        </div>
+      </div>
+
+      <!-- 规则表格 -->
+      <div class="stat-card rounded-xl shadow-sm overflow-hidden">
+        <table class="w-full">
+          <thead class="bg-gray-50">
+            <tr>
+              <th class="text-left py-3 px-4 text-sm font-medium text-gray-600">ID</th>
+              <th class="text-left py-3 px-4 text-sm font-medium text-gray-600">摘要</th>
+              <th class="text-left py-3 px-4 text-sm font-medium text-gray-600">优先级</th>
+              <th class="text-left py-3 px-4 text-sm font-medium text-gray-600">状态</th>
+              <th class="text-left py-3 px-4 text-sm font-medium text-gray-600">操作</th>
+            </tr>
+          </thead>
+          <tbody id="rulesTable"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 技能管理 -->
+    <section id="skills" class="content-section">
+      <div class="flex justify-between items-center mb-6">
+        <h2 class="text-2xl font-bold text-gray-800">技能管理</h2>
+        <button onclick="openSkillModal()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition">
+          + 新增技能
+        </button>
+      </div>
+
+      <div class="grid grid-cols-3 gap-4 mb-6">
+        <div class="stat-card rounded-xl p-4 shadow-sm">
+          <div class="text-2xl font-bold text-blue-600" id="skillsTotal">0</div>
+          <div class="text-sm text-gray-500">总数</div>
+        </div>
+        <div class="stat-card rounded-xl p-4 shadow-sm">
+          <div class="text-2xl font-bold text-green-600" id="skillsEnabled">0</div>
+          <div class="text-sm text-gray-500">已启用</div>
+        </div>
+        <div class="stat-card rounded-xl p-4 shadow-sm">
+          <div class="text-2xl font-bold text-orange-600" id="skillsCalls">-</div>
+          <div class="text-sm text-gray-500">今日调用</div>
+        </div>
+      </div>
+
+      <div id="skillsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+    </section>
+
+    <!-- 能力包 -->
+    <section id="packs" class="content-section">
+      <div class="flex justify-between items-center mb-6">
+        <h2 class="text-2xl font-bold text-gray-800">能力包管理</h2>
+        <button onclick="openPackModal()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition">
+          + 新增能力包
+        </button>
+      </div>
+
+      <div class="grid grid-cols-2 gap-4 mb-6">
+        <div class="stat-card rounded-xl p-4 shadow-sm">
+          <div class="text-2xl font-bold text-green-600" id="packsTotal">0</div>
+          <div class="text-sm text-gray-500">能力包</div>
+        </div>
+        <div class="stat-card rounded-xl p-4 shadow-sm">
+          <div class="text-2xl font-bold text-orange-600" id="packsActive">0</div>
+          <div class="text-sm text-gray-500">活跃场景</div>
+        </div>
+      </div>
+
+      <div id="packsGrid" class="grid grid-cols-1 lg:grid-cols-2 gap-4"></div>
+    </section>
+
+    <!-- 场景监控 -->
+    <section id="scenes" class="content-section">
+      <div class="flex justify-between items-center mb-6">
+        <h2 class="text-2xl font-bold text-gray-800">场景监控</h2>
+        <button onclick="refreshScenes()" class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium transition">
+          刷新
+        </button>
+      </div>
+
+      <!-- 激活场景 -->
+      <div class="stat-card rounded-xl p-5 shadow-sm mb-6">
+        <h3 class="font-semibold text-gray-800 mb-4">激活新场景</h3>
+        <div class="flex gap-3">
+          <select id="packSelect" class="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm">
+            <option value="">选择能力包...</option>
+          </select>
+          <input type="text" id="sceneParticipants" class="w-64 border border-gray-300 rounded-lg px-3 py-2 text-sm" placeholder="参与者ID (逗号分隔)">
+          <button onclick="activateScene()" class="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition">
+            激活
+          </button>
+        </div>
+      </div>
+
+      <div id="scenesList" class="space-y-3"></div>
+    </section>
+
+    <!-- Agent管理 -->
+    <section id="agents" class="content-section">
+      <div class="mb-6">
+        <h2 class="text-2xl font-bold text-gray-800">Agent 管理</h2>
+        <p class="text-gray-500 mt-1">管理 Agent 接入和状态</p>
+      </div>
+
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <div class="stat-card rounded-xl p-4 shadow-sm">
+          <div class="text-2xl font-bold text-yellow-600" id="agentsPending">0</div>
+          <div class="text-sm text-gray-500">待审核</div>
+        </div>
+        <div class="stat-card rounded-xl p-4 shadow-sm">
+          <div class="text-2xl font-bold text-green-600" id="agentsApproved">0</div>
+          <div class="text-sm text-gray-500">已批准</div>
+        </div>
+        <div class="stat-card rounded-xl p-4 shadow-sm">
+          <div class="text-2xl font-bold text-blue-600" id="agentsActive">0</div>
+          <div class="text-sm text-gray-500">已激活</div>
+        </div>
+        <div class="stat-card rounded-xl p-4 shadow-sm">
+          <div class="text-2xl font-bold text-red-600" id="agentsRejected">0</div>
+          <div class="text-sm text-gray-500">已拒绝</div>
+        </div>
+      </div>
+
+      <div class="stat-card rounded-xl p-5 shadow-sm">
+        <a href="/admin/agents.html" target="_blank" class="text-purple-600 hover:text-purple-800 font-medium">
+          打开 Agent 审核页面 →
+        </a>
+      </div>
+    </section>
+  </main>
+
+  <!-- 通用模态框 -->
+  <div id="modal" class="hidden fixed inset-0 modal-overlay flex items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-lg">
+      <div class="p-6">
+        <div class="flex items-center justify-between mb-4">
+          <h3 id="modalTitle" class="text-lg font-bold text-gray-800">标题</h3>
+          <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+          </button>
+        </div>
+        <div id="modalContent"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const API_BASE = '/api/platform';
+    let currentSection = 'overview';
+    let data = { rules: [], skills: [], packs: [], scenes: [], context: {} };
+
+    // 初始化
+    document.addEventListener('DOMContentLoaded', () => {
+      loadAllData();
+      setupNavigation();
+    });
+
+    // 导航切换
+    function setupNavigation() {
+      document.querySelectorAll('.sidebar-item').forEach(item => {
+        item.addEventListener('click', () => {
+          const section = item.dataset.section;
+          switchSection(section);
+        });
+      });
+    }
+
+    function switchSection(section) {
+      currentSection = section;
+      document.querySelectorAll('.sidebar-item').forEach(i => i.classList.remove('active'));
+      document.querySelector(`[data-section="${section}"]`)?.classList.add('active');
+      document.querySelectorAll('.content-section').forEach(s => s.classList.remove('active'));
+      document.getElementById(section)?.classList.add('active');
+    }
+
+    // 加载所有数据
+    async function loadAllData() {
+      try {
+        const [rulesRes, skillsRes, packsRes, scenesRes, contextRes] = await Promise.all([
+          fetch(`${API_BASE}/rules`),
+          fetch(`${API_BASE}/skills`),
+          fetch(`${API_BASE}/packs`),
+          fetch(`${API_BASE}/scenes`),
+          fetch(`${API_BASE}/context`)
+        ]);
+
+        const rulesData = await rulesRes.json();
+        const skillsData = await skillsRes.json();
+        const packsData = await packsRes.json();
+        const scenesData = await scenesRes.json();
+        const contextData = await contextRes.json();
+
+        if (rulesData.success) data.rules = rulesData.rules;
+        if (skillsData.success) data.skills = skillsData.skills;
+        if (packsData.success) data.packs = packsData.packs;
+        if (scenesData.success) data.scenes = scenesData.scenes;
+        if (contextData.success) data.context = contextData.context;
+
+        renderOverview();
+        renderRules();
+        renderSkills();
+        renderPacks();
+        renderScenes();
+        renderAgents();
+      } catch (err) {
+        console.error('加载数据失败:', err);
+      }
+    }
+
+    // 概览
+    function renderOverview() {
+      document.getElementById('statRules').textContent = data.rules.length;
+      document.getElementById('statSkills').textContent = data.skills.length;
+      document.getElementById('statPacks').textContent = data.packs.length;
+      document.getElementById('statScenes').textContent = data.scenes.length;
+      document.getElementById('contextJson').textContent = JSON.stringify(data.context, null, 2);
+    }
+
+    // 规则
+    function renderRules() {
+      document.getElementById('rulesVersion').textContent = data.context.rules_version || '-';
+      document.getElementById('rulesTotal').textContent = data.rules.length;
+      document.getElementById('rulesEnabled').textContent = data.rules.filter(r => r.enabled).length;
+      document.getElementById('rulesDisabled').textContent = data.rules.filter(r => !r.enabled).length;
+
+      document.getElementById('rulesTable').innerHTML = data.rules.map(r => `
+        <tr class="border-b border-gray-100 hover:bg-gray-50">
+          <td class="py-3 px-4 text-sm font-mono">${r.id}</td>
+          <td class="py-3 px-4 text-sm">${r.summary}</td>
+          <td class="py-3 px-4 text-sm">${r.priority}</td>
+          <td class="py-3 px-4"><span class="px-2 py-1 rounded text-xs font-medium ${r.enabled ? 'badge-enabled' : 'badge-disabled'}">${r.enabled ? '启用' : '禁用'}</span></td>
+          <td class="py-3 px-4">
+            <button onclick="toggleRule('${r.id}', ${!r.enabled})" class="text-xs text-purple-600 hover:text-purple-800 mr-2">${r.enabled ? '禁用' : '启用'}</button>
+            <button onclick="deleteRule('${r.id}')" class="text-xs text-red-600 hover:text-red-800">删除</button>
+          </td>
+        </tr>
+      `).join('') || '<tr><td colspan="5" class="py-8 text-center text-gray-500">暂无规则</td></tr>';
+    }
+
+    async function toggleRule(id, enable) {
+      await fetch(`${API_BASE}/rules/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled: enable }) });
+      loadAllData();
+    }
+
+    async function deleteRule(id) {
+      if (!confirm('确定删除？')) return;
+      await fetch(`${API_BASE}/rules/${id}`, { method: 'DELETE' });
+      loadAllData();
+    }
+
+    function openRuleModal() {
+      document.getElementById('modalTitle').textContent = '新增规则';
+      document.getElementById('modalContent').innerHTML = `
+        <form id="ruleForm" class="space-y-4">
+          <div><label class="block text-sm font-medium mb-1">ID</label><input type="text" id="ruleId" class="w-full border rounded-lg px-3 py-2 text-sm" required></div>
+          <div><label class="block text-sm font-medium mb-1">摘要</label><input type="text" id="ruleSummary" class="w-full border rounded-lg px-3 py-2 text-sm" required></div>
+          <div><label class="block text-sm font-medium mb-1">触发条件 (JSON)</label><textarea id="ruleTrigger" class="w-full border rounded-lg px-3 py-2 text-sm font-mono" rows="2" required>{"mentioned": true}</textarea></div>
+          <div><label class="block text-sm font-medium mb-1">执行动作 (JSON)</label><textarea id="ruleMust" class="w-full border rounded-lg px-3 py-2 text-sm font-mono" rows="2">{"set": {"reply_required": true}}</textarea></div>
+          <div><label class="block text-sm font-medium mb-1">优先级</label><input type="number" id="rulePriority" class="w-full border rounded-lg px-3 py-2 text-sm" value="100"></div>
+          <div class="flex justify-end gap-2 pt-2">
+            <button type="button" onclick="closeModal()" class="px-4 py-2 border rounded-lg text-sm">取消</button>
+            <button type="submit" class="px-4 py-2 bg-purple-600 text-white rounded-lg text-sm">保存</button>
+          </div>
+        </form>
+      `;
+      document.getElementById('ruleForm').onsubmit = async (e) => {
+        e.preventDefault();
+        try {
+          const payload = {
+            id: document.getElementById('ruleId').value,
+            summary: document.getElementById('ruleSummary').value,
+            trigger: JSON.parse(document.getElementById('ruleTrigger').value),
+            must: document.getElementById('ruleMust').value ? JSON.parse(document.getElementById('ruleMust').value) : null,
+            priority: parseInt(document.getElementById('rulePriority').value) || 100
+          };
+          await fetch(`${API_BASE}/rules`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+          closeModal();
+          loadAllData();
+        } catch (err) { alert('JSON 格式错误: ' + err.message); }
+      };
+      document.getElementById('modal').classList.remove('hidden');
+    }
+
+    // 技能
+    function renderSkills() {
+      document.getElementById('skillsTotal').textContent = data.skills.length;
+      document.getElementById('skillsEnabled').textContent = data.skills.filter(s => s.enabled !== false).length;
+
+      document.getElementById('skillsGrid').innerHTML = data.skills.map(s => `
+        <div class="stat-card rounded-xl p-4 shadow-sm">
+          <div class="flex justify-between items-start mb-2">
+            <div>
+              <h4 class="font-semibold">${s.name}</h4>
+              <span class="text-xs text-gray-500 font-mono">${s.id}</span>
+            </div>
+            <span class="badge-category-${s.category || 'information'} px-2 py-1 rounded text-xs">${s.category || 'information'}</span>
+          </div>
+          <p class="text-sm text-gray-600 mb-3">${s.description || '暂无描述'}</p>
+          <div class="flex justify-end gap-2">
+            <button onclick="toggleSkill('${s.id}', ${!s.enabled})" class="text-xs text-purple-600 hover:text-purple-800">${s.enabled !== false ? '禁用' : '启用'}</button>
+            <button onclick="deleteSkill('${s.id}')" class="text-xs text-red-600 hover:text-red-800">删除</button>
+          </div>
+        </div>
+      `).join('') || '<div class="col-span-3 text-center py-8 text-gray-500">暂无技能</div>';
+    }
+
+    async function toggleSkill(id, enable) {
+      await fetch(`${API_BASE}/skills/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled: enable }) });
+      loadAllData();
+    }
+
+    async function deleteSkill(id) {
+      if (!confirm('确定删除？')) return;
+      await fetch(`${API_BASE}/skills/${id}`, { method: 'DELETE' });
+      loadAllData();
+    }
+
+    function openSkillModal() {
+      document.getElementById('modalTitle').textContent = '新增技能';
+      document.getElementById('modalContent').innerHTML = `
+        <form id="skillForm" class="space-y-4">
+          <div><label class="block text-sm font-medium mb-1">ID</label><input type="text" id="skillId" class="w-full border rounded-lg px-3 py-2 text-sm" required></div>
+          <div><label class="block text-sm font-medium mb-1">名称</label><input type="text" id="skillName" class="w-full border rounded-lg px-3 py-2 text-sm" required></div>
+          <div><label class="block text-sm font-medium mb-1">类别</label>
+            <select id="skillCategory" class="w-full border rounded-lg px-3 py-2 text-sm">
+              <option value="information">信息处理</option>
+              <option value="communication">通信交流</option>
+              <option value="analysis">分析推理</option>
+            </select>
+          </div>
+          <div><label class="block text-sm font-medium mb-1">描述</label><textarea id="skillDesc" class="w-full border rounded-lg px-3 py-2 text-sm" rows="2"></textarea></div>
+          <div class="flex justify-end gap-2 pt-2">
+            <button type="button" onclick="closeModal()" class="px-4 py-2 border rounded-lg text-sm">取消</button>
+            <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm">保存</button>
+          </div>
+        </form>
+      `;
+      document.getElementById('skillForm').onsubmit = async (e) => {
+        e.preventDefault();
+        const payload = {
+          id: document.getElementById('skillId').value,
+          name: document.getElementById('skillName').value,
+          category: document.getElementById('skillCategory').value,
+          description: document.getElementById('skillDesc').value
+        };
+        await fetch(`${API_BASE}/skills`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+        closeModal();
+        loadAllData();
+      };
+      document.getElementById('modal').classList.remove('hidden');
+    }
+
+    // 能力包
+    function renderPacks() {
+      document.getElementById('packsTotal').textContent = data.packs.length;
+      document.getElementById('packsActive').textContent = data.scenes.length;
+
+      document.getElementById('packSelect').innerHTML = '<option value="">选择能力包...</option>' +
+        data.packs.filter(p => p.enabled).map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+
+      document.getElementById('packsGrid').innerHTML = data.packs.map(p => `
+        <div class="stat-card rounded-xl p-4 shadow-sm">
+          <div class="flex justify-between items-start mb-2">
+            <h4 class="font-semibold">${p.name}</h4>
+            <span class="${p.enabled ? 'badge-enabled' : 'badge-disabled'} px-2 py-1 rounded text-xs">${p.enabled ? '启用' : '禁用'}</span>
+          </div>
+          <p class="text-sm text-gray-600 mb-2">${p.goal || '暂无目标'}</p>
+          <div class="mb-2 text-xs">${(p.skills || []).map(s => `<span class="bg-purple-100 text-purple-700 px-2 py-0.5 rounded mr-1">${s}</span>`).join('')}</div>
+          <div class="flex justify-end gap-2">
+            <button onclick="togglePack('${p.id}', ${!p.enabled})" class="text-xs text-purple-600 hover:text-purple-800">${p.enabled ? '禁用' : '启用'}</button>
+            <button onclick="deletePack('${p.id}')" class="text-xs text-red-600 hover:text-red-800">删除</button>
+          </div>
+        </div>
+      `).join('') || '<div class="col-span-2 text-center py-8 text-gray-500">暂无能力包</div>';
+    }
+
+    async function togglePack(id, enable) {
+      await fetch(`${API_BASE}/packs/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled: enable }) });
+      loadAllData();
+    }
+
+    async function deletePack(id) {
+      if (!confirm('确定删除？')) return;
+      await fetch(`${API_BASE}/packs/${id}`, { method: 'DELETE' });
+      loadAllData();
+    }
+
+    function openPackModal() {
+      document.getElementById('modalTitle').textContent = '新增能力包';
+      document.getElementById('modalContent').innerHTML = `
+        <form id="packForm" class="space-y-4">
+          <div><label class="block text-sm font-medium mb-1">ID</label><input type="text" id="packId" class="w-full border rounded-lg px-3 py-2 text-sm" required></div>
+          <div><label class="block text-sm font-medium mb-1">名称</label><input type="text" id="packName" class="w-full border rounded-lg px-3 py-2 text-sm" required></div>
+          <div><label class="block text-sm font-medium mb-1">目标</label><textarea id="packGoal" class="w-full border rounded-lg px-3 py-2 text-sm" rows="2"></textarea></div>
+          <div><label class="block text-sm font-medium mb-1">技能 (JSON数组)</label><input type="text" id="packSkills" class="w-full border rounded-lg px-3 py-2 text-sm font-mono" placeholder='["skill1", "skill2"]'></div>
+          <div><label class="block text-sm font-medium mb-1">触发词 (JSON数组)</label><input type="text" id="packKeywords" class="w-full border rounded-lg px-3 py-2 text-sm font-mono" placeholder='["关键词1", "关键词2"]'></div>
+          <div class="flex justify-end gap-2 pt-2">
+            <button type="button" onclick="closeModal()" class="px-4 py-2 border rounded-lg text-sm">取消</button>
+            <button type="submit" class="px-4 py-2 bg-green-600 text-white rounded-lg text-sm">保存</button>
+          </div>
+        </form>
+      `;
+      document.getElementById('packForm').onsubmit = async (e) => {
+        e.preventDefault();
+        try {
+          const payload = {
+            id: document.getElementById('packId').value,
+            name: document.getElementById('packName').value,
+            goal: document.getElementById('packGoal').value,
+            skills: document.getElementById('packSkills').value ? JSON.parse(document.getElementById('packSkills').value) : [],
+            trigger_keywords: document.getElementById('packKeywords').value ? JSON.parse(document.getElementById('packKeywords').value) : []
+          };
+          await fetch(`${API_BASE}/packs`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+          closeModal();
+          loadAllData();
+        } catch (err) { alert('JSON 格式错误: ' + err.message); }
+      };
+      document.getElementById('modal').classList.remove('hidden');
+    }
+
+    // 场景
+    function renderScenes() {
+      document.getElementById('scenesList').innerHTML = data.scenes.length ? data.scenes.map(s => `
+        <div class="stat-card rounded-xl p-4 shadow-sm">
+          <div class="flex justify-between">
+            <div>
+              <h4 class="font-semibold">${s.pack_name}</h4>
+              <div class="text-sm text-gray-500">场景: ${s.scene_id} | 参与者: ${(s.participants || []).join(', ') || '无'}</div>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="badge-status-${s.status} px-2 py-1 rounded text-xs">${s.status}</span>
+              <button onclick="endScene('${s.scene_id}')" class="text-xs text-red-600 hover:text-red-800">结束</button>
+            </div>
+          </div>
+        </div>
+      `).join('') : '<div class="text-center py-8 text-gray-500">暂无活跃场景</div>';
+    }
+
+    async function activateScene() {
+      const packId = document.getElementById('packSelect').value;
+      const participants = document.getElementById('sceneParticipants').value.split(',').map(s => s.trim()).filter(Boolean);
+      if (!packId) return alert('请选择能力包');
+      await fetch(`${API_BASE}/scenes/activate`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pack_id: packId, participants }) });
+      document.getElementById('sceneParticipants').value = '';
+      loadAllData();
+    }
+
+    async function endScene(sceneId) {
+      if (!confirm('确定结束场景？')) return;
+      await fetch(`${API_BASE}/scenes/${sceneId}/end`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) });
+      loadAllData();
+    }
+
+    function refreshScenes() { loadAllData(); }
+
+    // Agent
+    async function renderAgents() {
+      try {
+        const res = await fetch('/api/admin/join-requests/stats');
+        const d = await res.json();
+        if (d.success) {
+          document.getElementById('agentsPending').textContent = d.stats.pending || 0;
+          document.getElementById('agentsApproved').textContent = d.stats.approved || 0;
+          document.getElementById('agentsActive').textContent = d.stats.active || 0;
+          document.getElementById('agentsRejected').textContent = d.stats.rejected || 0;
+        }
+      } catch (err) {}
+    }
+
+    function closeModal() {
+      document.getElementById('modal').classList.add('hidden');
+    }
+  </script>
+</body>
+</html>
