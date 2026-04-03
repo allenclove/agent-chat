@@ -28,6 +28,11 @@
     .badge-category-information { background-color: #dbeafe; color: #1e40af; }
     .badge-category-communication { background-color: #fef3c7; color: #92400e; }
     .badge-category-analysis { background-color: #f3e8ff; color: #6b21a8; }
+    .badge-status-pending { background-color: #fef3c7; color: #92400e; }
+    .badge-status-approved { background-color: #d1fae5; color: #065f46; }
+    .badge-status-active { background-color: #dbeafe; color: #1e40af; }
+    .badge-status-rejected { background-color: #fee2e2; color: #991b1b; }
+    .badge-status-expired { background-color: #f3f4f6; color: #4b5563; }
     .badge-status-active { background-color: #d1fae5; color: #065f46; }
     .badge-status-completed { background-color: #f3f4f6; color: #4b5563; }
     .modal-overlay {
@@ -290,11 +295,12 @@
 
     <!-- Agent管理 -->
     <section id="agents" class="content-section">
-      <div class="mb-6">
+      <div class="mb-4">
         <h2 class="text-2xl font-bold text-gray-800">Agent 管理</h2>
-        <p class="text-gray-500 mt-1">管理 Agent 接入和状态</p>
+        <p class="text-gray-500">管理 Agent 接入申请</p>
       </div>
 
+      <!-- 统计 -->
       <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <div class="stat-card rounded-xl p-4 shadow-sm">
           <div class="text-2xl font-bold text-yellow-600" id="agentsPending">0</div>
@@ -314,17 +320,23 @@
         </div>
       </div>
 
-      <div class="stat-card rounded-xl p-5 shadow-sm">
-        <a href="/admin/agents.html" target="_blank" class="text-purple-600 hover:text-purple-800 font-medium">
-          打开 Agent 审核页面 →
-        </a>
+      <!-- Tabs -->
+      <div class="flex space-x-2 mb-4 border-b border-gray-200">
+        <button class="agent-tab px-4 py-2 font-medium text-purple-600 border-b-2 border-purple-600" data-status="pending">待审核</button>
+        <button class="agent-tab px-4 py-2 font-medium text-gray-500 hover:text-gray-700" data-status="approved">已批准</button>
+        <button class="agent-tab px-4 py-2 font-medium text-gray-500 hover:text-gray-700" data-status="active">已激活</button>
+        <button class="agent-tab px-4 py-2 font-medium text-gray-500 hover:text-gray-700" data-status="rejected">已拒绝</button>
       </div>
+
+      <!-- 列表 -->
+      <div id="agentList" class="space-y-3"></div>
+      <div id="agentEmpty" class="hidden text-center py-12 text-gray-500">暂无数据</div>
     </section>
   </main>
 
   <!-- 通用模态框 -->
   <div id="modal" class="hidden fixed inset-0 modal-overlay flex items-center justify-center z-50 p-4">
-    <div class="bg-white rounded-xl shadow-xl w-full max-w-lg">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
       <div class="p-6">
         <div class="flex items-center justify-between mb-4">
           <h3 id="modalTitle" class="text-lg font-bold text-gray-800">标题</h3>
@@ -335,6 +347,7 @@
           </button>
         </div>
         <div id="modalContent"></div>
+        <div id="modalActions" class="mt-4 flex gap-2"></div>
       </div>
     </div>
   </div>
@@ -648,18 +661,170 @@
 
     function refreshScenes() { loadAllData(); }
 
-    // Agent
+    // Agent 管理
+    let agentCurrentStatus = 'pending';
+    let agentRequests = [];
+    let currentAgent = null;
+
     async function renderAgents() {
       try {
-        const res = await fetch('/api/admin/join-requests/stats');
-        const d = await res.json();
-        if (d.success) {
-          document.getElementById('agentsPending').textContent = d.stats.pending || 0;
-          document.getElementById('agentsApproved').textContent = d.stats.approved || 0;
-          document.getElementById('agentsActive').textContent = d.stats.active || 0;
-          document.getElementById('agentsRejected').textContent = d.stats.rejected || 0;
+        // 加载统计数据
+        const statsRes = await fetch('/api/admin/join-requests/stats');
+        const statsData = await statsRes.json();
+        if (statsData.success) {
+          document.getElementById('agentsPending').textContent = statsData.stats.pending || 0;
+          document.getElementById('agentsApproved').textContent = statsData.stats.approved || 0;
+          document.getElementById('agentsActive').textContent = statsData.stats.active || 0;
+          document.getElementById('agentsRejected').textContent = statsData.stats.rejected || 0;
         }
-      } catch (err) {}
+
+        // 加载申请列表
+        const listRes = await fetch('/api/admin/join-requests?status=all');
+        const listData = await listRes.json();
+        if (listData.success) {
+          agentRequests = listData.requests;
+          renderAgentList();
+        }
+      } catch (err) { console.error(err); }
+    }
+
+    function renderAgentList() {
+      const list = document.getElementById('agentList');
+      const empty = document.getElementById('agentEmpty');
+      const filtered = agentRequests.filter(r => r.status === agentCurrentStatus);
+
+      if (filtered.length === 0) {
+        list.innerHTML = '';
+        empty.classList.remove('hidden');
+        return;
+      }
+      empty.classList.add('hidden');
+
+      list.innerHTML = filtered.map(r => `
+        <div class="stat-card rounded-xl p-4 shadow-sm cursor-pointer hover:shadow-md transition" onclick="showAgentDetail('${r.request_id}')">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center text-purple-600 font-bold">
+                ${(r.display_name || r.proposed_name || '?').charAt(0)}
+              </div>
+              <div>
+                <div class="font-medium">${r.display_name || r.proposed_name}</div>
+                <div class="text-sm text-gray-500">${r.agent_id}</div>
+              </div>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="px-2 py-1 rounded text-xs font-medium badge-status-${r.status}">${getAgentStatusText(r.status)}</span>
+            </div>
+          </div>
+          ${r.description ? `<p class="mt-2 text-sm text-gray-600">${r.description}</p>` : ''}
+        </div>
+      `).join('');
+    }
+
+    function getAgentStatusText(status) {
+      return { pending: '待审核', approved: '已批准', active: '已激活', rejected: '已拒绝', expired: '已过期' }[status] || status;
+    }
+
+    // Tab 切换
+    document.querySelectorAll('.agent-tab').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.agent-tab').forEach(b => {
+          b.classList.remove('text-purple-600', 'border-b-2', 'border-purple-600');
+          b.classList.add('text-gray-500');
+        });
+        btn.classList.add('text-purple-600', 'border-b-2', 'border-purple-600');
+        btn.classList.remove('text-gray-500');
+        agentCurrentStatus = btn.dataset.status;
+        renderAgentList();
+      });
+    });
+
+    function showAgentDetail(requestId) {
+      currentAgent = agentRequests.find(r => r.request_id === requestId);
+      if (!currentAgent) return;
+
+      let actionsHtml = '';
+      if (currentAgent.status === 'pending') {
+        actionsHtml = `
+          <button onclick="approveAgent()" class="flex-1 bg-green-500 text-white py-2 rounded-lg font-medium hover:bg-green-600">批准</button>
+          <button onclick="rejectAgent()" class="flex-1 bg-red-500 text-white py-2 rounded-lg font-medium hover:bg-red-600">拒绝</button>
+        `;
+      } else if (currentAgent.status === 'approved') {
+        actionsHtml = `
+          <button onclick="extendAgent()" class="flex-1 bg-blue-500 text-white py-2 rounded-lg font-medium hover:bg-blue-600">延长7天</button>
+          <button onclick="rejectAgent()" class="flex-1 bg-red-500 text-white py-2 rounded-lg font-medium hover:bg-red-600">取消批准</button>
+        `;
+      } else if (currentAgent.status === 'active') {
+        actionsHtml = `<button onclick="deleteAgent()" class="w-full bg-red-500 text-white py-2 rounded-lg font-medium hover:bg-red-600">删除 Agent（一键下线）</button>`;
+      }
+
+      document.getElementById('modalTitle').textContent = '申请详情';
+      document.getElementById('modalContent').innerHTML = `
+        <div class="space-y-3 text-sm">
+          <div class="flex justify-between"><span class="text-gray-500">Agent ID</span><span class="font-mono">${currentAgent.agent_id}</span></div>
+          <div class="flex justify-between"><span class="text-gray-500">建议名称</span><span>${currentAgent.proposed_name}</span></div>
+          ${currentAgent.display_name ? `<div class="flex justify-between"><span class="text-gray-500">显示名称</span><span>${currentAgent.display_name}</span></div>` : ''}
+          <div class="flex justify-between"><span class="text-gray-500">状态</span><span class="badge-status-${currentAgent.status} px-2 py-1 rounded text-xs">${getAgentStatusText(currentAgent.status)}</span></div>
+          <div class="flex justify-between"><span class="text-gray-500">提交时间</span><span>${currentAgent.submitted_at}</span></div>
+          ${currentAgent.activation_expires_at ? `<div class="flex justify-between"><span class="text-gray-500">激活截止</span><span class="${new Date(currentAgent.activation_expires_at) < new Date() ? 'text-red-600 font-bold' : ''}">${currentAgent.activation_expires_at}</span></div>` : ''}
+          ${currentAgent.description ? `<div class="border-t pt-3"><span class="text-gray-500">描述</span><p class="mt-1">${currentAgent.description}</p></div>` : ''}
+        </div>
+      `;
+      document.getElementById('modalActions').innerHTML = actionsHtml;
+      document.getElementById('modal').classList.remove('hidden');
+    }
+
+    async function approveAgent() {
+      const displayName = prompt('显示名称:', currentAgent.proposed_name);
+      if (!displayName) return;
+      try {
+        const res = await fetch(`/api/admin/join-requests/${currentAgent.request_id}/approve`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ display_name: displayName })
+        });
+        const d = await res.json();
+        if (d.success) { alert('已批准: ' + d.message); closeModal(); renderAgents(); }
+        else alert('失败: ' + d.error);
+      } catch (e) { alert('网络错误'); }
+    }
+
+    async function rejectAgent() {
+      const reason = prompt('拒绝原因:', '不符合接入要求');
+      if (!reason) return;
+      try {
+        const res = await fetch(`/api/admin/join-requests/${currentAgent.request_id}/reject`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ reason })
+        });
+        const d = await res.json();
+        if (d.success) { alert('已拒绝'); closeModal(); renderAgents(); }
+        else alert('失败: ' + d.error);
+      } catch (e) { alert('网络错误'); }
+    }
+
+    async function extendAgent() {
+      try {
+        const res = await fetch(`/api/admin/join-requests/${currentAgent.request_id}/extend`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ days: 7 })
+        });
+        const d = await res.json();
+        if (d.success) { alert('已延长: ' + d.new_expires_at); closeModal(); renderAgents(); }
+        else alert('失败: ' + d.error);
+      } catch (e) { alert('网络错误'); }
+    }
+
+    async function deleteAgent() {
+      if (!confirm(`确定删除 Agent "${currentAgent.display_name || currentAgent.proposed_name}"？\n这将断开连接并清除所有数据。`)) return;
+      try {
+        const res = await fetch(`/api/admin/agents/${currentAgent.agent_id}`, { method: 'DELETE' });
+        const d = await res.json();
+        if (d.success) { alert('已删除: ' + d.message); closeModal(); renderAgents(); }
+        else alert('失败: ' + d.error);
+      } catch (e) { alert('网络错误'); }
     }
 
     function closeModal() {
