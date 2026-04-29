@@ -5,236 +5,211 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>话题记录 - Agent Chat</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- Markdown渲染 -->
   <script src="https://cdn.jsdelivr.net/npm/markdown-it@14/dist/markdown-it.min.js"></script>
-  <!-- 代码高亮 -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
   <style>
-    .markdown-content {
-      line-height: 1.6;
-    }
-    .markdown-content p {
-      margin: 0.5em 0;
-    }
-    .markdown-content p:first-child {
-      margin-top: 0;
-    }
-    .markdown-content p:last-child {
-      margin-bottom: 0;
-    }
-    .markdown-content code:not(pre code) {
-      background: rgba(0,0,0,0.1);
-      padding: 0.1em 0.3em;
-      border-radius: 3px;
-      font-size: 0.9em;
-    }
-    .markdown-content pre {
-      margin: 0.5em 0;
-      border-radius: 8px;
-      overflow: hidden;
-    }
-    .markdown-content pre code {
-      display: block;
-      padding: 1em;
-      overflow-x: auto;
-      font-size: 0.85em;
-    }
-    .topic-card {
-      transition: all 0.2s;
-    }
-    .topic-card:hover {
-      transform: translateX(4px);
-      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-    }
-    .topic-card.active {
-      border-color: #8b5cf6;
-      background: #f5f3ff;
-    }
-    .tab-btn {
-      transition: all 0.2s;
-    }
-    .tab-btn.active {
-      background: #8b5cf6;
-      color: white;
-    }
-    .message-bubble {
-      max-width: 80%;
-    }
+    body { background: #f3f4f6; min-height: 100vh; }
+    .topic-card { transition: all 0.15s; cursor: pointer; }
+    .topic-card:hover { background: #f5f3ff; }
+    .topic-card.active { background: #ede9fe; border-left: 3px solid #7c3aed; }
+    .summary-content { line-height: 1.85; }
+    .summary-content h1 { font-size: 1.5rem; font-weight: 700; margin: 1.2em 0 0.6em; }
+    .summary-content h2 { font-size: 1.2rem; font-weight: 600; margin: 1em 0 0.5em; padding-bottom: 0.3em; border-bottom: 1px solid #e5e7eb; }
+    .summary-content h3 { font-size: 1.05rem; font-weight: 600; margin: 0.8em 0 0.4em; }
+    .summary-content h4 { font-size: 0.95rem; font-weight: 600; margin: 0.6em 0 0.3em; }
+    .summary-content p { margin: 0.6em 0; }
+    .summary-content ul, .summary-content ol { margin: 0.5em 0; padding-left: 1.5em; }
+    .summary-content li { margin: 0.25em 0; }
+    .summary-content li > input[type=checkbox] { margin-right: 0.5em; }
+    .summary-content table { width: 100%; border-collapse: collapse; margin: 1em 0; font-size: 0.9rem; }
+    .summary-content th { background: #f3f4f6; font-weight: 600; padding: 0.6em 0.8em; border: 1px solid #d1d5db; text-align: left; }
+    .summary-content td { padding: 0.5em 0.8em; border: 1px solid #e5e7eb; }
+    .summary-content tr:nth-child(even) { background: #fafafa; }
+    .summary-content blockquote { border-left: 3px solid #d1d5db; padding-left: 1em; color: #6b7280; margin: 0.5em 0; }
+    .summary-content hr { border: none; border-top: 1px solid #e5e7eb; margin: 1.5em 0; }
+    .summary-content code:not(pre code) { background: #f3f4f6; padding: 0.15em 0.4em; border-radius: 3px; font-size: 0.9em; }
+    .summary-content pre { margin: 0.8em 0; border-radius: 8px; overflow: hidden; }
+    .summary-content pre code { display: block; padding: 1em; overflow-x: auto; font-size: 0.85em; }
+    .chat-bubble { max-width: 85%; }
+    .modal-overlay { background: rgba(0, 0, 0, 0.45); }
   </style>
 </head>
-<body class="h-screen flex flex-col bg-gray-100">
-  <!-- Header -->
-  <header class="bg-white shadow-sm px-4 py-3 flex items-center justify-between z-10">
-    <div class="flex items-center space-x-3">
-      <span class="text-2xl">📚</span>
-      <div>
-        <h1 class="font-bold text-gray-800">话题记录</h1>
-        <p class="text-xs text-gray-500">保存有价值的讨论</p>
+<body class="flex h-screen">
+  <!-- 话题列表侧边栏 -->
+  <aside class="w-72 md:w-80 bg-white shadow-lg h-screen flex flex-col flex-shrink-0 z-10">
+    <!-- Header -->
+    <div class="p-4 border-b">
+      <div class="flex items-center justify-between mb-3">
+        <h1 class="font-bold text-gray-800 text-lg">📚 话题记录</h1>
+        <a href="/chat.html" class="text-sm text-purple-600 hover:text-purple-800">返回聊天</a>
+      </div>
+      <!-- 搜索框 -->
+      <div class="relative">
+        <input type="text" id="searchInput" placeholder="搜索话题标题..."
+          class="w-full px-3 py-2 pl-9 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-400 focus:border-transparent outline-none">
+        <svg class="w-4 h-4 text-gray-400 absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+        </svg>
       </div>
     </div>
-    <div class="flex items-center space-x-2">
-      <a href="/chat.html" class="px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">
-        💬 返回聊天
-      </a>
-    </div>
-  </header>
-
-  <div class="flex-1 flex overflow-hidden">
     <!-- 话题列表 -->
-    <aside id="topicList" class="w-80 bg-white border-r flex flex-col overflow-hidden">
-      <div class="p-4 border-b">
-        <h2 class="text-sm font-semibold text-gray-600">话题列表</h2>
+    <div id="topicsContainer" class="flex-1 overflow-y-auto">
+      <div id="topicLoading" class="text-center text-gray-400 py-8 text-sm">加载中...</div>
+    </div>
+  </aside>
+
+  <!-- 主内容区 -->
+  <main class="flex-1 flex flex-col overflow-hidden bg-gray-50">
+    <!-- 空状态 -->
+    <div id="emptyState" class="flex-1 flex items-center justify-center">
+      <div class="text-center text-gray-400">
+        <div class="text-5xl mb-3">📋</div>
+        <p class="text-lg">选择一个话题查看详情</p>
+        <p class="text-sm mt-1">在聊天中选中消息后创建话题</p>
       </div>
-      <div id="topicsContainer" class="flex-1 overflow-y-auto p-4 space-y-2">
-        <!-- 话题卡片动态插入 -->
-      </div>
-    </aside>
+    </div>
 
     <!-- 话题详情 -->
-    <main id="topicDetail" class="flex-1 flex flex-col bg-gray-50 overflow-hidden">
-      <!-- 空状态提示 -->
-      <div id="emptyState" class="flex-1 flex items-center justify-center text-gray-400">
-        <div class="text-center">
-          <div class="text-4xl mb-2">📋</div>
-          <p>选择一个话题查看详情</p>
+    <div id="topicDetail" class="hidden flex-1 flex flex-col overflow-hidden">
+      <!-- 标题栏 -->
+      <div class="bg-white border-b px-4 md:px-6 py-4">
+        <h1 id="detailTitle" class="text-xl font-bold text-gray-800"></h1>
+        <div id="detailMeta" class="text-sm text-gray-500 mt-1 flex items-center gap-3 flex-wrap"></div>
+      </div>
+
+      <!-- 总结区域（主要内容） -->
+      <div id="summaryArea" class="flex-1 overflow-y-auto p-4 md:p-6">
+        <div id="summaryContent" class="bg-white rounded-xl shadow-sm p-5 md:p-8 max-w-4xl mx-auto">
+          <!-- 动态填充 -->
+        </div>
+        <!-- 底部操作栏 -->
+        <div id="summaryActions" class="max-w-4xl mx-auto mt-4 flex items-center justify-end gap-2 text-sm">
         </div>
       </div>
 
-      <!-- 话题内容 -->
-      <div id="topicContent" class="hidden flex-1 flex flex-col overflow-hidden">
-        <!-- 话题标题 -->
-        <div class="bg-white border-b p-4">
-          <h1 id="topicTitle" class="text-xl font-bold text-gray-800"></h1>
-          <p id="topicMeta" class="text-sm text-gray-500 mt-1"></p>
-        </div>
-
-        <!-- 标签切换 -->
-        <div class="bg-white border-b px-4 py-2 flex space-x-2">
-          <button id="tabChat" class="tab-btn px-4 py-2 rounded-lg text-sm font-medium active">
-            💬 聊天记录
+      <!-- 未总结时 -->
+      <div id="noSummaryArea" class="hidden flex-1 flex items-center justify-center p-6">
+        <div class="text-center max-w-md">
+          <div class="text-4xl mb-3">📝</div>
+          <p class="text-gray-600 mb-2">暂无总结</p>
+          <p class="text-sm text-gray-400 mb-4">该话题尚未生成总结文档</p>
+          <button onclick="openRegenModal()" class="px-5 py-2.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm font-medium">
+            🤖 生成总结
           </button>
-          <button id="tabSummary" class="tab-btn px-4 py-2 rounded-lg text-sm font-medium">
-            📝 总结
-          </button>
-          <div class="flex-1"></div>
-          <button id="exportBtn" class="px-3 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">
-            ⬇ 下载
-          </button>
-        </div>
-
-        <!-- 聊天记录 -->
-        <div id="chatView" class="flex-1 overflow-y-auto p-4 space-y-3">
-          <!-- 消息动态插入 -->
-        </div>
-
-        <!-- 总结视图 -->
-        <div id="summaryView" class="hidden flex-1 overflow-y-auto p-4">
-          <div id="summaryContent" class="bg-white rounded-lg p-4 shadow-sm">
-            <!-- 总结内容动态插入 -->
-          </div>
-          <!-- 生成总结按钮 -->
-          <div id="generateSummarySection" class="mt-4 text-center">
-            <button id="generateSummaryBtn" class="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed">
-              🤖 请求 Agent 生成总结
-            </button>
-            <p id="summaryStatus" class="text-sm text-gray-500 mt-2 hidden"></p>
-          </div>
         </div>
       </div>
-    </main>
+    </div>
+  </main>
+
+  <!-- 重新生成模态框 -->
+  <div id="regenModal" class="hidden fixed inset-0 modal-overlay flex items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-md">
+      <div class="p-5">
+        <h3 class="font-bold text-lg mb-1">重新生成总结</h3>
+        <p class="text-sm text-gray-500 mb-4" id="regenTopicTitle"></p>
+
+        <div class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">执行 Agent</label>
+            <select id="regenAgentSelect" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+              <option value="">自动选择在线 Agent</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">额外要求（可选）</label>
+            <textarea id="regenInstructions" rows="3"
+              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm resize-none"
+              placeholder="例如：请重点分析技术方案的可行性，并给出具体的实施建议"></textarea>
+          </div>
+        </div>
+
+        <div class="mt-5 flex justify-end gap-2">
+          <button onclick="closeRegenModal()" class="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50">取消</button>
+          <button id="regenSubmitBtn" onclick="doRegenerate()" class="px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700 disabled:opacity-50">
+            🤖 开始生成
+          </button>
+        </div>
+        <p id="regenStatus" class="hidden text-sm text-yellow-600 mt-3 text-center"></p>
+      </div>
+    </div>
   </div>
 
-  <!-- 下载弹窗 -->
-  <div id="exportModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-    <div class="bg-white rounded-lg p-6 w-80">
-      <h3 class="font-bold text-lg mb-4">选择导出格式</h3>
-      <div class="space-y-2">
-        <button id="exportMd" class="w-full px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">
-          Markdown (.md)
-        </button>
-        <button id="exportJson" class="w-full px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300">
-          JSON (.json)
-        </button>
+  <!-- 聊天记录弹窗 -->
+  <div id="chatModal" class="hidden fixed inset-0 modal-overlay flex items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[85vh] flex flex-col">
+      <div class="flex items-center justify-between p-4 border-b">
+        <h3 class="font-bold text-lg" id="chatModalTitle">聊天记录</h3>
+        <button onclick="closeChatModal()" class="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
       </div>
-      <button id="closeExportModal" class="mt-4 w-full px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg">
-        取消
-      </button>
+      <div id="chatModalContent" class="flex-1 overflow-y-auto p-4 space-y-3"></div>
+      <div class="border-t p-3 flex justify-end">
+        <button onclick="closeChatModal()" class="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50">关闭</button>
+      </div>
     </div>
   </div>
 
   <script>
-    // 初始化 markdown-it
-    const md = window.markdownit({
-      html: false,
-      breaks: true,
-      linkify: true,
-      typographer: true
+    const md = window.markdownit({ html: false, breaks: true, linkify: true, typographer: true,
+      highlight: function(code, lang) {
+        if (lang && hljs.getLanguage(lang)) {
+          try { return hljs.highlight(code, { language: lang }).value; } catch(e) {}
+        }
+        return hljs.highlightAuto(code).value;
+      }
     });
 
     let currentTopicId = null;
     let currentTopic = null;
+    let allTopics = [];
+    let onlineAgents = [];
+    let ws = null;
+    let generating = false;
 
-    // 加载话题列表
-    async function loadTopics() {
+    // ==================== 数据加载 ====================
+
+    async function loadTopics(search = '') {
+      const container = document.getElementById('topicsContainer');
+      document.getElementById('topicLoading')?.classList.remove('hidden');
       try {
-        const res = await fetch('/api/topics');
+        const params = new URLSearchParams();
+        if (search) params.set('search', search);
+        const res = await fetch(`/api/topics?${params.toString()}`);
         const data = await res.json();
-
-        if (data.success) {
-          renderTopicList(data.topics);
-        }
+        if (data.success) { allTopics = data.topics; renderTopicList(); }
       } catch (e) {
         console.error('加载话题列表失败:', e);
+      } finally {
+        document.getElementById('topicLoading')?.classList.add('hidden');
       }
     }
 
-    // 渲染话题列表
-    function renderTopicList(topics) {
+    function renderTopicList() {
       const container = document.getElementById('topicsContainer');
-
-      if (topics.length === 0) {
-        container.innerHTML = `
-          <div class="text-center text-gray-400 py-8">
-            <div class="text-2xl mb-2">📭</div>
-            <p>暂无话题</p>
-            <p class="text-xs mt-1">在聊天中选择消息创建话题</p>
-          </div>
-        `;
+      if (allTopics.length === 0) {
+        container.innerHTML = `<div class="text-center text-gray-400 py-12"><div class="text-3xl mb-2">📭</div><p class="text-sm">暂无话题</p></div>`;
         return;
       }
-
-      container.innerHTML = topics.map(topic => `
-        <div class="topic-card p-3 bg-gray-50 rounded-lg cursor-pointer ${currentTopicId === topic.id ? 'active' : ''}"
-             data-id="${topic.id}">
-          <div class="font-medium text-gray-800 truncate">${escapeHtml(topic.title)}</div>
-          <div class="flex items-center justify-between mt-1 text-xs text-gray-500">
-            <span>${topic.message_count || 0} 条消息</span>
-            <span>${formatDate(topic.created_at)}</span>
+      container.innerHTML = allTopics.map(t => `
+        <div class="topic-card px-4 py-3 border-b border-gray-100 ${currentTopicId === t.id ? 'active' : ''}"
+             onclick="selectTopic('${t.id}')" data-id="${t.id}">
+          <div class="font-medium text-gray-800 text-sm truncate">${escHtml(t.title)}</div>
+          <div class="flex items-center justify-between mt-1 text-xs text-gray-400">
+            <span>${t.message_count || 0} 条消息 · ${fmtDate(t.created_at)}</span>
+            ${t.summary_agent
+              ? `<span class="text-purple-600">🤖 ${escHtml(t.summary_agent)}</span>`
+              : '<span class="text-gray-300">⏳ 未总结</span>'}
           </div>
-          ${topic.has_summary ? '<span class="text-xs text-green-600">✓ 已总结</span>' : ''}
         </div>
       `).join('');
-
-      // 绑定点击事件
-      container.querySelectorAll('.topic-card').forEach(card => {
-        card.addEventListener('click', () => loadTopicDetail(card.dataset.id));
-      });
     }
 
-    // 加载话题详情
-    async function loadTopicDetail(topicId) {
+    async function selectTopic(topicId) {
       currentTopicId = topicId;
-
-      // 更新列表选中状态
-      document.querySelectorAll('.topic-card').forEach(card => {
-        card.classList.toggle('active', card.dataset.id === topicId);
-      });
-
+      renderTopicList();
       try {
         const res = await fetch(`/api/topics/${topicId}`);
         const data = await res.json();
-
         if (data.success) {
           currentTopic = data.topic;
           renderTopicDetail(data.topic);
@@ -244,331 +219,279 @@
       }
     }
 
-    // 渲染话题详情
+    // ==================== 话题详情渲染 ====================
+
     function renderTopicDetail(topic) {
       document.getElementById('emptyState').classList.add('hidden');
-      document.getElementById('topicContent').classList.remove('hidden');
+      document.getElementById('topicDetail').classList.remove('hidden');
 
-      document.getElementById('topicTitle').textContent = topic.title;
-      document.getElementById('topicMeta').textContent = `创建于 ${formatDate(topic.created_at)} · ${topic.messages?.length || 0} 条消息`;
+      document.getElementById('detailTitle').textContent = topic.title;
 
-      // 渲染聊天记录
-      renderChatView(topic.messages || []);
+      // 元信息
+      let metaHtml = `<span>${topic.messages?.length || 0} 条消息</span><span>·</span><span>${fmtFullDate(topic.created_at)} 创建</span>`;
+      if (topic.summary) {
+        if (topic.summary.agent_name) {
+          metaHtml += `<span>·</span><span>总结: 🤖 ${escHtml(topic.summary.agent_name)}</span>`;
+        }
+        metaHtml += `<span>·</span><span>${fmtFullDate(topic.summary.created_at)}</span>`;
+      }
+      document.getElementById('detailMeta').innerHTML = metaHtml;
 
-      // 渲染总结
-      renderSummaryView(topic.summary);
-
-      // 默认显示聊天记录
-      switchTab('chat');
+      // 总结
+      if (topic.summary && topic.summary.narrative) {
+        document.getElementById('summaryArea').classList.remove('hidden');
+        document.getElementById('noSummaryArea').classList.add('hidden');
+        renderSummary(topic);
+      } else {
+        document.getElementById('summaryArea').classList.add('hidden');
+        document.getElementById('noSummaryArea').classList.remove('hidden');
+      }
     }
 
-    // 渲染聊天记录
-    function renderChatView(messages) {
-      const container = document.getElementById('chatView');
+    function renderSummary(topic) {
+      const s = topic.summary;
+      // 渲染 Markdown 正文
+      let html = `<div class="summary-content">${md.render(s.narrative || '')}</div>`;
 
-      if (messages.length === 0) {
-        container.innerHTML = `<div class="text-center text-gray-400 py-8">暂无消息记录</div>`;
-        return;
+      // 元信息行
+      html += `<div class="mt-8 pt-4 border-t border-gray-100 text-xs text-gray-400">`;
+      html += `基于 ${topic.messages?.length || 0} 条聊天记录生成`;
+      if (s.agent_name) {
+        html += ` · ${escHtml(s.agent_name)}`;
       }
+      if (s.created_at) {
+        html += ` · ${fmtFullDate(s.created_at)}`;
+      }
+      html += `</div>`;
 
-      container.innerHTML = messages.map(msg => {
-        const isAgent = msg.sender_type === 'agent';
-        const isSystem = msg.sender_type === 'system';
-        const time = msg.original_created_at ? msg.original_created_at.split(' ')[1]?.substring(0, 5) : '';
+      document.getElementById('summaryContent').innerHTML = html;
 
-        if (isSystem) {
-          return `
-            <div class="text-center text-xs text-gray-400 my-2">
-              ${escapeHtml(msg.content)}
-            </div>
-          `;
+      // 底部按钮
+      document.getElementById('summaryActions').innerHTML = `
+        <button onclick="openChatModal()" class="px-3 py-1.5 border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-100">
+          👁 查看聊天记录 (${topic.messages?.length || 0}条)
+        </button>
+        <button onclick="openRegenModal()" class="px-3 py-1.5 border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-100">
+          🔄 重新生成
+        </button>
+        <button onclick="downloadMd()" class="px-3 py-1.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700">
+          📥 下载 Markdown
+        </button>
+      `;
+    }
+
+    // ==================== 重新生成 ====================
+
+    function openRegenModal() {
+      if (!currentTopicId) return;
+      document.getElementById('regenTopicTitle').textContent = currentTopic?.title || '';
+      document.getElementById('regenStatus').classList.add('hidden');
+      document.getElementById('regenSubmitBtn').disabled = false;
+      document.getElementById('regenSubmitBtn').textContent = '🤖 开始生成';
+
+      // 加载在线 Agent 列表
+      loadOnlineAgents().then(() => {
+        const select = document.getElementById('regenAgentSelect');
+        select.innerHTML = '<option value="">自动选择在线 Agent</option>' +
+          onlineAgents.map(a => `<option value="${a.id}">🤖 ${escHtml(a.name)}${a.status === 'online' ? ' (在线)' : ' (离线)'}</option>`).join('');
+        // 上次总结的 Agent 默认选中
+        if (currentTopic?.summary?.agent_id) {
+          select.value = currentTopic.summary.agent_id;
         }
+      });
 
+      document.getElementById('regenModal').classList.remove('hidden');
+    }
+
+    function closeRegenModal() {
+      document.getElementById('regenModal').classList.add('hidden');
+    }
+
+    async function loadOnlineAgents() {
+      try {
+        const res = await fetch('/api/platform/participants');
+        const data = await res.json();
+        if (data.success) {
+          onlineAgents = data.participants.filter(p => p.type === 'agent');
+        }
+      } catch (e) {
+        console.error('加载Agent列表失败:', e);
+      }
+    }
+
+    async function doRegenerate() {
+      if (!currentTopicId || generating) return;
+      generating = true;
+
+      const agentId = document.getElementById('regenAgentSelect').value || null;
+      const instructions = document.getElementById('regenInstructions').value.trim() || null;
+
+      const btn = document.getElementById('regenSubmitBtn');
+      const status = document.getElementById('regenStatus');
+      btn.disabled = true;
+      btn.textContent = '⏳ 生成中...';
+      status.textContent = '正在请求 Agent 生成总结，请稍候...';
+      status.classList.remove('hidden');
+
+      try {
+        const res = await fetch(`/api/topics/${currentTopicId}/generate-summary`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ agent_id: agentId, user_instructions: instructions })
+        });
+        const data = await res.json();
+        if (data.success) {
+          status.textContent = data.message || '已发送请求，等待 Agent 响应...';
+          // 等待 WebSocket 通知
+          const wsTimeout = setTimeout(() => {
+            generating = false;
+            btn.disabled = false;
+            btn.textContent = '🤖 开始生成';
+            status.textContent = '⏰ 超时：Agent 未在 60 秒内回应';
+            status.classList.remove('text-yellow-600');
+            status.classList.add('text-red-600');
+          }, 60000);
+          // 存储以在收到响应时清除
+          window._regenWsTimeout = wsTimeout;
+        } else {
+          generating = false;
+          btn.disabled = false;
+          btn.textContent = '🤖 开始生成';
+          status.textContent = '❌ ' + (data.error || '请求失败');
+          status.classList.remove('text-yellow-600');
+          status.classList.add('text-red-600');
+        }
+      } catch (e) {
+        generating = false;
+        btn.disabled = false;
+        btn.textContent = '🤖 开始生成';
+        status.textContent = '❌ 网络错误';
+        status.classList.remove('text-yellow-600');
+        status.classList.add('text-red-600');
+      }
+    }
+
+    // ==================== 聊天记录弹窗 ====================
+
+    function openChatModal() {
+      if (!currentTopic?.messages?.length) return;
+      document.getElementById('chatModalTitle').textContent = `📋 ${currentTopic.title} — 聊天记录`;
+      document.getElementById('chatModalContent').innerHTML = currentTopic.messages.map(m => {
+        const isAgent = m.sender_type === 'agent';
         return `
-          <div class="flex ${isAgent ? 'justify-start' : 'justify-start'}">
-            <div class="message-bubble">
-              <div class="flex items-end space-x-2">
-                <div class="w-8 h-8 rounded-full flex items-center justify-center text-sm ${isAgent ? 'bg-purple-100' : 'bg-blue-100'}">
-                  ${isAgent ? '🤖' : '👤'}
-                </div>
-                <div class="min-w-0">
-                  <div class="text-xs text-gray-500 mb-1">${escapeHtml(msg.sender_name)}</div>
-                  <div class="px-4 py-2 rounded-2xl ${isAgent ? 'bg-purple-100 text-purple-900' : 'bg-white text-gray-800'} shadow-sm">
-                    <div class="markdown-content">${renderMarkdown(msg.content)}</div>
-                  </div>
-                  <div class="text-xs text-gray-400 mt-1">${time}</div>
+        <div class="flex ${isAgent ? 'justify-start' : 'justify-start'}">
+          <div class="chat-bubble">
+            <div class="flex items-end gap-2">
+              <div class="w-7 h-7 rounded-full flex items-center justify-center text-xs flex-shrink-0 ${isAgent ? 'bg-purple-100' : 'bg-blue-100'}">
+                ${isAgent ? '🤖' : '👤'}
+              </div>
+              <div>
+                <div class="text-xs text-gray-400 mb-0.5">${escHtml(m.sender_name)} · ${m.original_created_at || ''}</div>
+                <div class="px-3 py-2 rounded-xl text-sm ${isAgent ? 'bg-purple-50 text-gray-800' : 'bg-gray-100 text-gray-800'}">
+                  <div class="markdown-content">${md.render(m.content)}</div>
                 </div>
               </div>
             </div>
           </div>
-        `;
+        </div>`;
       }).join('');
+      document.getElementById('chatModal').classList.remove('hidden');
     }
 
-    // 渲染总结视图
-    function renderSummaryView(summary) {
-      const container = document.getElementById('summaryContent');
-      const generateSection = document.getElementById('generateSummarySection');
-      const generateBtn = document.getElementById('generateSummaryBtn');
-      const statusText = document.getElementById('summaryStatus');
-
-      if (!summary) {
-        container.innerHTML = `
-          <div class="text-center text-gray-400 py-8">
-            <div class="text-2xl mb-2">📝</div>
-            <p>暂无总结</p>
-            <p class="text-xs mt-1">点击下方按钮请求 Agent 生成总结</p>
-          </div>
-        `;
-        // 显示生成按钮
-        generateSection.classList.remove('hidden');
-        generateBtn.disabled = false;
-        generateBtn.textContent = '🤖 请求 Agent 生成总结';
-        statusText.classList.add('hidden');
-        return;
-      }
-
-      // 有总结时隐藏生成按钮
-      generateSection.classList.add('hidden');
-
-      let html = '';
-
-      // 叙事层
-      if (summary.narrative) {
-        html += `
-          <div class="mb-6">
-            <h3 class="font-semibold text-gray-800 mb-2 flex items-center">
-              <span class="text-purple-600 mr-2">📖</span> 讨论概述
-            </h3>
-            <div class="text-gray-700 leading-relaxed markdown-content">
-              ${renderMarkdown(summary.narrative)}
-            </div>
-          </div>
-        `;
-      }
-
-      // 各方观点
-      if (summary.viewpoints && summary.viewpoints.length > 0) {
-        html += `
-          <div class="mb-6">
-            <h3 class="font-semibold text-gray-800 mb-3 flex items-center">
-              <span class="text-purple-600 mr-2">💭</span> 各方观点
-            </h3>
-            <div class="space-y-3">
-              ${summary.viewpoints.map(v => `
-                <div class="p-3 bg-gray-50 rounded-lg">
-                  <div class="flex items-center mb-1">
-                    <span class="text-sm font-medium ${v.type === 'agent' ? 'text-purple-600' : 'text-blue-600'}">
-                      ${v.type === 'agent' ? '🤖' : '👤'} ${escapeHtml(v.name)}
-                    </span>
-                  </div>
-                  <p class="text-sm text-gray-600">${escapeHtml(v.summary)}</p>
-                </div>
-              `).join('')}
-            </div>
-          </div>
-        `;
-      }
-
-      // 共识
-      if (summary.consensus) {
-        html += `
-          <div class="mb-6">
-            <h3 class="font-semibold text-gray-800 mb-2 flex items-center">
-              <span class="text-green-600 mr-2">🤝</span> 达成共识
-            </h3>
-            <div class="p-3 bg-green-50 rounded-lg text-green-800">
-              ${escapeHtml(summary.consensus)}
-            </div>
-          </div>
-        `;
-      }
-
-      // 开放问题
-      if (summary.open_questions && summary.open_questions.length > 0) {
-        html += `
-          <div>
-            <h3 class="font-semibold text-gray-800 mb-2 flex items-center">
-              <span class="text-orange-600 mr-2">❓</span> 待解决问题
-            </h3>
-            <ul class="list-disc list-inside text-gray-600 space-y-1">
-              ${summary.open_questions.map(q => `<li>${escapeHtml(q)}</li>`).join('')}
-            </ul>
-          </div>
-        `;
-      }
-
-      container.innerHTML = html;
+    function closeChatModal() {
+      document.getElementById('chatModal').classList.add('hidden');
     }
 
-    // 切换标签
-    function switchTab(tab) {
-      const tabChat = document.getElementById('tabChat');
-      const tabSummary = document.getElementById('tabSummary');
-      const chatView = document.getElementById('chatView');
-      const summaryView = document.getElementById('summaryView');
+    // ==================== 下载 ====================
 
-      if (tab === 'chat') {
-        tabChat.classList.add('active');
-        tabSummary.classList.remove('active');
-        chatView.classList.remove('hidden');
-        summaryView.classList.add('hidden');
-      } else {
-        tabChat.classList.remove('active');
-        tabSummary.classList.add('active');
-        chatView.classList.add('hidden');
-        summaryView.classList.remove('hidden');
-      }
+    function downloadMd() {
+      if (!currentTopicId) return;
+      window.location.href = `/api/topics/${currentTopicId}/export?format=markdown`;
     }
 
-    // 渲染 Markdown
-    function renderMarkdown(content) {
-      try {
-        return md.render(content);
-      } catch (e) {
-        return escapeHtml(content).replace(/\n/g, '<br>');
-      }
-    }
+    // ==================== WebSocket ====================
 
-    // HTML 转义
-    function escapeHtml(text) {
-      const div = document.createElement('div');
-      div.textContent = text;
-      return div.innerHTML;
-    }
-
-    // 格式化日期
-    function formatDate(dateStr) {
-      if (!dateStr) return '';
-      const parts = dateStr.split(' ');
-      return parts[0] || dateStr;
-    }
-
-    // 事件绑定
-    document.getElementById('tabChat').addEventListener('click', () => switchTab('chat'));
-    document.getElementById('tabSummary').addEventListener('click', () => switchTab('summary'));
-
-    // 导出功能
-    document.getElementById('exportBtn').addEventListener('click', () => {
-      document.getElementById('exportModal').classList.remove('hidden');
-    });
-
-    document.getElementById('closeExportModal').addEventListener('click', () => {
-      document.getElementById('exportModal').classList.add('hidden');
-    });
-
-    document.getElementById('exportMd').addEventListener('click', () => {
-      if (currentTopicId) {
-        window.location.href = `/api/topics/${currentTopicId}/export?format=markdown`;
-      }
-      document.getElementById('exportModal').classList.add('hidden');
-    });
-
-    document.getElementById('exportJson').addEventListener('click', () => {
-      if (currentTopicId) {
-        window.location.href = `/api/topics/${currentTopicId}/export?format=json`;
-      }
-      document.getElementById('exportModal').classList.add('hidden');
-    });
-
-    // 点击弹窗外部关闭
-    document.getElementById('exportModal').addEventListener('click', (e) => {
-      if (e.target.id === 'exportModal') {
-        document.getElementById('exportModal').classList.add('hidden');
-      }
-    });
-
-    // 生成总结功能
-    let ws = null;
-    let summaryGenerating = false;
-
-    // 连接 WebSocket
-    function connectWebSocket() {
-      const wsProtocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-      ws = new WebSocket(`${wsProtocol}//${location.host}`);
-
-      ws.onopen = () => {
-        console.log('[Topics] WebSocket 已连接');
-      };
-
+    function connectWS() {
+      const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+      ws = new WebSocket(`${proto}//${location.host}`);
       ws.onmessage = (event) => {
         try {
           const msg = JSON.parse(event.data);
-          if (msg.type === 'topic_summary_ready' && msg.payload?.topic_id === currentTopicId) {
-            // 收到总结完成通知
-            summaryGenerating = false;
-            const statusText = document.getElementById('summaryStatus');
-            statusText.textContent = '✅ 总结已生成！';
-            statusText.classList.remove('hidden');
-            statusText.classList.remove('text-yellow-600');
-            statusText.classList.add('text-green-600');
+          if ((msg.type === 'topic_summary_ready' || msg.type === 'topic_created') &&
+              msg.payload?.topic_id === currentTopicId) {
+            // 清除重新生成超时
+            if (window._regenWsTimeout) { clearTimeout(window._regenWsTimeout); }
 
+            generating = false;
+            const btn = document.getElementById('regenSubmitBtn');
+            const status = document.getElementById('regenStatus');
+            if (btn) { btn.disabled = false; btn.textContent = '🤖 开始生成'; }
+            if (status) { status.classList.add('hidden'); }
+
+            // 关闭重生成弹窗
+            closeRegenModal();
             // 重新加载话题详情
-            setTimeout(() => {
-              loadTopicDetail(currentTopicId);
-            }, 500);
+            setTimeout(() => selectTopic(currentTopicId), 300);
           }
-        } catch (e) {
-          console.error('[Topics] 解析消息失败:', e);
-        }
+          if (msg.type === 'topic_summary_failed' && msg.payload?.topic_id === currentTopicId) {
+            generating = false;
+            const btn = document.getElementById('regenSubmitBtn');
+            const status = document.getElementById('regenStatus');
+            if (btn) { btn.disabled = false; btn.textContent = '🤖 开始生成'; }
+            if (status) {
+              status.textContent = `❌ ${msg.payload.error || '总结生成失败'}`;
+              status.classList.remove('text-yellow-600');
+              status.classList.add('text-red-600');
+            }
+          }
+          // 监听 agent 状态更新
+          if (msg.type === 'agent_status') {
+            loadOnlineAgents();
+          }
+        } catch (e) {}
       };
-
-      ws.onclose = () => {
-        console.log('[Topics] WebSocket 断开，5秒后重连');
-        setTimeout(connectWebSocket, 5000);
-      };
-
-      ws.onerror = (err) => {
-        console.error('[Topics] WebSocket 错误:', err);
-      };
+      ws.onclose = () => { setTimeout(connectWS, 5000); };
     }
 
-    // 请求生成总结
-    async function requestGenerateSummary() {
-      if (!currentTopicId || summaryGenerating) return;
+    // ==================== 工具函数 ====================
 
-      const btn = document.getElementById('generateSummaryBtn');
-      const statusText = document.getElementById('summaryStatus');
-
-      btn.disabled = true;
-      btn.textContent = '⏳ 生成中...';
-      summaryGenerating = true;
-      statusText.textContent = '正在请求 Agent 生成总结，请稍候...';
-      statusText.classList.remove('hidden');
-      statusText.classList.remove('text-green-600');
-      statusText.classList.add('text-yellow-600');
-
-      try {
-        const res = await fetch(`/api/topics/${currentTopicId}/generate-summary`, {
-          method: 'POST'
-        });
-        const data = await res.json();
-
-        if (data.success) {
-          statusText.textContent = data.message || '已发送请求，等待 Agent 响应...';
-        } else {
-          summaryGenerating = false;
-          btn.disabled = false;
-          btn.textContent = '🤖 请求 Agent 生成总结';
-          statusText.textContent = `❌ ${data.error || '请求失败'}`;
-          statusText.classList.remove('text-yellow-600');
-          statusText.classList.add('text-red-600');
-        }
-      } catch (e) {
-        summaryGenerating = false;
-        btn.disabled = false;
-        btn.textContent = '🤖 请求 Agent 生成总结';
-        statusText.textContent = '❌ 请求失败，请检查网络连接';
-        statusText.classList.remove('text-yellow-600');
-        statusText.classList.add('text-red-600');
-      }
+    function escHtml(s) {
+      const d = document.createElement('div');
+      d.textContent = s || '';
+      return d.innerHTML;
     }
 
-    document.getElementById('generateSummaryBtn').addEventListener('click', requestGenerateSummary);
+    function fmtDate(s) {
+      if (!s) return '';
+      const parts = s.split(' ');
+      return parts[0] || s;
+    }
 
-    // 启动
+    function fmtFullDate(s) {
+      if (!s) return '';
+      const parts = s.split(' ');
+      return parts[0] + ' ' + (parts[1]?.substring(0, 5) || '');
+    }
+
+    // ==================== 事件绑定 ====================
+
+    document.getElementById('searchInput').addEventListener('input', (e) => {
+      loadTopics(e.target.value);
+    });
+
+    document.getElementById('regenModal').addEventListener('click', (e) => {
+      if (e.target.id === 'regenModal') closeRegenModal();
+    });
+
+    document.getElementById('chatModal').addEventListener('click', (e) => {
+      if (e.target.id === 'chatModal') closeChatModal();
+    });
+
+    // ==================== 启动 ====================
+
     loadTopics();
-    connectWebSocket();
+    loadOnlineAgents();
+    connectWS();
   </script>
 </body>
 </html>

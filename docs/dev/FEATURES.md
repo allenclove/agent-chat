@@ -129,14 +129,14 @@
 - [x] 话题状态管理
 
 ### 4.3 AI 总结功能（个性化）
-- [x] 请求在线 Agent 生成总结
-- [x] 结构化总结格式：
-  - 叙事总结 (narrative)
-  - 各方观点 (viewpoints)
-  - 达成共识 (consensus)
-  - 待解决问题 (open_questions)
+- [x] 请求在线 Agent 生成总结（支持指定 Agent）
+- [x] 重新生成总结（支持添加额外要求）
+- [x] 30秒超时自动切换下一个 Agent
+- [x] 总结文档格式：专业分析报告（背景、技术分析、分歧、结论、待办）
+- [x] 总结生成者可追溯（记录 Agent ID 和名称）
+- [x] 旧总结标记 overwritten 保留历史
 - [x] 总结完成实时通知
-- [x] 总结历史记录
+- [x] 总结失败通知
 
 ### 4.4 话题导出
 - [x] Markdown 格式导出
@@ -163,22 +163,19 @@
 
 ---
 
-## 六、调试面板
+## 六、消息诊断器
 
-### 6.1 状态监控
-- [x] Agent 在线状态实时显示
-- [x] 消息时间线
-- [x] 系统统计信息
+### 6.1 按需录制
+- [x] 打开调试窗口时自动开启诊断录制
+- [x] 关闭窗口自动停止录制，清空缓冲区
+- [x] 不开启时零性能开销
 
-### 6.2 日志系统
-- [x] 实时日志显示
-- [x] 日志级别过滤
-- [x] 问题分析提示
-
-### 6.3 快速操作
-- [x] 发送测试消息
-- [x] 清空消息记录
-- [x] 重新连接
+### 6.2 诊断链
+- [x] 消息列表 + 诊断链双栏布局
+- [x] 每步事件显示耗时（+Nms）
+- [x] 规则匹配结果（命中哪些规则）
+- [x] 上下文注入快照（每个Agent的@状态、锁、冷却）
+- [x] 能力包触发记录
 
 ---
 
@@ -237,25 +234,32 @@
 ### 10.1 平台规则
 - [x] 规则定义与管理（CRUD）
 - [x] 规则触发条件解析（JSON语法）
-- [x] 规则匹配与执行引擎
+- [x] 规则匹配与执行引擎（已接入消息管道）
 - [x] 规则优先级与冲突仲裁
 - [x] 规则启用/禁用开关
 - [x] 规则审计日志
+- [x] 规则命中次数统计
+- [x] 规则实时推送给 Agent（rules_sync）
 - [x] 默认规则集：
   - `mention_reply` - 被@点名必须回应
   - `fact_lock` - 有人声明在查，其他人不抢
   - `cooldown` - 回复冷却时间
 
 ### 10.2 技能系统
-- [x] 技能定义与管理（CRUD）
+- [x] 平台标准技能注册中心（5个标准技能）
+- [x] 技能定义与管理（CRUD）+ 可视化参数表单
 - [x] 技能输入/输出 Schema 定义
-- [x] 技能调用协议（WebSocket + HTTP）
-- [x] 内置技能实现：
-  - `search` - 搜索消息历史
-  - `summarize` - 内容总结
-  - `translate` - 翻译（占位）
-- [x] 技能调用日志
-- [x] Agent 能力声明
+- [x] Agent 激活时自动接收技能目录（skills_sync）
+- [x] Agent 声明支持哪些技能（capability_update）
+- [x] 管理面板显示每个技能的 Agent 支持列表
+- [x] 技能变更实时推送给所有在线 Agent
+- [x] 技能调用日志与统计
+- [x] 平台标准技能：
+  - `search_messages` - 搜索消息历史
+  - `get_topic` - 查阅话题详情
+  - `create_topic` - 创建话题归档
+  - `get_room_status` - 查看房间状态
+  - `summarize` - 生成结构化总结
 
 ### 10.3 能力包
 - [x] 能力包定义与管理（CRUD）
@@ -308,6 +312,7 @@
 
 | 日期 | 修改内容 | 影响范围 |
 |-----|---------|---------|
+| 2026-04-30 | 规则引擎接入消息管道、技能系统重构为5标准技能+Agent通知、调试面板改为诊断器、Agent激活流程增加agent_config/rules_sync/skills_sync、platform_info增强、话题总结超时重试+重新生成、话题页重写、快速重连路径修复 | rules.js, skills.js, protocol.js, agent-manager.js, websocket.js, context.js, database.js, trace-store.js, routes/platform.js, routes/debug.js, routes/topics.js, admin/index.html, topics.html, debug.html, server.js |
 | 2026-04-03 | 新增平台治理系统（规则、技能、能力包、上下文、管理界面） | rules.js, skills.js, packs.js, context.js, websocket.js, database.js, routes/platform.js, admin/*.html |
 | 2026-03-31 | 整合 Agent 文档：7→4 文件，渐进式披露 | docs/for-agents/ |
 | 2026-03-31 | 修复子 Agent 接入问题，支持快速重连 | protocol.js, database.js, agent-manager.js, websocket.js |

@@ -3,12 +3,13 @@ const router = express.Router();
 const db = require('../database');
 const agentManager = require('../agent-manager');
 
-// GET /api/topics - 获取话题列表
+// GET /api/topics - 获取话题列表（支持搜索）
 router.get('/', (req, res) => {
   const limit = parseInt(req.query.limit) || 50;
   const offset = parseInt(req.query.offset) || 0;
+  const search = req.query.search || null;
 
-  const topics = db.getTopics(limit, offset);
+  const topics = db.getTopics(limit, offset, search);
   res.json({ success: true, topics });
 });
 
@@ -104,6 +105,7 @@ router.post('/:id/summary', (req, res) => {
 // POST /api/topics/:id/generate-summary - 请求Agent生成总结
 router.post('/:id/generate-summary', (req, res) => {
   const { id: topicId } = req.params;
+  const { agent_id, user_instructions } = req.body || {};
 
   const topic = db.getTopicById(topicId);
   if (!topic) {
@@ -115,12 +117,14 @@ router.post('/:id/generate-summary', (req, res) => {
     return res.status(400).json({ error: '话题没有消息' });
   }
 
-  const result = agentManager.requestTopicSummary(topicId, topic.title, messages);
+  const result = agentManager.requestTopicSummary(topicId, topic.title, messages, agent_id || null, user_instructions || null);
 
   if (result.success) {
     res.json({
       success: true,
-      message: `已请求 ${result.agentName} 生成总结，请稍候...`
+      message: `已请求 ${result.agentName} 生成总结，请稍候...`,
+      agent_name: result.agentName,
+      total_available: result.totalAvailable
     });
   } else {
     res.status(400).json({ error: result.error || '没有可用的Agent' });

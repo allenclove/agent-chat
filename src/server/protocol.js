@@ -287,6 +287,15 @@ const protocol = {
     // 发送历史消息
     this.sendHistorySync(ws, request);
 
+    // 发送 Agent 个人配置
+    this.sendAgentConfig(ws, request);
+
+    // 发送平台规则
+    this.sendRulesSync(ws);
+
+    // 发送技能目录
+    this.sendSkillsSync(ws);
+
     console.log(`[Protocol] Agent 激活成功: ${request.display_name || request.proposed_name}`);
     return { success: true, agent_id: request.agent_id };
   },
@@ -345,7 +354,7 @@ const protocol = {
   // ==================== 激活后同步 ====================
 
   /**
-   * 发送平台信息
+   * 发送平台信息（Agent 接入后的第一条欢迎消息）
    */
   sendPlatformInfo(ws, request) {
     if (ws.readyState !== 1) return;
@@ -355,10 +364,50 @@ const protocol = {
       payload: {
         platform_id: 'agent-chat-v2',
         platform_name: 'Agent Chat',
+        platform_description: '一个多 Agent 群聊协作平台，人类与多个 AI Agent 在同一个聊天室中实时交流。Agent 可以自由参与讨论，也可以调用平台提供的标准技能来完成特定任务。',
         protocol_version: '2.0.0',
         your_name: request.display_name || request.proposed_name,
         your_id: request.agent_id,
-        capabilities: PLATFORM_CAPABILITIES
+
+        // 平台能力
+        capabilities: PLATFORM_CAPABILITIES,
+
+        // 你可以做什么
+        what_you_can_do: [
+          '自由参与群聊对话，回复任何消息',
+          '在被 @提及时优先回应',
+          '使用平台标准技能完成任务（搜索、查阅话题、创建话题、生成总结等）',
+          '声明你支持的技能，让平台和其他成员知道你的能力',
+          '参与场景（能力包激活后的协作模式）',
+          '查看房间状态：在线成员、活跃规则、活跃场景'
+        ],
+
+        // 技能系统说明
+        skills_guide: {
+          description: '平台维护了一套标准技能目录。你会在 skills_sync 消息中收到完整列表。你可以根据自己的能力声明支持哪些技能。',
+          declare_skills: {
+            type: 'capability_update',
+            payload: {
+              declared_skills: ['search_messages', 'get_topic', 'summarize']
+            },
+            note: '发送此消息来声明你支持哪些平台标准技能。ID 必须与技能目录一致。'
+          },
+          use_skills: '其他成员或平台会向声明了对应技能的 Agent 发起调用请求。你收到 skill_call 消息时，按照技能的 input_schema 解析参数，执行后按 output_schema 返回结果。'
+        },
+
+        // 房间规则
+        room_rules: {
+          mention_hint: '消息中包含 @你的名字 时，你被点名了，应优先回应',
+          reply_policy: '你可以自由参与任何讨论，被否决的观点不要纠缠',
+          language: '使用与对话上下文一致的语言回复',
+          max_consecutive: '避免连续发言超过3条，给其他人留出参与空间'
+        },
+
+        // 消息类型速查
+        message_types: {
+          from_you: ['message (发送聊天消息)', 'pong (心跳响应)', 'capability_update (声明技能)', 'skill_call (调用技能)', 'summary_response (返回总结)', 'scene_activate_request', 'scene_state_update'],
+          to_you: ['message (收到聊天消息)', 'skills_sync (技能目录)', 'platform_info (本消息)', 'history_sync (历史消息)', 'participants_sync (成员列表)', 'join_ack (激活确认)', 'skill_result (技能调用结果)', 'ping (心跳)', 'summary_request (请求生成总结)']
+        }
       }
     }));
   },
@@ -418,6 +467,90 @@ const protocol = {
         })),
         has_more: false,
         synced_at: db.formatShanghaiTime(new Date())
+      }
+    }));
+  },
+
+  /**
+   * 发送平台技能目录
+   */
+  sendSkillsSync(ws) {
+    if (ws.readyState !== 1) return;
+
+    const skills = db.getActiveSkills();
+    const skillList = skills.map(s => ({
+      id: s.id,
+      name: s.name,
+      description: s.description || '',
+      category: s.category || '',
+      input_schema: s.input_schema || {},
+      output_schema: s.output_schema || {},
+      usage_hint: s.usage_hint || ''
+    }));
+
+    ws.send(JSON.stringify({
+      type: 'skills_sync',
+      payload: {
+        skills: skillList,
+        total: skillList.length,
+        version: skillList.length > 0
+          ? `${new Date().getFullYear()}.${new Date().getMonth() + 1}.${new Date().getDate()}`
+          : '1.0',
+        hint: '使用 capability_update 声明你支持的技能ID列表'
+      }
+    }));
+  },
+
+  /**
+   * 发送 Agent 个人配置
+   */
+  sendAgentConfig(ws, request) {
+    if (ws.readyState !== 1) return;
+
+    const agentConfig = db.getAgentFullConfig(request.agent_id);
+    if (!agentConfig) return;
+
+    ws.send(JSON.stringify({
+      type: 'agent_config',
+      payload: {
+        agent_id: request.agent_id,
+        name: agentConfig.name,
+        persona: agentConfig.persona || null,
+        conversation_mode: agentConfig.conversation_mode || 'free',
+        message_filter: agentConfig.message_filter || 'all',
+        keywords: agentConfig.keywords || [],
+        history_limit: agentConfig.history_limit || 50,
+        receive_mode: agentConfig.receive_mode || 'free',
+        runtime_type: agentConfig.runtime_type || 'generic-ws',
+        custom_settings: agentConfig.custom_settings || {},
+        hint: '这是平台为你设定的行为和角色配置。请按照 persona 定义的角色进行对话，遵守 conversation_mode 的参与策略。'
+      }
+    }));
+  },
+
+  /**
+   * 发送平台规则（按优先级排序）
+   */
+  sendRulesSync(ws) {
+    if (ws.readyState !== 1) return;
+
+    const rules = db.getActiveRules();
+    ws.send(JSON.stringify({
+      type: 'rules_sync',
+      payload: {
+        rules: rules.map(r => ({
+          id: r.id,
+          summary: r.summary,
+          priority: r.priority || 100,
+          trigger: r.trigger,
+          must: r.must || null,
+          must_not: r.must_not || null
+        })),
+        total: rules.length,
+        version: rules.length > 0
+          ? `${new Date().getFullYear()}.${new Date().getMonth() + 1}.${new Date().getDate()}`
+          : '1.0',
+        hint: '以上规则按优先级从高到低排列。收到消息时请自行检查是否触发规则，must 中的动作为必须执行，must_not 中的动作为禁止执行。'
       }
     }));
   },

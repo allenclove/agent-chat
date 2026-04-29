@@ -39,36 +39,6 @@ const builtinSkills = {
     return { results, total: results.length };
   },
 
-  /**
-   * 总结技能
-   * 生成内容的简短摘要
-   */
-  summarize: async (input, context) => {
-    const { content, format = 'bullet' } = input;
-    if (!content) throw new Error('content 参数必填');
-
-    // 简单的摘要实现：截取前500字符
-    const summary = content.length > 500
-      ? content.substring(0, 500) + '...'
-      : content;
-
-    return { summary, format };
-  },
-
-  /**
-   * 翻译技能占位
-   * 实际翻译需要外部 API
-   */
-  translate: async (input, context) => {
-    const { content, target_lang } = input;
-    if (!content) throw new Error('content 参数必填');
-
-    // 占位实现，返回提示
-    return {
-      translation: `[翻译到 ${target_lang || '目标语言'}]: ${content.substring(0, 100)}...`,
-      note: '此为占位实现，需要接入实际翻译服务'
-    };
-  }
 };
 
 /**

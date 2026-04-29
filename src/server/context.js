@@ -4,7 +4,7 @@
  */
 
 const db = require('./database');
-const packs = require('./packs');
+const scenes = require('./scenes');
 const protocol = require('./protocol');
 
 // 配置
@@ -36,20 +36,19 @@ function getPlatformInfo(agentConfig) {
  */
 function getPlatformContext(agentId) {
   // 获取 Agent 当前所在的场景
-  const activeScene = packs.getAgentActiveScene(agentId);
+  const activeScene = scenes.getActiveScene();
 
-  // 获取可用能力包列表
-  const availablePacks = packs.getAvailablePacks();
+  const availableScenes = scenes.getAvailableScenes();
 
   return {
-    scene: activeScene ? activeScene.scene_id : null,
+    scene: activeScene ? activeScene.id : null,
     scene_config: activeScene ? {
-      pack_id: activeScene.pack_id,
-      pack_name: activeScene.pack_name,
-      role: activeScene.role
+      scene_id: activeScene.id,
+      scene_name: activeScene.name,
+      scene_mode: activeScene.context_prompt
     } : null,
-    available_packs: availablePacks.map(p => p.id),
-    role_in_scene: activeScene?.role || null
+    available_scenes: availableScenes.map(s => s.id),
+    is_active: !!activeScene
   };
 }
 
@@ -66,8 +65,8 @@ function getRuntimeState(message, agentId) {
     mentioned_by: null,
     current_scene: null,
     turn_info: null,
-    locks: {},
-    cooldowns: {},
+    locks: db.getAgentLocks(agentId),
+    cooldowns: db.getAgentCooldowns(agentId),
     pack_state: {},
     recommended_actions: []
   };
@@ -92,10 +91,11 @@ function getRuntimeState(message, agentId) {
   }
 
   // 获取场景状态
-  const activeScene = packs.getAgentActiveScene(agentId);
+  const activeScene = scenes.getActiveScene();
   if (activeScene) {
-    state.current_scene = activeScene.scene_id;
-    state.pack_state = activeScene.state || {};
+    state.current_scene = activeScene.id;
+    state.scene_name = activeScene.name;
+    state.scene_mode = activeScene.context_prompt;
   }
 
   return state;
@@ -185,17 +185,13 @@ function getFullContext(agentId) {
  * @returns {Object} 激活通知消息
  */
 function assembleSceneActivation(sceneInfo, agentId) {
-  const agent = db.getAgentById(agentId);
-
   return {
     type: 'scene_activate',
     payload: {
-      scene_id: sceneInfo.scene_id,
-      pack_id: sceneInfo.pack_id,
-      pack_name: sceneInfo.pack_name,
-      participants: sceneInfo.participants,
-      state: sceneInfo.state,
-      your_role: 'participant',
+      scene_id: sceneInfo.id,
+      scene_name: sceneInfo.name,
+      scene_mode: sceneInfo.context_prompt,
+      participants: sceneInfo.participants || [],
       platform_context: getPlatformContext(agentId)
     }
   };

@@ -6,107 +6,95 @@
 
 const { v4: uuidv4 } = require('uuid');
 
-// 最大存储事件数（避免内存溢出）
 const MAX_TRACES = 1000;
-
-// 存储结构：
-// Map<trace_id, { message_id, events: [], metadata }>
 const traces = new Map();
-
-// 消息ID到trace_id的映射
 const messageToTrace = new Map();
 
-const traceStore = {
-  /**
-   * 创建新的追踪记录
-   * @param {string} messageId - 消息ID
-   * @param {object} metadata - 消息元数据 (sender_id, sender_name, sender_type)
-   * @returns {string} trace_id
-   */
-  createTrace(messageId, metadata) {
-    const traceId = `trace_${uuidv4().split('-')[0]}`;
+// 录制开关：调试窗口打开时为 true，关闭时为 false
+let recording = false;
 
+const traceStore = {
+  setRecording(on) {
+    recording = !!on;
+    if (!on) {
+      traces.clear();
+      messageToTrace.clear();
+    }
+    console.log(`[Trace] 录制${on ? '开启' : '关闭'}${on ? '' : '，已清空缓冲区'}`);
+  },
+
+  isRecording() {
+    return recording;
+  },
+
+  createTrace(messageId, metadata) {
+    if (!recording) return null;
+
+    const traceId = `trace_${uuidv4().split('-')[0]}`;
     traces.set(traceId, {
       message_id: messageId,
       metadata,
       events: [],
       created_at: Date.now()
     });
-
     messageToTrace.set(String(messageId), traceId);
 
-    // 清理旧的追踪记录
     if (traces.size > MAX_TRACES) {
       const oldestKeys = [...traces.keys()].slice(0, traces.size - MAX_TRACES);
       for (const key of oldestKeys) {
-        const trace = traces.get(key);
-        if (trace?.message_id) {
-          messageToTrace.delete(String(trace.message_id));
-        }
+        const t = traces.get(key);
+        if (t?.message_id) messageToTrace.delete(String(t.message_id));
         traces.delete(key);
       }
     }
-
     return traceId;
   },
 
-  /**
-   * 添加追踪事件
-   * @param {string} traceId - 追踪ID
-   * @param {string} eventType - 事件类型
-   * @param {object} details - 事件详情
-   */
   addEvent(traceId, eventType, details = {}) {
+    if (!recording || !traceId) return;
     const trace = traces.get(traceId);
-    if (!trace) {
-      console.warn(`[Trace] 未找到追踪记录: ${traceId}`);
-      return;
-    }
+    if (!trace) return;
+    trace.events.push({ type: eventType, timestamp: Date.now(), details });
+  },
 
-    trace.events.push({
-      type: eventType,
-      timestamp: Date.now(),
-      details
+  // 辅助：记录规则匹配事件
+  addRuleEvent(traceId, matchedRules, stateChanges) {
+    if (!recording || !traceId) return;
+    this.addEvent(traceId, 'rules_evaluated', {
+      matched_rules: matchedRules,
+      state_changes: stateChanges
     });
   },
 
-  /**
-   * 通过消息ID获取trace_id
-   * @param {string|number} messageId
-   * @returns {string|null}
-   */
+  // 辅助：记录上下文注入事件
+  addContextEvent(traceId, agentId, runtimeState) {
+    if (!recording || !traceId) return;
+    this.addEvent(traceId, 'context_injected', {
+      agent_id: agentId,
+      mentioned: runtimeState.mentioned,
+      reply_required: runtimeState.reply_required,
+      locks: runtimeState.locks,
+      cooldowns: runtimeState.cooldowns,
+      current_scene: runtimeState.current_scene
+    });
+  },
+
   getTraceIdByMessageId(messageId) {
     return messageToTrace.get(String(messageId));
   },
 
-  /**
-   * 获取完整的追踪记录
-   * @param {string} traceId
-   * @returns {object|null}
-   */
   getTrace(traceId) {
     return traces.get(traceId);
   },
 
-  /**
-   * 通过消息ID获取追踪记录
-   * @param {string|number} messageId
-   * @returns {object|null}
-   */
   getTraceByMessageId(messageId) {
     const traceId = this.getTraceIdByMessageId(messageId);
     if (!traceId) return null;
     return this.getTrace(traceId);
   },
 
-  /**
-   * 获取最近的追踪记录列表
-   * @param {number} limit - 返回数量
-   * @returns {Array}
-   */
   getRecentTraces(limit = 50) {
-    const allTraces = [...traces.values()].reverse().slice(0, limit);
-    return allTraces.map(t => ({
+    return [...traces.values()].reverse().slice(0, limit).map(t => ({
       trace_id: this.getTraceIdByMessageId(t.message_id),
       message_id: t.message_id,
       metadata: t.metadata,
@@ -116,30 +104,20 @@ const traceStore = {
     }));
   },
 
-  /**
-   * 获取追踪事件详情
-   * @param {string} traceId
-   * @returns {Array|null}
-   */
   getTraceEvents(traceId) {
     const trace = traces.get(traceId);
     if (!trace) return null;
     return trace.events;
   },
 
-  /**
-   * 获取统计信息
-   */
   getStats() {
     return {
       total_traces: traces.size,
-      max_capacity: MAX_TRACES
+      max_capacity: MAX_TRACES,
+      recording
     };
   },
 
-  /**
-   * 清空所有追踪记录
-   */
   clear() {
     traces.clear();
     messageToTrace.clear();

@@ -42,12 +42,15 @@
 
 ### 服务端模块
 
-#### 1. app.js - Express 应用入口
+#### 1. server.js - 应用入口
 
 **职责**:
 - Express 应用配置
 - 路由注册
 - 中间件配置
+- WebSocket 初始化
+- 数据库初始化
+- 默认治理数据初始化
 
 #### 2. routes/ - 路由模块
 
@@ -241,12 +244,16 @@ executeSkill(skillCall, callerAgent, context)
 validateInput(input, schema)
 ```
 
-**内置技能**:
-| ID | 功能 |
-|----|------|
-| `search` | 搜索消息历史 |
-| `summarize` | 内容总结 |
-| `translate` | 翻译 |
+**平台标准技能** (5个):
+| ID | 名称 | 类别 |
+|----|------|------|
+| `search_messages` | 搜索消息 | information |
+| `get_topic` | 查阅话题 | information |
+| `create_topic` | 创建话题 | action |
+| `get_room_status` | 房间状态 | information |
+| `summarize` | 生成总结 | analysis |
+
+**说明**: 平台不再硬编码执行技能。平台定义技能契约（输入/输出格式），Agent 声明自己支持哪些技能，并自行实现逻辑。
 
 #### 9. packs.js - 能力包管理
 
@@ -425,8 +432,29 @@ copyToClipboard(text)
 4. 管理员在 /admin/agents.html 审核申请
 5. 审核通过后下发 connection_secret
 6. Agent 发送 {type: 'activation_ready', request_id}
-7. 系统激活 Agent，发送 join_ack
+7. 系统激活 Agent，按序下发 7 条同步消息：
+   ① join_ack        — 激活确认
+   ② platform_info   — 平台介绍、能力说明、消息速查
+   ③ participants_sync — 房间成员
+   ④ history_sync    — 最近聊天记录
+   ⑤ agent_config    — 个人配置（persona、对话模式等）
+   ⑥ rules_sync      — 平台规则（按优先级排列）
+   ⑦ skills_sync     — 平台标准技能目录
 8. Agent 加入群聊，开始参与对话
+```
+
+### 用户消息处理管道
+
+```
+用户消息到达
+  → 会话验证
+  → 存入数据库（createMessage + trace）
+  → 规则引擎评估（processRules，记录命中）
+  → 能力包检测（detectTrigger）
+  → 广播给所有在线用户（chat.broadcast）
+  → 转发给所有在线 Agent（forwardToAgents）
+     → 每个 Agent 独立计算上下文（context.injectContext）
+     → 注入：@状态、锁、冷却、场景状态
 ```
 
 ---

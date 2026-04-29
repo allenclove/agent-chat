@@ -5,7 +5,7 @@ const chat = require('../chat');
 const agentManager = require('../agent-manager');
 const rules = require('../rules');
 const skills = require('../skills');
-const packs = require('../packs');
+const scenes = require('../scenes');
 const context = require('../context');
 
 // GET /api/platform/messages - 获取历史消息
@@ -78,6 +78,31 @@ router.get('/time', (req, res) => {
     success: true,
     time: db.formatShanghaiTime(new Date()),
     timestamp: Date.now()
+  });
+});
+
+// GET /api/platform/stats - 获取运行时统计
+router.get('/stats', (req, res) => {
+  const ruleHitCounts = db.getRuleHitCounts();
+  const allRules = db.getAllRules();
+  const activeScene = scenes.getActiveScene();
+  const onlineAgents = agentManager.getAgentStatus().filter(a => a.status === 'online').length;
+  const messageStats = db.getMessageStats();
+
+  res.json({
+    success: true,
+    stats: {
+      rules_total: allRules.length,
+      rules_enabled: allRules.filter(r => r.enabled).length,
+      rules_total_hits: Object.values(ruleHitCounts).reduce((s, c) => s + c, 0),
+      rule_hits: ruleHitCounts,
+      skills_total: db.getActiveSkills().length,
+      skill_calls: db.getSkillCallStats(),
+      scenes_total: db.getEnabledScenes().length,
+      active_scene: activeScene ? activeScene.name : null,
+      online_agents: onlineAgents,
+      total_messages: messageStats.total
+    }
   });
 });
 
@@ -284,6 +309,7 @@ router.post('/rules', (req, res) => {
   try {
     const rule = db.createRule({ id, summary, trigger, must, must_not, priority, version });
     console.log(`[API] 创建规则: ${id}`);
+    agentManager.broadcastRulesSync();
     res.json({ success: true, rule });
   } catch (e) {
     res.status(400).json({ error: '创建失败: ' + e.message });
@@ -301,6 +327,7 @@ router.put('/rules/:id', (req, res) => {
       return res.status(404).json({ error: '规则不存在' });
     }
     console.log(`[API] 更新规则: ${id}`);
+    agentManager.broadcastRulesSync();
     res.json({ success: true, rule });
   } catch (e) {
     res.status(400).json({ error: '更新失败: ' + e.message });
@@ -312,6 +339,7 @@ router.delete('/rules/:id', (req, res) => {
   const { id } = req.params;
   db.deleteRule(id);
   console.log(`[API] 删除规则: ${id}`);
+  agentManager.broadcastRulesSync();
   res.json({ success: true });
 });
 
@@ -350,6 +378,7 @@ router.post('/skills', (req, res) => {
   try {
     const skill = skills.registerSkill({ id, name, description, category, input_schema, output_schema, usage_hint });
     console.log(`[API] 创建技能: ${id}`);
+    agentManager.broadcastSkillsSync();
     res.json({ success: true, skill });
   } catch (e) {
     res.status(400).json({ error: '创建失败: ' + e.message });
@@ -364,6 +393,7 @@ router.put('/skills/:id', (req, res) => {
   try {
     const skill = skills.updateSkill(id, updates);
     console.log(`[API] 更新技能: ${id}`);
+    agentManager.broadcastSkillsSync();
     res.json({ success: true, skill });
   } catch (e) {
     res.status(400).json({ error: '更新失败: ' + e.message });
@@ -376,6 +406,7 @@ router.delete('/skills/:id', (req, res) => {
   try {
     skills.unregisterSkill(id);
     console.log(`[API] 删除技能: ${id}`);
+    agentManager.broadcastSkillsSync();
     res.json({ success: true });
   } catch (e) {
     res.status(400).json({ error: '删除失败: ' + e.message });
@@ -411,120 +442,74 @@ router.get('/skills/logs', (req, res) => {
   res.json({ success: true, logs });
 });
 
-// ==================== 能力包 API ====================
+// ==================== 场景 API（统一模式管理） ====================
 
-// GET /api/platform/packs - 获取能力包列表
-router.get('/packs', (req, res) => {
-  const packsList = packs.getAvailablePacks();
-  res.json({ success: true, packs: packsList });
-});
-
-// GET /api/platform/packs/:id - 获取能力包详情
-router.get('/packs/:id', (req, res) => {
-  const pack = packs.getPackDetail(req.params.id);
-  if (!pack) {
-    return res.status(404).json({ error: '能力包不存在' });
-  }
-  res.json({ success: true, pack });
-});
-
-// POST /api/platform/packs - 新增能力包
-router.post('/packs', (req, res) => {
-  const { id, name, goal, skills, state_fields, trigger_keywords } = req.body;
-
-  if (!id || !name) {
-    return res.status(400).json({ error: 'id 和 name 必填' });
-  }
-
-  try {
-    const pack = packs.createPack({ id, name, goal, skills, state_fields, trigger_keywords });
-    console.log(`[API] 创建能力包: ${id}`);
-    res.json({ success: true, pack });
-  } catch (e) {
-    res.status(400).json({ error: '创建失败: ' + e.message });
-  }
-});
-
-// PUT /api/platform/packs/:id - 更新能力包
-router.put('/packs/:id', (req, res) => {
-  const { id } = req.params;
-  const updates = req.body;
-
-  try {
-    const pack = packs.updatePack(id, updates);
-    console.log(`[API] 更新能力包: ${id}`);
-    res.json({ success: true, pack });
-  } catch (e) {
-    res.status(400).json({ error: '更新失败: ' + e.message });
-  }
-});
-
-// DELETE /api/platform/packs/:id - 删除能力包
-router.delete('/packs/:id', (req, res) => {
-  const { id } = req.params;
-  try {
-    packs.deletePack(id);
-    console.log(`[API] 删除能力包: ${id}`);
-    res.json({ success: true });
-  } catch (e) {
-    res.status(400).json({ error: '删除失败: ' + e.message });
-  }
-});
-
-// ==================== 场景 API ====================
-
-// GET /api/platform/scenes - 获取活跃场景列表
+// GET /api/platform/scenes - 获取场景列表
 router.get('/scenes', (req, res) => {
-  const scenes = packs.getActiveScenes();
-  res.json({ success: true, scenes });
+  const list = scenes.getAvailableScenes();
+  res.json({ success: true, scenes: list });
 });
 
-// POST /api/platform/scenes/activate - 激活场景
-router.post('/scenes/activate', (req, res) => {
-  const { pack_id, participants } = req.body;
-
-  if (!pack_id) {
-    return res.status(400).json({ error: 'pack_id 必填' });
-  }
-
-  try {
-    const scene = packs.activateScene(pack_id, participants || []);
-    console.log(`[API] 激活场景: ${scene.scene_id}`);
-    res.json({ success: true, scene });
-  } catch (e) {
-    res.status(400).json({ error: '激活失败: ' + e.message });
-  }
+// GET /api/platform/scenes/active - 获取当前活跃场景
+router.get('/scenes/active', (req, res) => {
+  const active = scenes.getActiveScene();
+  res.json({ success: true, scene: active });
 });
 
-// GET /api/platform/scenes/:id - 获取场景状态
+// GET /api/platform/scenes/:id - 获取场景详情
 router.get('/scenes/:id', (req, res) => {
-  const scene = packs.getSceneState(req.params.id);
-  if (!scene) {
-    return res.status(404).json({ error: '场景不存在或已结束' });
-  }
+  const scene = db.getSceneById(req.params.id);
+  if (!scene) return res.status(404).json({ error: '场景不存在' });
   res.json({ success: true, scene });
 });
 
-// PUT /api/platform/scenes/:id - 更新场景状态
-router.put('/scenes/:id', (req, res) => {
-  const { id } = req.params;
-  const { state_data } = req.body;
-
-  try {
-    const scene = packs.updateSceneState(id, state_data);
-    res.json({ success: true, scene });
-  } catch (e) {
-    res.status(400).json({ error: '更新失败: ' + e.message });
+// POST /api/platform/scenes - 新增场景
+router.post('/scenes', (req, res) => {
+  const { id, name, description, icon, context_prompt, trigger_keywords, auto_activate, skills } = req.body;
+  if (!id || !name || !context_prompt) {
+    return res.status(400).json({ error: 'id、name 和 context_prompt 必填' });
   }
+  try {
+    const scene = scenes.createScene({ id, name, description, icon, context_prompt, trigger_keywords, auto_activate, skills });
+    console.log(`[API] 创建场景: ${id}`);
+    res.json({ success: true, scene });
+  } catch (e) { res.status(400).json({ error: '创建失败: ' + e.message }); }
 });
 
-// POST /api/platform/scenes/:id/end - 结束场景
-router.post('/scenes/:id/end', (req, res) => {
-  const { id } = req.params;
-  const { reason } = req.body;
-  packs.endScene(id, reason);
-  console.log(`[API] 结束场景: ${id}`);
-  res.json({ success: true });
+// PUT /api/platform/scenes/:id - 更新场景
+router.put('/scenes/:id', (req, res) => {
+  try {
+    const scene = scenes.updateScene(req.params.id, req.body);
+    console.log(`[API] 更新场景: ${req.params.id}`);
+    res.json({ success: true, scene });
+  } catch (e) { res.status(400).json({ error: '更新失败: ' + e.message }); }
+});
+
+// DELETE /api/platform/scenes/:id - 删除场景
+router.delete('/scenes/:id', (req, res) => {
+  try {
+    scenes.deleteScene(req.params.id);
+    console.log(`[API] 删除场景: ${req.params.id}`);
+    res.json({ success: true });
+  } catch (e) { res.status(400).json({ error: '删除失败: ' + e.message }); }
+});
+
+// POST /api/platform/scenes/:id/activate - 激活场景
+router.post('/scenes/:id/activate', (req, res) => {
+  try {
+    const scene = scenes.activateScene(req.params.id, req.body.activated_by || 'admin', req.body.participants || []);
+    console.log(`[API] 激活场景: ${req.params.id}`);
+    res.json({ success: true, scene });
+  } catch (e) { res.status(400).json({ error: '激活失败: ' + e.message }); }
+});
+
+// POST /api/platform/scenes/:id/deactivate - 结束场景
+router.post('/scenes/:id/deactivate', (req, res) => {
+  try {
+    scenes.deactivateScene(req.params.id);
+    console.log(`[API] 结束场景: ${req.params.id}`);
+    res.json({ success: true });
+  } catch (e) { res.status(400).json({ error: '结束失败: ' + e.message }); }
 });
 
 // ==================== 上下文 API ====================
@@ -542,7 +527,7 @@ router.get('/context', (req, res) => {
       success: true,
       context: {
         rules_version: context.getRulesVersion(),
-        available_packs: packs.getAvailablePacks().map(p => p.id),
+        available_scenes: scenes.getAvailableScenes().map(s => s.id),
         available_skills: skills.getAvailableSkills().map(s => s.id)
       }
     });

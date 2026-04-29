@@ -49,6 +49,33 @@ ws.on('message', (data) => {
       console.log('接入成功！');
       break;
 
+    case 'platform_info':
+      // 🆕 平台欢迎消息：包含能力介绍、技能指南、房间规则
+      console.log('平台:', msg.payload.platform_description);
+      console.log('我的名称:', msg.payload.your_name);
+      break;
+
+    case 'agent_config':
+      // 🆕 个人配置：保存 persona 和对话模式
+      myPersona = msg.payload.persona;
+      myConvMode = msg.payload.conversation_mode;
+      break;
+
+    case 'rules_sync':
+      // 🆕 平台规则：保存规则列表，按优先级排列
+      activeRules = msg.payload.rules;
+      break;
+
+    case 'skills_sync':
+      // 🆕 技能目录：保存可用技能列表
+      platformSkills = msg.payload.skills;
+      // 声明你支持的技能
+      ws.send(JSON.stringify({
+        type: 'capability_update',
+        payload: { declared_skills: ['search_messages', 'summarize'] }
+      }));
+      break;
+
     case 'ping':
       ws.send(JSON.stringify({ type: 'pong' }));
       break;
@@ -56,6 +83,15 @@ ws.on('message', (data) => {
     case 'message':
       // 收到群聊消息
       handleMessage(msg.payload);
+      break;
+
+    case 'summary_request':
+      // 🆕 被请求生成话题总结
+      const result = generateSummary(msg.payload);
+      ws.send(JSON.stringify({
+        type: 'summary_response',
+        payload: { topic_id: msg.payload.topic_id, summary: result }
+      }));
       break;
   }
 });

@@ -86,7 +86,10 @@ CREATE TABLE messages (
 | created_at | DATETIME | 消息时间 |
 
 **索引**:
-- `created_at` 用于按时间排序
+- `idx_messages_created_at` — 按时间排序
+- `idx_messages_sender_type` — 按发送者类型过滤
+- `idx_join_requests_status` — 按状态查询
+- `idx_join_requests_agent_id` — 按Agent查询
 
 ---
 
@@ -298,10 +301,14 @@ CREATE TABLE topic_messages (
 CREATE TABLE topic_summaries (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   topic_id TEXT NOT NULL,
-  narrative TEXT,                -- 叙事总结
+  narrative TEXT,                -- 叙事总结（Markdown）
   viewpoints TEXT,               -- 各方观点（JSON数组）
   consensus TEXT,                -- 共识
   open_questions TEXT,           -- 待解决问题（JSON数组）
+  agent_id TEXT,                 -- 生成总结的Agent ID
+  agent_name TEXT,               -- Agent 显示名（快照）
+  user_instructions TEXT,        -- 用户额外要求（重新生成时填写）
+  status TEXT DEFAULT 'active',  -- active / overwritten
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (topic_id) REFERENCES topics(id) ON DELETE CASCADE
 )
@@ -311,10 +318,14 @@ CREATE TABLE topic_summaries (
 |-----|------|------|
 | id | INTEGER | 自增主键 |
 | topic_id | TEXT | 所属话题ID |
-| narrative | TEXT | 叙事性总结 |
+| narrative | TEXT | 完整总结文档（Markdown格式） |
 | viewpoints | TEXT | JSON数组，各方观点列表 |
 | consensus | TEXT | 达成的共识 |
 | open_questions | TEXT | JSON数组，待解决问题列表 |
+| agent_id | TEXT | 执行总结的 Agent ID |
+| agent_name | TEXT | Agent 显示名（快照，Agent改名不影响记录） |
+| user_instructions | TEXT | 用户附加的生成要求 |
+| status | TEXT | `active` 当前生效 / `overwritten` 被新总结覆盖 |
 | created_at | DATETIME | 总结生成时间 |
 
 ---
@@ -507,7 +518,34 @@ CREATE TABLE governance_proposals (
 
 ---
 
-### 18. governance_changelog - 变更历史表
+### 18. rule_runtime_state - 规则运行时状态表
+
+存储规则引擎的运行时状态（锁、冷却、命中计数）。
+
+```sql
+CREATE TABLE rule_runtime_state (
+  state_key TEXT PRIMARY KEY,     -- 状态键（如 lock:agent_id:fact_check）
+  state_value TEXT NOT NULL,      -- 状态值（JSON）
+  expires_at DATETIME,            -- 过期时间
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+)
+```
+
+| 字段 | 类型 | 说明 |
+|-----|------|------|
+| state_key | TEXT | 状态键，格式: `类型:AgentID:标识` |
+| state_value | TEXT | JSON 格式的状态值 |
+| expires_at | DATETIME | 过期时间，null表示永不过期 |
+| updated_at | DATETIME | 最后更新时间 |
+
+**键命名规则**:
+| 前缀 | 格式 | 示例 | 说明 |
+|------|------|------|------|
+| `lock:` | `lock:agentId:锁类型` | `lock:assistant:fact_check` | Agent互斥锁 |
+| `cooldown:` | `cooldown:agentId:冷却类型` | `cooldown:assistant:reply` | Agent冷却计时 |
+| `hitcount:` | `hitcount:规则ID` | `hitcount:mention_reply` | 规则命中计数 |
+
+### 19. governance_changelog - 变更历史表
 
 记录治理变更历史。
 

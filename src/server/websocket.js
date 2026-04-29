@@ -5,7 +5,7 @@ const agentManager = require('./agent-manager');
 const { traceStore, EVENT_TYPES } = require('./trace-store');
 const rules = require('./rules');
 const skills = require('./skills');
-const packs = require('./packs');
+const scenes = require('./scenes');
 const context = require('./context');
 
 function setupWebSocket(server) {
@@ -29,11 +29,13 @@ function setupWebSocket(server) {
     });
 
     ws.on('close', () => {
-      if (sessionId && !isAgent) {
+      if (isDebug) {
+        console.log('[WS] 调试面板断开，关闭录制');
+        traceStore.setRecording(false);
+      } else if (sessionId && !isAgent) {
         chat.removeClient(sessionId);
         console.log(`[WS] 用户断开: ${sessionId}`);
         broadcastUserList();
-        // 通知所有Agent更新成员列表
         agentManager.broadcastParticipantsUpdate();
       } else if (isAgent && agentId) {
         console.log(`[WS] Agent断开: ${agentId}`);
@@ -97,7 +99,8 @@ function setupWebSocket(server) {
 
       // 处理Agent返回的总结响应
       if (type === 'summary_response' && isAgent) {
-        agentManager.handleSummaryResponse(msg);
+        const agentStatus = agentManager.getAgentStatus().find(a => a.id === agentId);
+        agentManager.handleSummaryResponse(msg, { id: agentId, name: agentStatus?.name || agentId });
         return;
       }
 
@@ -162,15 +165,29 @@ function setupWebSocket(server) {
 
     function handleDebugJoin(ws, payload) {
       isDebug = true;
-      console.log('[WS] 调试面板已连接');
+      console.log('[WS] 调试面板已连接，开启录制');
 
-      // 发送确认
+      // 开启追踪录制
+      traceStore.setRecording(true);
+
       ws.send(JSON.stringify({
         type: 'debug_join_ack',
         payload: {
-          message: '调试面板已连接',
-          server_time: new Date().toISOString()
+          message: '调试面板已连接，追踪录制已开启',
+          server_time: new Date().toISOString(),
+          recording: true
         }
+      }));
+
+      // 发送最近消息列表（带 trace_id）
+      const history = chat.getHistory(50);
+      const messagesWithTrace = history.map(m => ({
+        ...m,
+        trace_id: traceStore.getTraceIdByMessageId(m.id) || null
+      }));
+      ws.send(JSON.stringify({
+        type: 'debug_messages',
+        payload: { messages: messagesWithTrace }
       }));
 
       // 发送Agent状态
@@ -179,14 +196,6 @@ function setupWebSocket(server) {
         payload: { agents: agentManager.getAgentStatus() }
       }));
 
-      // 发送历史消息
-      const history = chat.getHistory(20);
-      ws.send(JSON.stringify({
-        type: 'history',
-        payload: { messages: history }
-      }));
-
-      // 发送在线用户
       ws.send(JSON.stringify({
         type: 'user_list',
         payload: { users: chat.getOnlineUsers() }
@@ -315,10 +324,8 @@ function setupWebSocket(server) {
 
       const trimmedContent = content.trim();
 
-      // 正常消息处理
       const message = chat.handleUserMessage(sessionId, trimmedContent);
       if (message) {
-        // 记录服务端接收事件
         if (message.trace_id) {
           traceStore.addEvent(message.trace_id, EVENT_TYPES.SERVER_RECEIVED, {
             from_session: sessionId,
@@ -326,10 +333,57 @@ function setupWebSocket(server) {
           });
         }
 
+        // 规则引擎 + 能力包检测
+        try {
+          const allAgents = db.getAllAgents();
+          const allMatched = [];
+          for (const agent of allAgents) {
+            const runtimeCtx = context.getRuntimeState(message, agent.id);
+            const result = rules.processRules(message, runtimeCtx);
+            if (result.matchedRules.length > 0) {
+              result.matchedRules.forEach(r => {
+                db.incrementRuleHitCount(r.id);
+                allMatched.push({ rule: r.id, agent: agent.id });
+              });
+            }
+          }
+          if (allMatched.length > 0) {
+            traceStore.addEvent(message.trace_id, 'rules_evaluated', { matched: allMatched });
+          }
+          const triggeredScene = scenes.detectTrigger(trimmedContent);
+          if (triggeredScene && triggeredScene.auto_activate) {
+            try {
+              scenes.activateScene(triggeredScene.id, sessionId || 'system', []);
+              traceStore.addEvent(message.trace_id, 'scene_activated', { scene_id: triggeredScene.id, scene_name: triggeredScene.name });
+              chat.broadcast('system', {
+                type: 'scene_activated',
+                message: `${triggeredScene.icon || '📦'} 已进入「${triggeredScene.name}」模式`,
+                scene_id: triggeredScene.id,
+                scene_name: triggeredScene.name
+              });
+              agentManager.broadcastToAgents({
+                type: 'scene_activated',
+                payload: {
+                  scene_id: triggeredScene.id,
+                  scene_name: triggeredScene.name,
+                  scene_mode: triggeredScene.context_prompt,
+                  hint: '当前聊天室已切换到此模式，请按照模式要求调整行为'
+                }
+              });
+            } catch (err) {
+              console.error('[WS] 场景自动激活失败:', err.message);
+            }
+          } else if (triggeredScene) {
+            traceStore.addEvent(message.trace_id, 'scene_detected', { scene_id: triggeredScene.id, scene_name: triggeredScene.name });
+          }
+        } catch (err) {
+          console.error('[WS] 规则/能力包处理异常:', err.message);
+        }
+
         // 广播给所有用户
         chat.broadcast('message', message);
 
-        // 转发给Agent
+        // 转发给Agent（每个Agent会独立计算运行时上下文）
         agentManager.forwardToAgents(message);
       }
     }
@@ -442,7 +496,7 @@ function handleSceneActivateRequest(ws, msg, agentId) {
   try {
     // 默认参与者为请求者自己
     const sceneParticipants = participants || [agentId];
-    const scene = packs.activateScene(pack_id, sceneParticipants);
+    const scene = scenes.activateScene(scene_id, agentId, [agentId]);
 
     // 通知所有参与者场景激活
     const activationMsg = context.assembleSceneActivation(scene, agentId);

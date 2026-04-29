@@ -3,653 +3,277 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Agent Chat - 可观测性控制台</title>
+  <title>消息诊断 - Agent Chat</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    .log-entry { font-family: 'Consolas', 'Monaco', monospace; font-size: 12px; line-height: 1.5; }
-    .log-info { color: #60a5fa; }
-    .log-success { color: #4ade80; }
-    .log-warning { color: #fbbf24; }
-    .log-error { color: #f87171; }
-    .log-agent { color: #c084fc; }
-    .log-user { color: #38bdf8; }
-    .log-ws { color: #fb7185; }
-    .log-system { color: #94a3b8; }
-    .message-bubble { max-width: 100%; word-break: break-word; }
-    .pulse { animation: pulse 2s infinite; }
-    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
-    .timeline-item { border-left: 2px solid #4b5563; padding-left: 12px; margin-left: 8px; }
-    .timeline-dot { width: 8px; height: 8px; border-radius: 50%; position: absolute; left: -5px; }
-    pre { white-space: pre-wrap; word-break: break-all; margin: 0; }
-    .trace-item { transition: all 0.2s; }
-    .trace-item:hover { background-color: #374151; }
-    .event-timeline { border-left: 2px solid #4b5563; }
-    .event-dot { width: 6px; height: 6px; border-radius: 50%; }
-    .tab-active { border-bottom: 2px solid #3b82f6; color: #3b82f6; }
+    body { background: #0f172a; color: #e2e8f0; }
+    .msg-row { transition: all 0.15s; cursor: pointer; }
+    .msg-row:hover { background: #1e293b; }
+    .msg-row.selected { background: #1e3a5f; border-left: 3px solid #3b82f6; }
+    .event-item { border-left: 2px solid #334155; padding-left: 12px; position: relative; }
+    .event-dot { width: 8px; height: 8px; border-radius: 50%; position: absolute; left: -5px; top: 6px; }
+    .no-trace { color: #475569; cursor: default; }
+    .no-trace:hover { background: transparent; }
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: #1e293b; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
   </style>
 </head>
-<body class="bg-gray-900 text-white min-h-screen">
-  <div class="container mx-auto p-4 max-w-7xl">
-    <!-- Header -->
-    <div class="flex justify-between items-center mb-4">
+<body class="flex h-screen">
+  <!-- 左侧：消息列表 -->
+  <aside class="w-80 md:w-96 bg-gray-900 border-r border-gray-800 flex flex-col flex-shrink-0">
+    <div class="p-4 border-b border-gray-800 flex items-center justify-between">
       <div>
-        <h1 class="text-xl font-bold">🔍 Agent Chat 可观测性控制台</h1>
-        <p class="text-xs text-gray-500">实时追踪消息生命周期</p>
+        <h1 class="font-bold text-base">🔍 消息诊断</h1>
+        <div class="flex items-center gap-2 mt-1">
+          <span id="recordingDot" class="w-2 h-2 rounded-full bg-gray-600"></span>
+          <span id="recordingText" class="text-xs text-gray-500">未连接</span>
+        </div>
       </div>
-      <div class="flex items-center space-x-2">
-        <span id="connectionIndicator" class="flex items-center text-sm">
-          <span class="w-2 h-2 rounded-full bg-gray-500 mr-2"></span>
-          <span id="connectionText">未连接</span>
-        </span>
-        <a href="/chat.html" class="px-3 py-1 bg-gray-700 rounded hover:bg-gray-600 text-sm">返回聊天</a>
+      <a href="/chat.html" class="text-xs text-blue-400 hover:text-blue-300">返回聊天</a>
+    </div>
+    <div id="messageList" class="flex-1 overflow-y-auto">
+      <p class="text-center text-gray-500 py-12 text-sm">等待连接...</p>
+    </div>
+  </aside>
+
+  <!-- 右侧：诊断链 -->
+  <main class="flex-1 flex flex-col overflow-hidden">
+    <div id="emptyDetail" class="flex-1 flex items-center justify-center text-gray-600">
+      <div class="text-center">
+        <div class="text-4xl mb-3">🔍</div>
+        <p>点击左侧消息查看诊断链</p>
+        <p class="text-xs mt-2 text-gray-700">带 <span class="text-blue-400">🔗</span> 标记的消息有完整诊断数据</p>
       </div>
     </div>
-
-    <!-- 主布局 -->
-    <div class="grid grid-cols-1 lg:grid-cols-4 gap-4">
-      <!-- 左侧：Agent 状态 + 操作 -->
-      <div class="lg:col-span-1 space-y-4">
-        <!-- Agent 状态卡片 -->
-        <div class="bg-gray-800 rounded-lg p-4">
-          <h2 class="font-semibold mb-3 flex items-center justify-between">
-            <span>🤖 Agent 状态</span>
-            <button id="refreshAgents" class="text-xs px-2 py-1 bg-gray-700 rounded hover:bg-gray-600">刷新</button>
-          </h2>
-          <div id="agentList" class="space-y-2 text-sm">
-            <p class="text-gray-500">加载中...</p>
-          </div>
+    <div id="traceDetail" class="hidden flex-1 flex flex-col overflow-hidden">
+      <div class="p-4 border-b border-gray-800 flex items-center justify-between">
+        <div>
+          <span class="font-mono text-sm text-blue-400" id="detailTraceId"></span>
+          <span class="text-xs text-gray-500 ml-3" id="detailMsgInfo"></span>
         </div>
-
-        <!-- 追踪统计 -->
-        <div class="bg-gray-800 rounded-lg p-4">
-          <h2 class="font-semibold mb-3">📊 追踪统计</h2>
-          <div class="space-y-1 text-sm">
-            <div class="flex justify-between"><span class="text-gray-400">追踪记录:</span><span id="traceCount">0</span></div>
-            <div class="flex justify-between"><span class="text-gray-400">总消息:</span><span id="totalMsgCount">0</span></div>
-            <div class="flex justify-between"><span class="text-gray-400">用户消息:</span><span id="humanMsgCount">0</span></div>
-            <div class="flex justify-between"><span class="text-gray-400">Agent消息:</span><span id="agentMsgCount">0</span></div>
-            <div class="flex justify-between"><span class="text-gray-400">本次会话消息:</span><span id="sessionMsgCount">0</span></div>
-          </div>
-        </div>
-
-        <!-- 快速操作 -->
-        <div class="bg-gray-800 rounded-lg p-4">
-          <h2 class="font-semibold mb-3">⚡ 操作</h2>
-          <div class="space-y-2">
-            <input id="testInput" type="text" placeholder="输入测试消息..."
-              class="w-full px-3 py-2 bg-gray-700 rounded text-sm" autocomplete="off">
-            <button id="sendTest" class="w-full px-3 py-2 bg-blue-600 rounded hover:bg-blue-500 text-sm">
-              📤 发送测试消息
-            </button>
-            <div class="grid grid-cols-2 gap-2 text-xs">
-              <button id="testHello" class="px-2 py-1 bg-gray-700 rounded hover:bg-gray-600">"你好"</button>
-              <button id="testPing" class="px-2 py-1 bg-gray-700 rounded hover:bg-gray-600">"ping"</button>
-            </div>
-            <hr class="border-gray-700">
-            <button id="clearTraces" class="w-full px-3 py-2 bg-yellow-600 rounded hover:bg-yellow-500 text-sm">
-              🗑️ 清空追踪记录
-            </button>
-            <button id="reconnect" class="w-full px-3 py-2 bg-gray-700 rounded hover:bg-gray-600 text-sm">
-              🔄 重新连接
-            </button>
-          </div>
-        </div>
+        <span class="text-xs text-gray-500" id="detailDuration"></span>
       </div>
-
-      <!-- 中间：标签页内容 -->
-      <div class="lg:col-span-2 bg-gray-800 rounded-lg p-4">
-        <!-- 标签页切换 -->
-        <div class="flex border-b border-gray-700 mb-3">
-          <button class="tab-btn px-4 py-2 text-sm tab-active" data-tab="timeline">📨 消息时间线</button>
-          <button class="tab-btn px-4 py-2 text-sm text-gray-400 hover:text-white" data-tab="traces">🔍 消息追踪</button>
-        </div>
-
-        <!-- 消息时间线 -->
-        <div id="tab-timeline" class="tab-content">
-          <div class="flex justify-between items-center mb-2">
-            <span class="text-xs text-gray-500">显示最近消息</span>
-            <label class="text-xs flex items-center">
-              <input type="checkbox" id="showRaw" class="mr-1"> 显示原始数据
-            </label>
-          </div>
-          <div id="timeline" class="space-y-3 h-[560px] overflow-y-auto pr-2">
-            <p class="text-gray-500 text-center py-8">等待消息...</p>
-          </div>
-        </div>
-
-        <!-- 消息追踪列表 -->
-        <div id="tab-traces" class="tab-content hidden">
-          <div class="flex justify-between items-center mb-2">
-            <span class="text-xs text-gray-500">点击查看事件详情</span>
-            <button id="refreshTraces" class="text-xs px-2 py-1 bg-gray-700 rounded hover:bg-gray-600">刷新</button>
-          </div>
-          <div id="traceList" class="space-y-2 h-[560px] overflow-y-auto pr-2">
-            <p class="text-gray-500 text-center py-8">加载追踪数据...</p>
-          </div>
-        </div>
-      </div>
-
-      <!-- 右侧：追踪详情 / 系统日志 -->
-      <div class="lg:col-span-1 space-y-4">
-        <!-- 追踪详情面板 -->
-        <div id="traceDetail" class="bg-gray-800 rounded-lg p-4 hidden">
-          <div class="flex justify-between items-center mb-3">
-            <h2 class="font-semibold text-sm">📋 追踪详情</h2>
-            <button id="closeTraceDetail" class="text-xs text-gray-400 hover:text-white">✕</button>
-          </div>
-          <div id="traceDetailContent" class="text-xs space-y-2">
-            <!-- 动态填充 -->
-          </div>
-        </div>
-
-        <!-- 系统日志 -->
-        <div class="bg-gray-800 rounded-lg p-4">
-          <div class="flex justify-between items-center mb-3">
-            <h2 class="font-semibold">📋 系统日志</h2>
-            <button id="clearLogs" class="text-xs px-2 py-1 bg-gray-700 rounded hover:bg-gray-600">清空</button>
-          </div>
-          <div class="flex flex-wrap gap-1 mb-2 text-xs">
-            <label class="flex items-center bg-gray-700 px-2 py-1 rounded"><input type="checkbox" id="filterWs" checked class="mr-1">WS</label>
-            <label class="flex items-center bg-gray-700 px-2 py-1 rounded"><input type="checkbox" id="filterMsg" checked class="mr-1">消息</label>
-            <label class="flex items-center bg-gray-700 px-2 py-1 rounded"><input type="checkbox" id="filterErr" checked class="mr-1">错误</label>
-            <label class="flex items-center bg-gray-700 px-2 py-1 rounded"><input type="checkbox" id="filterSys" checked class="mr-1">系统</label>
-          </div>
-          <div id="logPanel" class="h-[400px] overflow-y-auto text-xs space-y-1 pr-2">
-            <p class="text-gray-500">等待日志...</p>
-          </div>
-        </div>
-      </div>
+      <div id="eventTimeline" class="flex-1 overflow-y-auto p-4 space-y-1"></div>
     </div>
-  </div>
+  </main>
 
   <script>
-    // DOM 元素
-    const timeline = document.getElementById('timeline');
-    const traceList = document.getElementById('traceList');
-    const traceDetail = document.getElementById('traceDetail');
-    const traceDetailContent = document.getElementById('traceDetailContent');
-    const logPanel = document.getElementById('logPanel');
-    const agentList = document.getElementById('agentList');
-
-    // 状态
     let ws = null;
-    let sessionMsgCount = 0;
-    let agents = {};
     let messages = [];
-    let logs = [];
-    let traces = [];
-    let adminToken = '';
+    let selectedMsgId = null;
 
-    // 事件类型映射
-    const EVENT_TYPE_LABELS = {
-      'message_created': { label: '消息创建', color: 'bg-blue-500', icon: '📝' },
-      'content_generated': { label: '内容生成', color: 'bg-purple-500', icon: '🤖' },
-      'send_attempted': { label: '尝试发送', color: 'bg-yellow-500', icon: '📤' },
-      'send_success': { label: '发送成功', color: 'bg-green-500', icon: '✅' },
-      'server_received': { label: '服务端接收', color: 'bg-cyan-500', icon: '📥' },
-      'server_broadcast': { label: '服务端广播', color: 'bg-indigo-500', icon: '📢' },
-      'server_forward_agent': { label: '转发给Agent', color: 'bg-pink-500', icon: '➡️' },
-      'frontend_rendered': { label: '前端渲染', color: 'bg-green-400', icon: '🖥️' },
-      'client_received': { label: '客户端接收', color: 'bg-teal-500', icon: '📱' },
-      'agent_received': { label: 'Agent接收', color: 'bg-violet-500', icon: '🤖' },
-      'agent_processing': { label: 'Agent处理中', color: 'bg-orange-500', icon: '⚙️' },
-      'agent_response_ready': { label: 'Agent响应就绪', color: 'bg-emerald-500', icon: '💬' },
-      'error': { label: '错误', color: 'bg-red-500', icon: '❌' },
-      'timeout': { label: '超时', color: 'bg-red-400', icon: '⏰' },
-      'retry': { label: '重试', color: 'bg-amber-500', icon: '🔄' }
+    const EVENT_LABELS = {
+      message_created:      { icon: '📝', label: '消息创建', color: '#60a5fa' },
+      server_received:      { icon: '📥', label: '服务端接收', color: '#22d3ee' },
+      server_broadcast:     { icon: '📢', label: '广播', color: '#818cf8' },
+      server_forward_agent: { icon: '➡️', label: '转发Agent', color: '#f472b6' },
+      rules_evaluated:      { icon: '✅', label: '规则匹配', color: '#34d399' },
+      packs_detected:       { icon: '📦', label: '能力包触发', color: '#fbbf24' },
+      context_injected:     { icon: '💉', label: '上下文注入', color: '#c084fc' },
+      message:              { icon: '💬', label: '消息事件', color: '#94a3b8' }
     };
 
-    // 日志函数
-    function log(type, message, detail = null) {
-      const time = new Date().toLocaleTimeString('zh-CN', { hour12: false });
-      const ms = String(Date.now() % 1000).padStart(3, '0');
+    // ==================== WebSocket ====================
 
-      const entry = { type, message, detail, time: `${time}.${ms}` };
-      logs.push(entry);
-      if (logs.length > 200) logs.shift();
-
-      const colors = {
-        info: 'log-info', success: 'log-success', warning: 'log-warning',
-        error: 'log-error', agent: 'log-agent', user: 'log-user',
-        ws: 'log-ws', system: 'log-system'
-      };
-
-      const div = document.createElement('div');
-      div.className = `log-entry ${colors[type] || 'log-info'}`;
-      div.dataset.type = type;
-      div.innerHTML = `<span class="text-gray-500">[${entry.time}]</span> ${message}`;
-      if (detail) {
-        div.innerHTML += `<br><pre class="text-gray-500 ml-4 text-xs">${escapeHtml(typeof detail === 'string' ? detail : JSON.stringify(detail, null, 2))}</pre>`;
-      }
-
-      logPanel.appendChild(div);
-      logPanel.scrollTop = logPanel.scrollHeight;
-
-      while (logPanel.children.length > 200) {
-        logPanel.removeChild(logPanel.firstChild);
-      }
-
-      applyFilters();
-    }
-
-    function escapeHtml(text) {
-      const div = document.createElement('div');
-      div.textContent = text;
-      return div.innerHTML;
-    }
-
-    function applyFilters() {
-      const filters = {
-        ws: document.getElementById('filterWs').checked,
-        msg: document.getElementById('filterMsg').checked,
-        err: document.getElementById('filterErr').checked,
-        sys: document.getElementById('filterSys').checked
-      };
-      const typeMap = { ws: 'ws', agent: 'msg', user: 'msg', error: 'err', system: 'sys', info: 'sys', success: 'sys', warning: 'err' };
-      logPanel.querySelectorAll('.log-entry').forEach(el => {
-        const type = el.dataset.type;
-        const category = typeMap[type] || 'sys';
-        el.style.display = filters[category] ? 'block' : 'none';
-      });
-    }
-
-    // 更新连接状态
-    function updateConnection(status, connected = false) {
-      const indicator = document.querySelector('#connectionIndicator span:first-child');
-      const text = document.getElementById('connectionText');
-      text.textContent = status;
-      indicator.className = `w-2 h-2 rounded-full mr-2 ${connected ? 'bg-green-500 pulse' : 'bg-red-500'}`;
-    }
-
-    // 格式化时间显示
-    function formatTime(timeStr) {
-      if (!timeStr) return '';
-      const parts = timeStr.split(' ');
-      if (parts.length >= 2) {
-        return parts[1].substring(0, 5);
-      }
-      return timeStr;
-    }
-
-    // 格式化时间戳
-    function formatTimestamp(ts) {
-      const date = new Date(ts);
-      return date.toLocaleTimeString('zh-CN', { hour12: false }) + '.' + String(ts % 1000).padStart(3, '0');
-    }
-
-    // 添加消息到时间线
-    function addMessage(msg, isHistory = false) {
-      if (timeline.querySelector('.text-gray-500')) {
-        timeline.innerHTML = '';
-      }
-
-      const isAgent = msg.sender_type === 'agent';
-      const isSystem = msg.sender_type === 'system';
-      const time = formatTime(msg.created_at);
-
-      const div = document.createElement('div');
-      div.className = 'timeline-item relative py-2';
-
-      let dotColor = isAgent ? 'bg-purple-500' : isSystem ? 'bg-gray-500' : 'bg-blue-500';
-      let icon = isAgent ? '🤖' : isSystem ? '🔧' : '👤';
-      let typeLabel = isAgent ? 'Agent' : isSystem ? '系统' : '用户';
-
-      // 显示 trace_id
-      const traceIdHtml = msg.trace_id ?
-        `<span class="text-xs text-cyan-400 cursor-pointer hover:underline" onclick="showTraceDetail('${msg.trace_id}')">📋 ${msg.trace_id}</span>` : '';
-
-      div.innerHTML = `
-        <div class="timeline-dot ${dotColor} top-3"></div>
-        <div class="flex items-start justify-between">
-          <div class="flex items-center space-x-2">
-            <span>${icon}</span>
-            <span class="font-medium">${escapeHtml(msg.sender_name)}</span>
-            <span class="text-xs text-gray-500">${typeLabel}</span>
-            ${traceIdHtml}
-          </div>
-          <span class="text-xs text-gray-500">${time}</span>
-        </div>
-        <div class="message-bubble mt-1 text-gray-300 text-sm">${escapeHtml(msg.content)}</div>
-        ${document.getElementById('showRaw').checked ? `<details class="mt-2"><summary class="text-xs text-gray-500 cursor-pointer">原始数据</summary><pre class="text-xs text-gray-500 mt-1">${escapeHtml(JSON.stringify(msg, null, 2))}</pre></details>` : ''}
-      `;
-
-      timeline.appendChild(div);
-      timeline.scrollTop = timeline.scrollHeight;
-
-      messages.push(msg);
-      if (messages.length > 100) messages.shift();
-
-      sessionMsgCount++;
-      document.getElementById('sessionMsgCount').textContent = sessionMsgCount;
-    }
-
-    // 更新 Agent 列表
-    function updateAgentList(agentData) {
-      if (!agentData || agentData.length === 0) {
-        agentList.innerHTML = '<p class="text-gray-500">暂无配置的 Agent</p>';
-        return;
-      }
-
-      agentList.innerHTML = agentData.map(a => {
-        const isOnline = a.status === 'online';
-        return `
-          <div class="flex items-center justify-between p-2 bg-gray-700 rounded">
-            <div class="flex items-center space-x-2">
-              <span class="w-2 h-2 rounded-full ${isOnline ? 'bg-green-500' : 'bg-gray-500'}"></span>
-              <span class="text-sm">${escapeHtml(a.name)}</span>
-            </div>
-            <span class="text-xs ${isOnline ? 'text-green-400' : 'text-gray-500'}">${isOnline ? '在线' : '离线'}</span>
-          </div>
-        `;
-      }).join('');
-    }
-
-    // 加载追踪数据
-    async function loadTraces() {
-      try {
-        const headers = adminToken ? { 'x-admin-token': adminToken } : {};
-        const res = await fetch('/api/debug/traces?limit=50', { headers });
-        const data = await res.json();
-        if (data.success && data.traces) {
-          traces = data.traces;
-          renderTraceList();
-          document.getElementById('traceCount').textContent = traces.length;
-        }
-      } catch (e) {
-        log('error', '加载追踪数据失败', e.message);
-      }
-    }
-
-    // 渲染追踪列表
-    function renderTraceList() {
-      if (traces.length === 0) {
-        traceList.innerHTML = '<p class="text-gray-500 text-center py-8">暂无追踪数据</p>';
-        return;
-      }
-
-      traceList.innerHTML = traces.map(t => {
-        const senderIcon = t.metadata?.sender_type === 'agent' ? '🤖' :
-                          t.metadata?.sender_type === 'system' ? '🔧' : '👤';
-        const lastEventInfo = EVENT_TYPE_LABELS[t.last_event] || { label: t.last_event, icon: '📌' };
-
-        return `
-          <div class="trace-item p-3 bg-gray-700 rounded cursor-pointer" onclick="showTraceDetail('${t.trace_id}')">
-            <div class="flex justify-between items-start">
-              <div class="flex items-center space-x-2">
-                <span>${senderIcon}</span>
-                <span class="text-sm font-medium">${escapeHtml(t.metadata?.sender_name || 'Unknown')}</span>
-              </div>
-              <span class="text-xs text-gray-500">${formatTimestamp(t.created_at)}</span>
-            </div>
-            <div class="mt-1 flex items-center justify-between">
-              <span class="text-xs text-gray-400">msg:${t.message_id}</span>
-              <span class="text-xs">${lastEventInfo.icon} ${lastEventInfo.label}</span>
-            </div>
-          </div>
-        `;
-      }).join('');
-    }
-
-    // 显示追踪详情
-    async function showTraceDetail(traceId) {
-      try {
-        const headers = adminToken ? { 'x-admin-token': adminToken } : {};
-        const res = await fetch(`/api/debug/traces/${traceId}`, { headers });
-        const data = await res.json();
-        if (!data.success || !data.trace) {
-          log('error', '获取追踪详情失败');
-          return;
-        }
-
-        const trace = data.trace;
-        traceDetail.classList.remove('hidden');
-
-        // 渲染事件时间线
-        const eventsHtml = trace.events.map((e, idx) => {
-          const info = EVENT_TYPE_LABELS[e.type] || { label: e.type, color: 'bg-gray-500', icon: '📌' };
-          const time = formatTimestamp(e.timestamp);
-          const duration = idx > 0 ? `+${e.timestamp - trace.events[idx-1].timestamp}ms` : '';
-
-          return `
-            <div class="flex items-start space-x-2 py-1">
-              <div class="event-dot ${info.color} mt-1.5"></div>
-              <div class="flex-1">
-                <div class="flex justify-between">
-                  <span class="text-gray-300">${info.icon} ${info.label}</span>
-                  <span class="text-gray-500">${time} ${duration}</span>
-                </div>
-                ${e.details ? `<pre class="text-gray-500 text-xs mt-1">${escapeHtml(JSON.stringify(e.details, null, 2))}</pre>` : ''}
-              </div>
-            </div>
-          `;
-        }).join('');
-
-        traceDetailContent.innerHTML = `
-          <div class="bg-gray-700 p-2 rounded mb-2">
-            <div class="text-cyan-400 font-mono text-xs">${traceId}</div>
-            <div class="text-gray-400 text-xs mt-1">
-              消息ID: ${trace.message_id} | 事件数: ${trace.events.length}
-            </div>
-          </div>
-          <div class="event-timeline pl-3">
-            ${eventsHtml || '<p class="text-gray-500">暂无事件</p>'}
-          </div>
-        `;
-
-        log('info', `查看追踪: ${traceId}`);
-      } catch (e) {
-        log('error', '获取追踪详情失败', e.message);
-      }
-    }
-
-    // 清空追踪记录
-    async function clearTraces() {
-      if (!confirm('确定要清空所有追踪记录吗？')) return;
-      try {
-        const headers = adminToken ? { 'x-admin-token': adminToken } : {};
-        const res = await fetch('/api/debug/traces', { method: 'DELETE', headers });
-        const data = await res.json();
-        if (data.success) {
-          log('success', '追踪记录已清空');
-          traces = [];
-          renderTraceList();
-          document.getElementById('traceCount').textContent = '0';
-        }
-      } catch (e) {
-        log('error', '清空失败', e.message);
-      }
-    }
-
-    // WebSocket 连接
     function connect() {
-      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const url = `${protocol}//${window.location.host}`;
-
-      log('ws', `连接到 ${url}`);
-      updateConnection('连接中...', false);
-
-      ws = new WebSocket(url);
+      const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+      ws = new WebSocket(`${proto}//${location.host}`);
 
       ws.onopen = () => {
-        log('success', 'WebSocket 已连接');
-        updateConnection('已连接', true);
-
+        setRecording('已连接 · 等待录制', 'bg-yellow-500');
         ws.send(JSON.stringify({ type: 'debug_join', payload: {} }));
-        log('ws', '发送 debug_join');
       };
 
       ws.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
-          handleMessage(data);
-        } catch (e) {
-          log('error', '解析消息失败', event.data);
-        }
+          handleMsg(data);
+        } catch (e) {}
       };
 
-      ws.onclose = (e) => {
-        log('warning', `连接断开 code=${e.code}`);
-        updateConnection('已断开', false);
+      ws.onclose = () => {
+        setRecording('已断开', 'bg-gray-600');
+        setTimeout(connect, 3000);
       };
 
-      ws.onerror = () => {
-        log('error', 'WebSocket 错误');
-        updateConnection('错误', false);
-      };
+      ws.onerror = () => {};
     }
 
-    // 处理消息
-    function handleMessage(data) {
+    function handleMsg(data) {
       const { type, payload } = data;
 
       switch (type) {
         case 'debug_join_ack':
-          log('success', '调试模式已连接', payload);
+          setRecording('录制中', 'bg-green-500');
           break;
 
-        case 'history':
-          log('info', `历史消息: ${payload.messages?.length || 0} 条`);
+        case 'debug_messages':
           if (payload.messages) {
-            payload.messages.forEach(m => addMessage(m, true));
+            messages = payload.messages.reverse(); // 旧→新
+            renderMessageList();
           }
           break;
 
         case 'message':
-          const icon = payload.sender_type === 'agent' ? '🤖' : payload.sender_type === 'system' ? '🔧' : '👤';
-          log(payload.sender_type === 'agent' ? 'agent' : 'user', `${icon} ${payload.sender_name}: ${payload.content}`);
-          addMessage(payload);
-          // 刷新追踪列表
-          setTimeout(loadTraces, 100);
+          // 新消息到达
+          const traceId = payload.trace_id || null;
+          messages.push({ ...payload, trace_id: traceId });
+          if (messages.length > 200) messages.shift();
+          renderMessageList();
           break;
 
         case 'agent_list':
-          agents = {};
-          payload.agents?.forEach(a => agents[a.id] = a);
-          updateAgentList(payload.agents);
-          break;
-
-        case 'agent_status':
-          log('agent', `${payload.status === 'online' ? '🟢' : '🔴'} ${payload.name} ${payload.status}`);
           break;
 
         case 'user_list':
-          document.getElementById('userCount') && (document.getElementById('userCount').textContent = payload.users?.length || 0);
           break;
-
-        case 'error':
-          log('error', `服务器错误: ${payload.message}`);
-          break;
-
-        default:
-          log('system', `收到: ${type}`, payload);
       }
     }
 
-    // 发送测试消息
-    function sendTest(content) {
-      if (!content) {
-        content = document.getElementById('testInput').value.trim();
-      }
-      if (!content) return log('warning', '请输入消息内容');
-      if (!ws || ws.readyState !== 1) return log('error', 'WebSocket 未连接');
-
-      ws.send(JSON.stringify({ type: 'message', payload: { content } }));
-      log('ws', `发送: ${content}`);
-      document.getElementById('testInput').value = '';
+    function setRecording(text, dotClass) {
+      document.getElementById('recordingText').textContent = text;
+      const dot = document.getElementById('recordingDot');
+      dot.className = `w-2 h-2 rounded-full mr-2 ${dotClass}`;
     }
 
-    // 加载统计
-    async function loadStats() {
+    // ==================== 消息列表 ====================
+
+    function renderMessageList() {
+      const container = document.getElementById('messageList');
+      if (messages.length === 0) {
+        container.innerHTML = '<p class="text-center text-gray-500 py-12 text-sm">暂无消息</p>';
+        return;
+      }
+
+      container.innerHTML = messages.map((m, idx) => {
+        const isAgent = m.sender_type === 'agent';
+        const hasTrace = !!m.trace_id;
+        const selected = selectedMsgId === String(m.id) ? 'selected' : '';
+        const clickable = hasTrace ? '' : 'no-trace';
+        const icon = isAgent ? '🤖' : m.sender_type === 'system' ? '🔧' : '👤';
+        const time = fmtTime(m.created_at);
+
+        return `
+          <div class="msg-row px-4 py-2.5 border-b border-gray-800/50 ${selected} ${clickable}"
+               ${hasTrace ? `onclick="selectMessage('${m.id}')"` : ''}
+               data-id="${m.id}">
+            <div class="flex items-center justify-between">
+              <span class="text-sm">
+                ${hasTrace ? '<span class="text-blue-400 text-xs mr-1">🔗</span>' : '<span class="text-gray-700 text-xs mr-1">·</span>'}
+                ${icon} <span class="${isAgent ? 'text-purple-300' : 'text-gray-300'}">${escHtml(m.sender_name)}</span>
+              </span>
+              <span class="text-xs text-gray-600">${time}</span>
+            </div>
+            <div class="text-xs text-gray-500 mt-0.5 truncate">${escHtml(m.content).substring(0, 60)}</div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function selectMessage(msgId) {
+      selectedMsgId = String(msgId);
+      renderMessageList();
+      loadTraceDetail(msgId);
+    }
+
+    // ==================== 诊断链 ====================
+
+    async function loadTraceDetail(msgId) {
+      const msg = messages.find(m => String(m.id) === String(msgId));
+      if (!msg?.trace_id) return;
+
+      document.getElementById('emptyDetail').classList.add('hidden');
+      document.getElementById('traceDetail').classList.remove('hidden');
+      document.getElementById('detailTraceId').textContent = '📋 ' + msg.trace_id;
+      document.getElementById('detailMsgInfo').textContent =
+        `${msg.sender_type === 'agent' ? '🤖' : '👤'} ${msg.sender_name} · ${msg.content.substring(0, 40)}`;
+
       try {
-        const res = await fetch('/api/messages/stats');
+        const res = await fetch(`/api/debug/traces/${msg.trace_id}`);
         const data = await res.json();
-        if (data.stats) {
-          document.getElementById('totalMsgCount').textContent = data.stats.total || 0;
-          document.getElementById('humanMsgCount').textContent = data.stats.byType?.human || 0;
-          document.getElementById('agentMsgCount').textContent = data.stats.byType?.agent || 0;
+        if (data.success && data.trace) {
+          renderTimeline(data.trace);
         }
       } catch (e) {
-        // 静默失败
+        document.getElementById('eventTimeline').innerHTML =
+          '<p class="text-red-400 text-sm p-4">加载失败</p>';
       }
     }
 
-    // 加载 Agent 列表
-    async function loadAgents() {
-      try {
-        const res = await fetch('/api/agents');
-        const data = await res.json();
-        if (data.agents) {
-          updateAgentList(data.agents);
-          data.agents.forEach(a => agents[a.id] = a);
-        }
-      } catch (e) {
-        log('error', '获取 Agent 列表失败');
+    function renderTimeline(trace) {
+      const container = document.getElementById('eventTimeline');
+      const events = trace.events || [];
+
+      if (events.length === 0) {
+        container.innerHTML = '<p class="text-gray-500 text-sm p-4">暂无事件记录</p>';
+        document.getElementById('detailDuration').textContent = '';
+        return;
       }
+
+      let prevTs = trace.created_at;
+      const totalMs = events.length > 0 ? events[events.length - 1].timestamp - trace.created_at : 0;
+      document.getElementById('detailDuration').textContent = `总耗时: ${totalMs}ms`;
+
+      container.innerHTML = events.map((e, i) => {
+        const info = EVENT_LABELS[e.type] || { icon: '📌', label: e.type, color: '#94a3b8' };
+        const delta = e.timestamp - prevTs;
+        prevTs = e.timestamp;
+        const deltaStr = i === 0 ? 'start' : `+${delta}ms`;
+
+        let detailHtml = '';
+        if (e.type === 'rules_evaluated' && e.details?.matched) {
+          detailHtml = e.details.matched.map(r =>
+            `<span class="text-green-400">${r.rule}</span> → <span class="text-gray-400">${r.agent}</span>`
+          ).join('<br>');
+        } else if (e.type === 'context_injected' && e.details) {
+          const d = e.details;
+          const tags = [];
+          if (d.mentioned) tags.push('<span class="text-yellow-400">@mentioned</span>');
+          if (d.reply_required) tags.push('<span class="text-red-400">reply_required</span>');
+          if (d.current_scene) tags.push(`<span class="text-cyan-400">scene:${d.current_scene}</span>`);
+          const lockKeys = Object.keys(d.locks || {});
+          if (lockKeys.length > 0) tags.push(`<span class="text-orange-400">locks:${lockKeys.join(',')}</span>`);
+          const cdKeys = Object.keys(d.cooldowns || {});
+          if (cdKeys.length > 0) tags.push(`<span class="text-purple-400">cooldowns:${cdKeys.join(',')}</span>`);
+          detailHtml = `<span class="text-gray-400">→ ${d.agent_id}</span> ${tags.join(' ')}`;
+        } else if (e.type === 'packs_detected' && e.details) {
+          detailHtml = `<span class="text-yellow-400">${e.details.pack_name}</span> (${e.details.pack_id})`;
+        } else if (e.type === 'server_forward_agent' && e.details) {
+          detailHtml = `<span class="text-gray-400">→ ${e.details.agent_count || 0} 个Agent</span>`;
+        } else if (e.details && Object.keys(e.details).length > 0) {
+          detailHtml = `<pre class="text-gray-500 text-xs mt-1">${escHtml(JSON.stringify(e.details, null, 2))}</pre>`;
+        }
+
+        return `
+          <div class="event-item py-1.5">
+            <div class="event-dot" style="background:${info.color}"></div>
+            <div class="flex items-center justify-between">
+              <span class="text-sm">${info.icon} ${info.label} ${detailHtml}</span>
+              <span class="text-xs text-gray-600 ml-2 flex-shrink-0">${deltaStr}</span>
+            </div>
+          </div>
+        `;
+      }).join('');
     }
 
-    // 标签页切换
-    document.querySelectorAll('.tab-btn').forEach(btn => {
-      btn.onclick = () => {
-        document.querySelectorAll('.tab-btn').forEach(b => {
-          b.classList.remove('tab-active');
-          b.classList.add('text-gray-400');
-        });
-        btn.classList.add('tab-active');
-        btn.classList.remove('text-gray-400');
+    // ==================== 工具 ====================
 
-        document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
-        document.getElementById(`tab-${btn.dataset.tab}`).classList.remove('hidden');
+    function escHtml(s) {
+      const d = document.createElement('div');
+      d.textContent = String(s || '');
+      return d.innerHTML;
+    }
 
-        if (btn.dataset.tab === 'traces') {
-          loadTraces();
-        }
-      };
-    });
+    function fmtTime(s) {
+      if (!s) return '';
+      const parts = s.split(' ');
+      return (parts[1] || '').substring(0, 5);
+    }
 
-    // 事件绑定
-    document.getElementById('sendTest').onclick = () => sendTest();
-    document.getElementById('testInput').onkeypress = (e) => e.key === 'Enter' && sendTest();
-    document.getElementById('testHello').onclick = () => sendTest('你好');
-    document.getElementById('testPing').onclick = () => sendTest('ping');
-    document.getElementById('clearTraces').onclick = clearTraces;
-    document.getElementById('reconnect').onclick = () => { if (ws) ws.close(); setTimeout(connect, 500); };
-    document.getElementById('refreshAgents').onclick = loadAgents;
-    document.getElementById('refreshTraces').onclick = loadTraces;
-    document.getElementById('closeTraceDetail').onclick = () => traceDetail.classList.add('hidden');
-    document.getElementById('clearLogs').onclick = () => {
-      logPanel.innerHTML = '<p class="text-gray-500">日志已清空</p>';
-      logs = [];
-    };
-    document.getElementById('showRaw').onchange = () => {
-      const msgs = [...messages];
-      timeline.innerHTML = '';
-      if (msgs.length === 0) {
-        timeline.innerHTML = '<p class="text-gray-500 text-center py-8">等待消息...</p>';
-      } else {
-        msgs.forEach(m => addMessage(m, true));
-      }
-    };
+    // ==================== 启动 ====================
 
-    // 过滤器
-    ['filterWs', 'filterMsg', 'filterErr', 'filterSys'].forEach(id => {
-      document.getElementById(id).onchange = applyFilters;
-    });
-
-    // 启动
-    log('system', '可观测性控制台已启动');
     connect();
-    loadAgents();
-    loadStats();
-    loadTraces();
-
-    // 定时刷新
-    setInterval(loadAgents, 10000);
-    setInterval(loadStats, 5000);
-    setInterval(() => {
-      if (!document.getElementById('tab-traces').classList.contains('hidden')) {
-        loadTraces();
-      }
-    }, 3000);
   </script>
 </body>
 </html>

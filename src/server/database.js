@@ -245,6 +245,28 @@ async function init() {
     )
   `);
 
+  // 迁移：topic_summaries 增加 agent 信息、用户要求、状态
+  try {
+    const cols = db.exec("PRAGMA table_info(topic_summaries)");
+    if (cols.length > 0) {
+      const colNames = cols[0].values.map(v => v[1]);
+      if (!colNames.includes('agent_id')) {
+        db.run('ALTER TABLE topic_summaries ADD COLUMN agent_id TEXT');
+      }
+      if (!colNames.includes('agent_name')) {
+        db.run('ALTER TABLE topic_summaries ADD COLUMN agent_name TEXT');
+      }
+      if (!colNames.includes('user_instructions')) {
+        db.run('ALTER TABLE topic_summaries ADD COLUMN user_instructions TEXT');
+      }
+      if (!colNames.includes('status')) {
+        db.run("ALTER TABLE topic_summaries ADD COLUMN status TEXT DEFAULT 'active'");
+      }
+    }
+  } catch (e) {
+    console.log('[DB] topic_summaries 迁移跳过:', e.message);
+  }
+
   // ==================== 平台治理相关表 ====================
 
   // 平台规则表
@@ -279,20 +301,39 @@ async function init() {
     )
   `);
 
-  // 能力包表
+  // 场景表（统一模式管理，替代旧的 capability_packs + scene_states）
   db.run(`
-    CREATE TABLE IF NOT EXISTS capability_packs (
+    CREATE TABLE IF NOT EXISTS scenes (
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
-      goal TEXT,
-      skills TEXT,
-      state_fields TEXT,
+      description TEXT,
+      icon TEXT DEFAULT '📦',
+      context_prompt TEXT NOT NULL,
       trigger_keywords TEXT,
-      version TEXT DEFAULT '1.0',
+      auto_activate INTEGER DEFAULT 1,
+      skills TEXT,
       enabled INTEGER DEFAULT 1,
+      is_active INTEGER DEFAULT 0,
+      activated_at DATETIME,
+      activated_by TEXT,
+      participants TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )
   `);
+
+  // 迁移：从旧 capability_packs 导入数据
+  try {
+    const oldPacks = db.exec("SELECT name FROM sqlite_master WHERE type='table' AND name='capability_packs'");
+    if (oldPacks.length > 0 && oldPacks[0].values.length > 0) {
+      const existingScenes = db.exec("SELECT COUNT(*) FROM scenes");
+      if (existingScenes[0].values[0][0] === 0) {
+        db.run(`INSERT INTO scenes (id, name, description, context_prompt, trigger_keywords, skills, enabled)
+                SELECT id, name, goal, '场景模式: ' || name, trigger_keywords, skills, enabled
+                FROM capability_packs WHERE enabled = 1`);
+        console.log('[DB] 已从 capability_packs 迁移数据到 scenes 表');
+      }
+    }
+  } catch (e) { /* 迁移跳过 */ }
 
   // Agent 技能声明表
   db.run(`
@@ -333,19 +374,6 @@ async function init() {
     )
   `);
 
-  // 场景状态表
-  db.run(`
-    CREATE TABLE IF NOT EXISTS scene_states (
-      scene_id TEXT PRIMARY KEY,
-      pack_id TEXT NOT NULL,
-      status TEXT DEFAULT 'active',
-      participants TEXT,
-      state_data TEXT,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      expires_at DATETIME
-    )
-  `);
-
   // 治理提案表
   db.run(`
     CREATE TABLE IF NOT EXISTS governance_proposals (
@@ -375,6 +403,29 @@ async function init() {
       changed_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )
   `);
+
+  // 规则运行时状态表（锁、冷却等）
+  db.run(`
+    CREATE TABLE IF NOT EXISTS rule_runtime_state (
+      state_key TEXT PRIMARY KEY,
+      state_value TEXT NOT NULL,
+      expires_at DATETIME,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  // 消息索引
+  try {
+    db.run('CREATE INDEX IF NOT EXISTS idx_messages_created_at ON messages(created_at)');
+    db.run('CREATE INDEX IF NOT EXISTS idx_messages_sender_type ON messages(sender_type)');
+    db.run('CREATE INDEX IF NOT EXISTS idx_join_requests_status ON join_requests(status)');
+    db.run('CREATE INDEX IF NOT EXISTS idx_join_requests_agent_id ON join_requests(agent_id)');
+  } catch (e) { /* ignore */ }
+
+  // 启用外键约束
+  try {
+    db.run('PRAGMA foreign_keys = ON');
+  } catch (e) { /* ignore */ }
 
   // 初始化默认设置
   initDefaultSettings();
@@ -508,15 +559,43 @@ function formatShanghaiTime(date) {
   }).replace(/\//g, '-');
 }
 
-function getRecentMessages(limit = 50) {
-  const result = db.exec(
-    'SELECT * FROM messages ORDER BY created_at DESC LIMIT ?',
-    [limit]
-  );
+function getRecentMessages(limit = 50, before = null, after = null, senderType = null) {
+  let sql = 'SELECT * FROM messages WHERE 1=1';
+  const params = [];
+
+  if (before !== null && before !== undefined) {
+    sql += ' AND id < ?';
+    params.push(before);
+  }
+  if (after !== null && after !== undefined) {
+    sql += ' AND id > ?';
+    params.push(after);
+  }
+  if (senderType) {
+    sql += ' AND sender_type = ?';
+    params.push(senderType);
+  }
+
+  sql += ' ORDER BY created_at DESC LIMIT ?';
+  params.push(limit);
+
+  const result = db.exec(sql, params);
 
   if (result.length === 0) return [];
 
-  // 反转顺序，使最新消息在底部
+  const messages = parseMultipleResults(result);
+  return messages.reverse();
+}
+
+function searchMessages(query, limit = 20) {
+  if (!query || query.length < 2) return [];
+
+  const result = db.exec(
+    "SELECT * FROM messages WHERE content LIKE ? ORDER BY created_at DESC LIMIT ?",
+    [`%${query}%`, limit]
+  );
+
+  if (result.length === 0) return [];
   const messages = parseMultipleResults(result);
   return messages.reverse();
 }
@@ -907,20 +986,25 @@ function createTopic(title, description, createdBy, messageIds) {
 }
 
 // 获取所有话题列表
-function getTopics(limit = 50, offset = 0) {
+function getTopics(limit = 50, offset = 0, search = null) {
   try {
-    const result = db.exec(
-      `SELECT t.id, t.title, t.description, t.created_by, t.created_at, t.status,
+    let sql = `SELECT t.id, t.title, t.description, t.created_by, t.created_at, t.status,
               (SELECT COUNT(*) FROM topic_messages WHERE topic_id = t.id) as message_count,
-              (SELECT content FROM topic_summaries WHERE topic_id = t.id ORDER BY created_at DESC LIMIT 1) as has_summary
-       FROM topics t
-       ORDER BY t.created_at DESC
-       LIMIT ? OFFSET ?`,
-      [limit, offset]
-    );
+              (SELECT agent_name FROM topic_summaries WHERE topic_id = t.id AND status = 'active' ORDER BY created_at DESC LIMIT 1) as summary_agent,
+              (SELECT narrative FROM topic_summaries WHERE topic_id = t.id AND status = 'active' ORDER BY created_at DESC LIMIT 1) as has_summary
+       FROM topics t`;
+    const params = [];
 
+    if (search) {
+      sql += ' WHERE t.title LIKE ?';
+      params.push(`%${search}%`);
+    }
+
+    sql += ' ORDER BY t.created_at DESC LIMIT ? OFFSET ?';
+    params.push(limit, offset);
+
+    const result = db.exec(sql, params);
     const topics = parseMultipleResults(result);
-    console.log(`[DB] 查询到 ${topics.length} 个话题`);
     return topics;
   } catch (e) {
     console.error('[DB] 查询话题列表失败:', e.message);
@@ -1020,15 +1104,16 @@ function deleteTopic(topicId) {
 }
 
 // 保存话题总结
-function saveTopicSummary(topicId, narrative, viewpoints, consensus, openQuestions) {
+function saveTopicSummary(topicId, narrative, viewpoints, consensus, openQuestions, agentId = null, agentName = null, userInstructions = null) {
   const now = formatShanghaiTime(new Date());
 
-  // 先删除旧总结
-  db.run('DELETE FROM topic_summaries WHERE topic_id = ?', [topicId]);
+  // 旧总结标记为 overwritten（保留历史记录）
+  db.run("UPDATE topic_summaries SET status = 'overwritten' WHERE topic_id = ? AND status = 'active'", [topicId]);
 
   db.run(
-    `INSERT INTO topic_summaries (topic_id, narrative, viewpoints, consensus, open_questions, created_at) VALUES (?, ?, ?, ?, ?, ?)`,
-    [topicId, narrative, JSON.stringify(viewpoints), consensus, JSON.stringify(openQuestions), now]
+    `INSERT INTO topic_summaries (topic_id, narrative, viewpoints, consensus, open_questions, agent_id, agent_name, user_instructions, status, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', ?)`,
+    [topicId, narrative, JSON.stringify(viewpoints), consensus, JSON.stringify(openQuestions), agentId, agentName, userInstructions, now]
   );
 
   save();
@@ -1039,25 +1124,41 @@ function saveTopicSummary(topicId, narrative, viewpoints, consensus, openQuestio
     viewpoints,
     consensus,
     open_questions,
+    agent_id: agentId,
+    agent_name: agentName,
+    user_instructions: userInstructions,
     created_at: now
   };
 }
 
-// 获取话题总结
+// 获取话题总结（仅活跃的）
 function getTopicSummary(topicId) {
   const result = db.exec(
-    'SELECT id, topic_id, narrative, viewpoints, consensus, open_questions, created_at FROM topic_summaries WHERE topic_id = ? ORDER BY created_at DESC LIMIT 1',
+    "SELECT id, topic_id, narrative, viewpoints, consensus, open_questions, agent_id, agent_name, user_instructions, status, created_at FROM topic_summaries WHERE topic_id = ? AND status = 'active' ORDER BY created_at DESC LIMIT 1",
     [topicId]
   );
 
   const summary = parseSingleResult(result);
   if (!summary) return null;
 
-  // 解析 JSON 字段
   summary.viewpoints = safeParseJson(summary.viewpoints, summary.viewpoints);
   summary.open_questions = safeParseJson(summary.open_questions, summary.open_questions);
 
   return summary;
+}
+
+// 获取话题所有总结历史
+function getAllTopicSummaries(topicId) {
+  const result = db.exec(
+    'SELECT id, topic_id, narrative, viewpoints, consensus, open_questions, agent_id, agent_name, user_instructions, status, created_at FROM topic_summaries WHERE topic_id = ? ORDER BY created_at DESC',
+    [topicId]
+  );
+  const summaries = parseMultipleResults(result);
+  return summaries.map(s => {
+    s.viewpoints = safeParseJson(s.viewpoints, s.viewpoints);
+    s.open_questions = safeParseJson(s.open_questions, s.open_questions);
+    return s;
+  });
 }
 
 // 获取消息用于导出（根据ID列表）
@@ -1449,12 +1550,6 @@ function parseSkill(skill) {
   return parseJsonFields(skill, ['input_schema', 'output_schema']);
 }
 
-// 解析能力包 JSON 字段
-function parsePack(pack) {
-  if (!pack) return null;
-  return parseJsonFields(pack, ['skills', 'state_fields', 'trigger_keywords']);
-}
-
 // ===== 规则 CRUD =====
 
 function getAllRules() {
@@ -1569,56 +1664,86 @@ function deleteSkill(id) {
   save();
 }
 
-// ===== 能力包 CRUD =====
+// ===== 场景 CRUD（统一模式管理） =====
 
-function getAllPacks() {
-  const result = db.exec('SELECT * FROM capability_packs ORDER BY name');
-  return parseMultipleResults(result).map(parsePack);
+function parseScene(scene) {
+  if (!scene) return null;
+  return parseJsonFields(scene, ['trigger_keywords', 'skills', 'participants']);
 }
 
-function getPackById(id) {
-  const result = db.exec('SELECT * FROM capability_packs WHERE id = ?', [id]);
-  return parsePack(parseSingleResult(result));
+function getAllScenes() {
+  const result = db.exec('SELECT * FROM scenes ORDER BY name');
+  return parseMultipleResults(result).map(parseScene);
 }
 
-function getActivePacks() {
-  const result = db.exec('SELECT * FROM capability_packs WHERE enabled = 1 ORDER BY name');
-  return parseMultipleResults(result).map(parsePack);
+function getSceneById(id) {
+  const result = db.exec('SELECT * FROM scenes WHERE id = ?', [id]);
+  return parseScene(parseSingleResult(result));
 }
 
-function createPack(pack) {
+function getEnabledScenes() {
+  const result = db.exec('SELECT * FROM scenes WHERE enabled = 1 ORDER BY name');
+  return parseMultipleResults(result).map(parseScene);
+}
+
+function getActiveScene() {
+  const result = db.exec('SELECT * FROM scenes WHERE is_active = 1 LIMIT 1');
+  return parseScene(parseSingleResult(result));
+}
+
+function createScene(scene) {
   const now = formatShanghaiTime(new Date());
   db.run(
-    `INSERT INTO capability_packs (id, name, goal, skills, state_fields, trigger_keywords, version, enabled, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)`,
-    [pack.id, pack.name, pack.goal,
-     pack.skills ? JSON.stringify(pack.skills) : null,
-     pack.state_fields ? JSON.stringify(pack.state_fields) : null,
-     pack.trigger_keywords ? JSON.stringify(pack.trigger_keywords) : null,
-     pack.version || '1.0', now]
+    `INSERT INTO scenes (id, name, description, icon, context_prompt, trigger_keywords, auto_activate, skills, enabled, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?)`,
+    [scene.id, scene.name, scene.description || null, scene.icon || '📦',
+     scene.context_prompt, scene.trigger_keywords ? JSON.stringify(scene.trigger_keywords) : null,
+     scene.auto_activate !== false ? 1 : 0,
+     scene.skills ? JSON.stringify(scene.skills) : null, now]
   );
   save();
-  return getPackById(pack.id);
+  return getSceneById(scene.id);
 }
 
-function updatePack(id, updates) {
+function updateScene(id, updates) {
   const fields = [];
   const values = [];
   if (updates.name) { fields.push('name = ?'); values.push(updates.name); }
-  if (updates.goal) { fields.push('goal = ?'); values.push(updates.goal); }
-  if (updates.skills) { fields.push('skills = ?'); values.push(JSON.stringify(updates.skills)); }
-  if (updates.state_fields) { fields.push('state_fields = ?'); values.push(JSON.stringify(updates.state_fields)); }
+  if (updates.description !== undefined) { fields.push('description = ?'); values.push(updates.description); }
+  if (updates.context_prompt) { fields.push('context_prompt = ?'); values.push(updates.context_prompt); }
   if (updates.trigger_keywords) { fields.push('trigger_keywords = ?'); values.push(JSON.stringify(updates.trigger_keywords)); }
+  if (updates.skills) { fields.push('skills = ?'); values.push(JSON.stringify(updates.skills)); }
+  if (updates.icon) { fields.push('icon = ?'); values.push(updates.icon); }
+  if (updates.auto_activate !== undefined) { fields.push('auto_activate = ?'); values.push(updates.auto_activate ? 1 : 0); }
   if (updates.enabled !== undefined) { fields.push('enabled = ?'); values.push(updates.enabled ? 1 : 0); }
   if (fields.length > 0) {
-    db.run(`UPDATE capability_packs SET ${fields.join(', ')} WHERE id = ?`, [...values, id]);
+    db.run(`UPDATE scenes SET ${fields.join(', ')} WHERE id = ?`, [...values, id]);
     save();
   }
-  return getPackById(id);
+  return getSceneById(id);
 }
 
-function deletePack(id) {
-  db.run('DELETE FROM capability_packs WHERE id = ?', [id]);
+function deleteScene(id) {
+  db.run('UPDATE scenes SET is_active = 0 WHERE id = ?', [id]);
+  db.run('DELETE FROM scenes WHERE id = ?', [id]);
+  save();
+}
+
+function activateScene(id, activatedBy, participants) {
+  const now = formatShanghaiTime(new Date());
+  // 先停掉当前活跃的场景
+  db.run("UPDATE scenes SET is_active = 0, activated_at = NULL, activated_by = NULL, participants = NULL WHERE is_active = 1");
+  // 激活新场景
+  db.run(
+    'UPDATE scenes SET is_active = 1, activated_at = ?, activated_by = ?, participants = ? WHERE id = ?',
+    [now, activatedBy, JSON.stringify(participants || []), id]
+  );
+  save();
+  return getSceneById(id);
+}
+
+function deactivateScene(id) {
+  db.run('UPDATE scenes SET is_active = 0, activated_at = NULL, activated_by = NULL, participants = NULL WHERE id = ?', [id]);
   save();
 }
 
@@ -1699,55 +1824,12 @@ function getSkillCallLogsBySkill(skillId, limit = 50) {
   return parseMultipleResults(result).map(log => parseJsonFields(log, ['input_params', 'output_result']));
 }
 
-// ===== 场景状态 =====
-
-function parseSceneState(scene) {
-  if (!scene) return null;
-  return parseJsonFields(scene, ['participants', 'state_data']);
-}
-
-function getActiveScene(sceneId) {
-  const result = db.exec('SELECT * FROM scene_states WHERE scene_id = ? AND status = ?', [sceneId, 'active']);
-  return parseSceneState(parseSingleResult(result));
-}
-
-function getActiveScenes() {
-  const result = db.exec('SELECT * FROM scene_states WHERE status = ?', ['active']);
-  return parseMultipleResults(result).map(parseSceneState);
-}
-
-function createSceneState(scene) {
-  const now = formatShanghaiTime(new Date());
-  const expiresAt = scene.expires_at || formatShanghaiTime(new Date(Date.now() + 30 * 60 * 1000)); // 30分钟默认
-  db.run(
-    `INSERT INTO scene_states (scene_id, pack_id, status, participants, state_data, created_at, expires_at)
-     VALUES (?, ?, 'active', ?, ?, ?, ?)`,
-    [scene.scene_id, scene.pack_id,
-     scene.participants ? JSON.stringify(scene.participants) : null,
-     scene.state_data ? JSON.stringify(scene.state_data) : null,
-     now, expiresAt]
-  );
-  save();
-  return getActiveScene(scene.scene_id);
-}
-
-function updateSceneState(sceneId, updates) {
-  const fields = [];
-  const values = [];
-  if (updates.status) { fields.push('status = ?'); values.push(updates.status); }
-  if (updates.participants) { fields.push('participants = ?'); values.push(JSON.stringify(updates.participants)); }
-  if (updates.state_data) { fields.push('state_data = ?'); values.push(JSON.stringify(updates.state_data)); }
-  if (updates.expires_at) { fields.push('expires_at = ?'); values.push(updates.expires_at); }
-  if (fields.length > 0) {
-    db.run(`UPDATE scene_states SET ${fields.join(', ')} WHERE scene_id = ?`, [...values, sceneId]);
-    save();
-  }
-  return getActiveScene(sceneId);
-}
-
-function endScene(sceneId) {
-  db.run('UPDATE scene_states SET status = ? WHERE scene_id = ?', ['completed', sceneId]);
-  save();
+function getSkillCallStats() {
+  const result = db.exec('SELECT skill_id, COUNT(*) as call_count FROM skill_call_logs GROUP BY skill_id');
+  if (result.length === 0) return {};
+  const stats = {};
+  result[0].values.forEach(row => { stats[row[0]] = row[1]; });
+  return stats;
 }
 
 // ===== 治理提案 =====
@@ -1824,7 +1906,9 @@ function getGovernanceChangelog(entityType, entityId, limit = 50) {
 function initDefaultGovernanceData() {
   // 检查是否已有规则
   const existingRules = db.exec('SELECT COUNT(*) FROM platform_rules');
-  if (existingRules[0].values[0][0] > 0) return;
+  const hasRules = existingRules[0].values[0][0] > 0;
+
+  if (!hasRules) {
 
   // 添加初始规则集
   const defaultRules = [
@@ -1837,18 +1921,153 @@ function initDefaultGovernanceData() {
     createRule(rule);
   }
 
-  // 添加初始技能集
+  // 添加初始技能集（平台标准技能）
   const defaultSkills = [
-    { id: 'search', name: '搜索', category: 'information', description: '搜索相关信息' },
-    { id: 'summarize', name: '总结', category: 'information', description: '总结内容要点' },
-    { id: 'translate', name: '翻译', category: 'communication', description: '翻译内容' }
+    { id: 'search_messages', name: '搜索消息', category: 'information',
+      description: '在聊天记录中按关键词搜索',
+      input_schema: { type: 'object', properties: { query: { type: 'string', description: '搜索关键词' }, limit: { type: 'number', description: '返回数量上限' } }, required: ['query'] },
+      output_schema: { results: [{ id: 0, sender_name: '', sender_type: '', content: '', created_at: '' }], total: 0 } },
+    { id: 'get_topic', name: '查阅话题', category: 'information',
+      description: '获取指定话题的完整内容：消息列表和已有总结',
+      input_schema: { type: 'object', properties: { topic_id: { type: 'string', description: '话题ID' } }, required: ['topic_id'] },
+      output_schema: { topic: {}, messages: [], summary: null } },
+    { id: 'create_topic', name: '创建话题', category: 'action',
+      description: '将指定的消息归档为一个话题，方便后续查阅和总结',
+      input_schema: { type: 'object', properties: { title: { type: 'string', description: '话题标题' }, message_ids: { type: 'array', description: '消息ID列表' }, description: { type: 'string', description: '话题描述(可选)' } }, required: ['title', 'message_ids'] },
+      output_schema: { topic_id: '', message_count: 0 } },
+    { id: 'get_room_status', name: '房间状态', category: 'information',
+      description: '查看当前房间的在线成员、活跃规则和活跃场景',
+      input_schema: null,
+      output_schema: { online_users: [], online_agents: [], active_rules: [], active_scenes: [] } },
+    { id: 'summarize', name: '生成总结', category: 'analysis',
+      description: '对指定内容生成结构化分析文档，包括背景、分析、结论和待办',
+      input_schema: { type: 'object', properties: { content: { type: 'string', description: '需要总结的聊天内容' }, instructions: { type: 'string', description: '额外要求(可选)' } }, required: ['content'] },
+      output_schema: { narrative: '', viewpoints: [], consensus: '', open_questions: [] } }
   ];
 
   for (const skill of defaultSkills) {
     createSkill(skill);
   }
 
+  } // end if (!hasRules)
+
+  // 添加初始场景（独立初始化，不依赖规则是否已存在）
+  const existingScenes = db.exec('SELECT COUNT(*) FROM scenes');
+  if (existingScenes[0].values[0][0] === 0) {
+    const defaultScenes = [
+      { id: 'free_talk', name: '自由发言', icon: '💬', description: '默认模式，Agent自由参与对话',
+        context_prompt: '当前处于自由发言模式。你可以自由参与任何讨论，被@时优先回应。保持对话自然流畅。',
+        trigger_keywords: [], auto_activate: false },
+      { id: 'brainstorm', name: '头脑风暴', icon: '🧠', description: '集思广益，不批判，鼓励发散思维',
+        context_prompt: '当前处于头脑风暴模式。请自由提出想法和建议，不批判任何观点，鼓励发散思维。每个想法都值得展开讨论。最终目标是产出尽可能多的方案。',
+        trigger_keywords: ['头脑风暴', 'brainstorm', '讨论方案', '出主意', '有什么想法'], auto_activate: true },
+      { id: 'story_chain', name: '故事接龙', icon: '📖', description: 'Agent轮流接续故事',
+        context_prompt: '当前处于故事接龙模式。请接着上一个人的内容继续创作，保持故事连贯性和趣味性。每次发言控制在3-5句话，给其他Agent留出接龙空间。',
+        trigger_keywords: ['故事接龙', '讲故事', '接龙', '编故事'], auto_activate: true },
+      { id: 'casual_chat', name: '闲聊模式', icon: '☕', description: '轻松闲聊，不要求深度分析',
+        context_prompt: '当前处于闲聊模式。放松对话，不需要深度技术分析。保持轻松愉快的氛围，可以分享趣事、开玩笑。',
+        trigger_keywords: ['闲聊', '聊天', '放松', '随便聊聊'], auto_activate: true },
+      { id: 'deep_discussion', name: '深度讨论', icon: '🔬', description: '深度分析模式，要求详细论证',
+        context_prompt: '当前处于深度讨论模式。每个观点需要详细论证，提供数据和逻辑支撑。质疑和反驳是受欢迎的，但要基于事实。目标是深入理解问题本质。',
+        trigger_keywords: ['深度讨论', '深入分析', '认真讨论', '技术方案'], auto_activate: true }
+    ];
+    for (const scene of defaultScenes) {
+      createScene(scene);
+    }
+    console.log('[DB] 已初始化默认场景');
+  }
+
   console.log('[DB] 已初始化默认治理数据');
+}
+
+// ==================== 规则运行时状态 ====================
+
+function getRuntimeState(key) {
+  const result = db.exec(
+    "SELECT state_value FROM rule_runtime_state WHERE state_key = ? AND (expires_at IS NULL OR expires_at > datetime('now'))",
+    [key]
+  );
+  if (result.length === 0 || result[0].values.length === 0) return null;
+  try {
+    return JSON.parse(result[0].values[0][0]);
+  } catch (e) {
+    return result[0].values[0][0];
+  }
+}
+
+function setRuntimeState(key, value, ttlSeconds = null) {
+  const now = formatShanghaiTime(new Date());
+  const expiresAt = ttlSeconds
+    ? formatShanghaiTime(new Date(Date.now() + ttlSeconds * 1000))
+    : null;
+  db.run(
+    `INSERT OR REPLACE INTO rule_runtime_state (state_key, state_value, expires_at, updated_at) VALUES (?, ?, ?, ?)`,
+    [key, JSON.stringify(value), expiresAt, now]
+  );
+  save();
+}
+
+function deleteRuntimeState(key) {
+  db.run('DELETE FROM rule_runtime_state WHERE state_key = ?', [key]);
+  save();
+}
+
+function getAgentLocks(agentId) {
+  const locks = {};
+  const result = db.exec(
+    "SELECT state_key, state_value FROM rule_runtime_state WHERE state_key LIKE ? AND (expires_at IS NULL OR expires_at > datetime('now'))",
+    [`lock:${agentId}:%`]
+  );
+  if (result.length > 0) {
+    result[0].values.forEach(row => {
+      const lockType = row[0].replace(`lock:${agentId}:`, '');
+      try {
+        locks[lockType] = JSON.parse(row[1]);
+      } catch (e) {
+        locks[lockType] = row[1];
+      }
+    });
+  }
+  return locks;
+}
+
+function getAgentCooldowns(agentId) {
+  const cooldowns = {};
+  const result = db.exec(
+    "SELECT state_key, state_value FROM rule_runtime_state WHERE state_key LIKE ? AND (expires_at IS NULL OR expires_at > datetime('now'))",
+    [`cooldown:${agentId}:%`]
+  );
+  if (result.length > 0) {
+    result[0].values.forEach(row => {
+      const cdType = row[0].replace(`cooldown:${agentId}:`, '');
+      try {
+        cooldowns[cdType] = JSON.parse(row[1]);
+      } catch (e) {
+        cooldowns[cdType] = row[1];
+      }
+    });
+  }
+  return cooldowns;
+}
+
+function incrementRuleHitCount(ruleId) {
+  const key = `hitcount:${ruleId}`;
+  const current = getRuntimeState(key) || 0;
+  setRuntimeState(key, current + 1);
+}
+
+function getRuleHitCounts() {
+  const counts = {};
+  const result = db.exec(
+    "SELECT state_key, state_value FROM rule_runtime_state WHERE state_key LIKE 'hitcount:%'"
+  );
+  if (result.length > 0) {
+    result[0].values.forEach(row => {
+      const ruleId = row[0].replace('hitcount:', '');
+      try { counts[ruleId] = JSON.parse(row[1]); } catch (e) { counts[ruleId] = row[1]; }
+    });
+  }
+  return counts;
 }
 
 module.exports = {
@@ -1870,6 +2089,7 @@ module.exports = {
   clearMessages,
   getMessageStats,
   getMessagesByIds,
+  searchMessages,
   // Agent
   getAllAgents,
   getAgentById,
@@ -1895,6 +2115,7 @@ module.exports = {
   deleteTopic,
   saveTopicSummary,
   getTopicSummary,
+  getAllTopicSummaries,
   // Agent 接入申请相关
   createJoinRequest,
   getJoinRequestById,
@@ -1927,13 +2148,16 @@ module.exports = {
   createSkill,
   updateSkill,
   deleteSkill,
-  // 能力包
-  getAllPacks,
-  getPackById,
-  getActivePacks,
-  createPack,
-  updatePack,
-  deletePack,
+  // 场景
+  getAllScenes,
+  getSceneById,
+  getEnabledScenes,
+  getActiveScene,
+  createScene,
+  updateScene,
+  deleteScene,
+  activateScene,
+  deactivateScene,
   // Agent技能声明
   getAgentSkillDeclaration,
   setAgentSkillDeclaration,
@@ -1945,12 +2169,7 @@ module.exports = {
   logSkillCall,
   getSkillCallLogs,
   getSkillCallLogsBySkill,
-  // 场景状态
-  getActiveScene,
-  getActiveScenes,
-  createSceneState,
-  updateSceneState,
-  endScene,
+  getSkillCallStats,
   // 治理提案
   getAllProposals,
   getProposalById,
@@ -1961,5 +2180,13 @@ module.exports = {
   logGovernanceChange,
   getGovernanceChangelog,
   // 初始化默认数据
-  initDefaultGovernanceData
+  initDefaultGovernanceData,
+  // 规则运行时状态
+  getRuntimeState,
+  setRuntimeState,
+  deleteRuntimeState,
+  getAgentLocks,
+  getAgentCooldowns,
+  incrementRuleHitCount,
+  getRuleHitCounts
 };

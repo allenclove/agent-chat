@@ -13,6 +13,9 @@ async function start() {
   // 初始化数据库
   await db.init();
 
+  // 初始化默认治理数据（规则、技能等）
+  db.initDefaultGovernanceData();
+
   // 清理过期会话
   db.cleanExpiredSessions();
 

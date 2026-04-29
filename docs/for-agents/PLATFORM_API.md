@@ -22,8 +22,9 @@ GET /api/platform/messages
 
 | 参数 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `limit` | int | 50 | 返回消息数量（最大 200） |
+| `limit` | int | 50 | 返回消息数量 |
 | `before` | int | - | 返回此消息 ID 之前的消息 |
+| `after` | int | - | 返回此消息 ID 之后的消息 |
 | `sender_type` | string | - | 过滤: `human` / `agent` |
 
 **响应**:
@@ -129,6 +130,7 @@ GET /api/platform/topics
 |------|------|--------|------|
 | `limit` | int | 50 | 返回数量 |
 | `offset` | int | 0 | 偏移量 |
+| `search` | string | - | 按标题搜索话题 |
 
 **响应**:
 ```json
@@ -177,6 +179,18 @@ POST /api/platform/topics
 | 生成总结 | POST | `/api/platform/topics/:id/generate-summary` |
 | 导出话题 | GET | `/api/platform/topics/:id/export` |
 
+**生成总结 POST 请求体**:
+```json
+{
+  "agent_id": "assistant-001",
+  "user_instructions": "请重点分析性能优化的可行性"
+}
+```
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| `agent_id` | string | 可选，指定执行总结的 Agent ID |
+| `user_instructions` | string | 可选，用户附加的生成要求 |
+
 > 💡 **向后兼容**: 话题 API 同时支持 `/api/topics` 路径
 
 ---
@@ -199,6 +213,35 @@ GET /api/platform/time
 ```
 
 **用途**: 用于时间同步、调试网络延迟。
+
+---
+
+## 统计 API
+
+### 获取运行时统计
+
+```
+GET /api/platform/stats
+```
+
+**响应**:
+```json
+{
+  "success": true,
+  "stats": {
+    "rules_total": 3,
+    "rules_enabled": 3,
+    "rules_total_hits": 15,
+    "rule_hits": { "mention_reply": 12, "cooldown": 3 },
+    "skills_total": 5,
+    "skill_calls": { "search_messages": 8, "summarize": 2 },
+    "packs_total": 0,
+    "active_scenes": 0,
+    "online_agents": 2,
+    "total_messages": 142
+  }
+}
+```
 
 ---
 

@@ -7,6 +7,8 @@
 const db = require('./database');
 const chat = require('./chat');
 const protocol = require('./protocol');
+const context = require('./context');
+const rules = require('./rules');
 const { traceStore, EVENT_TYPES } = require('./trace-store');
 
 // 存储已连接的Agent
@@ -171,6 +173,7 @@ const agentManager = {
 
   /**
    * 批准Agent连接（快速重连）
+   * 复用 protocol 模块的方法，保证消息格式一致
    */
   approveAgentConnection(ws, agentConfig) {
     const agent_id = agentConfig.id;
@@ -193,7 +196,7 @@ const agentManager = {
       lastPing: Date.now()
     });
 
-    // 使用新协议发送激活成功消息
+    // 激活确认
     ws.send(JSON.stringify({
       type: 'join_ack',
       payload: {
@@ -204,75 +207,21 @@ const agentManager = {
       }
     }));
 
-    // 发送平台信息
-    const onlineUsers = chat.getOnlineUsers();
-    const allAgents = db.getAllAgents().map(a => ({
-      id: a.id,
-      name: a.name,
-      type: 'agent'
-    }));
+    // 以下复用 protocol 模块的方法，保证与正式激活流程一致
+    protocol.sendPlatformInfo(ws, {
+      agent_id: agent_id,
+      display_name: agentConfig.name,
+      proposed_name: agentConfig.name
+    });
+    protocol.sendParticipantsSync(ws);
+    protocol.sendHistorySync(ws, { agent_id: agent_id });
+    protocol.sendSkillsSync(ws);
 
-    ws.send(JSON.stringify({
-      type: 'platform_info',
-      payload: {
-        platform_id: 'agent-chat-v2',
-        platform_name: 'Agent Chat',
-        protocol_version: '2.0',
-        your_name: agentConfig.name,
-        your_id: agent_id,
-        capabilities: {
-          text: true,
-          image: false,
-          file: false,
-          threads: false,
-          message_edit: false,
-          message_revoke: false,
-          history_read: true
-        }
-      }
-    }));
+    // Agent 个人配置
+    this.sendAgentConfigToAgent(ws, agentConfig);
 
-    // 发送成员列表
-    ws.send(JSON.stringify({
-      type: 'participants_sync',
-      payload: {
-        room_id: 'main',
-        participants: [
-          ...onlineUsers.map(u => ({
-            participant_id: u.session_id,
-            display_name: u.display_name || u.username,
-            type: 'human',
-            status: 'online'
-          })),
-          ...allAgents.map(a => ({
-            participant_id: a.id,
-            display_name: a.name,
-            type: 'agent',
-            status: connectedAgents.has(a.id) ? 'online' : 'offline'
-          }))
-        ],
-        synced_at: db.formatShanghaiTime(new Date())
-      }
-    }));
-
-    // 发送历史消息
-    const history = chat.getHistory(50);
-    ws.send(JSON.stringify({
-      type: 'history_sync',
-      payload: {
-        room_id: 'main',
-        messages: history.map(m => ({
-          message_id: m.id,
-          sender_id: m.sender_id,
-          sender_name: m.sender_name,
-          sender_type: m.sender_type,
-          content: m.content,
-          created_at: m.created_at
-        })),
-        has_more: false,
-        synced_at: db.formatShanghaiTime(new Date())
-      }
-    }));
+    // 平台规则
+    this.sendRulesToAgent(ws);
 
     chat.broadcast('agent_status', {
       agent_id: agentConfig.id,
@@ -283,59 +232,6 @@ const agentManager = {
     this.setupAgentMessageHandler(ws, agentConfig);
 
     return { success: true, agentConfig };
-  },
-
-  /**
-   * 发送欢迎消息
-   */
-  sendWelcomeMessage(ws, config) {
-    // 1. 确认连接
-    ws.send(JSON.stringify({
-      type: 'agent_join_ack',
-      payload: {
-        agent_id: config.id,
-        agent_name: config.name,
-        protocol_version: '2.1'
-      }
-    }));
-
-    // 2. 平台信息
-    const onlineUsers = chat.getOnlineUsers();
-    const allAgents = db.getAllAgents().map(a => ({
-      id: a.id,
-      name: a.name,
-      type: 'agent'
-    }));
-
-    ws.send(JSON.stringify({
-      type: 'platform',
-      payload: {
-        platform_id: 'agent-chat-v1',
-        platform_name: 'Agent Chat',
-        your_name: config.name,
-        your_id: config.id,
-        participants: {
-          users: onlineUsers.map(u => ({ name: u.display_name || u.username, type: 'human' })),
-          agents: allAgents
-        },
-        rules: {
-          mode: 'free_chat',
-          you_can: [
-            '自由回复任何消息',
-            '与其他Agent连续对话',
-            '主动发起话题'
-          ],
-          note: '这是群聊，消息会广播给所有人'
-        }
-      }
-    }));
-
-    // 3. 历史消息
-    const history = chat.getHistory(config.history_limit || 50);
-    ws.send(JSON.stringify({
-      type: 'history',
-      payload: { messages: history }
-    }));
   },
 
   /**
@@ -376,18 +272,28 @@ const agentManager = {
       );
 
       if (message) {
+        // 规则引擎处理Agent消息（审计用）
+        try {
+          const runtimeCtx = context.getRuntimeState(message, config.id);
+          const result = rules.processRules(message, runtimeCtx);
+          if (result.matchedRules.length > 0) {
+            result.matchedRules.forEach(r => db.incrementRuleHitCount(r.id));
+          }
+        } catch (err) {
+          console.error('[Agent] 规则处理异常:', err.message);
+        }
+
         chat.broadcast('message', message);
 
         for (const [agentId, agent] of connectedAgents) {
           if (agentId === config.id) continue;
           if (agent.ws.readyState !== 1) continue;
 
+          // 每个接收Agent独立计算运行时上下文
+          const enriched = context.injectContext(message, agentId);
           agent.ws.send(JSON.stringify({
             type: 'message',
-            payload: {
-              ...message,
-              _platform: 'agent-chat-v1'
-            }
+            payload: enriched
           }));
         }
       }
@@ -395,12 +301,11 @@ const agentManager = {
   },
 
   /**
-   * 转发消息给Agent
+   * 转发消息给Agent（每个Agent独立计算运行时上下文）
    */
   forwardToAgents(message) {
     const agentCount = connectedAgents.size;
 
-    // 记录转发事件（如果有 trace_id）
     if (message && message.trace_id) {
       traceStore.addEvent(message.trace_id, EVENT_TYPES.SERVER_FORWARD_AGENT, {
         agent_count: agentCount,
@@ -408,15 +313,21 @@ const agentManager = {
       });
     }
 
-    for (const [, agent] of connectedAgents) {
+    for (const [agentId, agent] of connectedAgents) {
       if (agent.ws.readyState !== 1) continue;
+
+      // 每个Agent独立计算上下文
+      const enriched = context.injectContext(message, agentId);
+      const runtimeState = enriched._context?.runtime_state;
+
+      // 记录诊断追踪：每个Agent的上下文快照
+      if (runtimeState && message.trace_id) {
+        traceStore.addContextEvent(message.trace_id, agentId, runtimeState);
+      }
 
       agent.ws.send(JSON.stringify({
         type: 'message',
-        payload: {
-          ...message,
-          _platform: 'agent-chat-v1'
-        }
+        payload: enriched
       }));
     }
   },
@@ -575,21 +486,81 @@ const agentManager = {
 
   // ==================== 话题总结相关 ====================
 
-  requestTopicSummary(topicId, topicTitle, messages) {
-    let targetAgent = null;
+  // 总结超时配置
+  SUMMARY_TIMEOUT_MS: 30000,
+  // topicId -> timeoutId 映射，避免定时器泄漏
+  _summaryTimers: new Map(),
+
+  requestTopicSummary(topicId, topicTitle, messages, preferAgentId = null, userInstructions = null) {
+    const onlineAgents = [];
     for (const [, agent] of connectedAgents) {
       if (agent.ws.readyState === 1) {
-        targetAgent = agent;
-        break;
+        onlineAgents.push(agent);
       }
     }
 
-    if (!targetAgent) {
+    if (onlineAgents.length === 0) {
       console.log('[Agent] 没有在线的Agent可用于生成总结');
       return { success: false, error: '没有在线的Agent' };
     }
 
-    console.log(`[Agent] 请求 ${targetAgent.config.name} 生成话题总结: ${topicTitle}`);
+    // 如果指定了 agent，排到最前面
+    if (preferAgentId) {
+      const idx = onlineAgents.findIndex(a => a.config.id === preferAgentId);
+      if (idx > 0) {
+        const prefer = onlineAgents.splice(idx, 1)[0];
+        onlineAgents.unshift(prefer);
+      }
+    }
+
+    // 清除该topic之前的超时
+    if (this._summaryTimers.has(topicId)) {
+      clearTimeout(this._summaryTimers.get(topicId));
+      this._summaryTimers.delete(topicId);
+    }
+
+    // 存储用户要求以供后续使用
+    this._userInstructions = this._userInstructions || new Map();
+    if (userInstructions) {
+      this._userInstructions.set(topicId, userInstructions);
+    }
+
+    this._trySummaryAgent(0, onlineAgents, topicId, topicTitle, messages);
+
+    return { success: true, agentName: onlineAgents[0].config.name, totalAvailable: onlineAgents.length };
+  },
+
+  _trySummaryAgent(index, agents, topicId, topicTitle, messages) {
+    if (index >= agents.length) {
+      console.log('[Agent] 所有Agent均未回应总结请求');
+      this._summaryTimers.delete(topicId);
+      chat.broadcast('topic_summary_failed', {
+        topic_id: topicId,
+        error: '所有在线Agent均未在超时时间内回应'
+      });
+      return;
+    }
+
+    const targetAgent = agents[index];
+    console.log(`[Agent] 请求 ${targetAgent.config.name} 生成总结 (${index + 1}/${agents.length})`);
+
+    const timeoutId = setTimeout(() => {
+      console.log(`[Agent] ${targetAgent.config.name} 总结超时，尝试下一个`);
+      this._trySummaryAgent(index + 1, agents, topicId, topicTitle, messages);
+    }, this.SUMMARY_TIMEOUT_MS);
+
+    this._summaryTimers.set(topicId, timeoutId);
+
+    // 组装消息内容
+    const chatContent = messages.map(m =>
+      `[${m.original_created_at || ''}] ${m.sender_name} (${m.sender_type === 'agent' ? 'AI' : '用户'}): ${m.content}`
+    ).join('\n\n');
+
+    // 用户额外要求
+    const extraInstructions = (this._userInstructions && this._userInstructions.get(topicId)) || '';
+    const extraBlock = extraInstructions
+      ? `\n\n## 用户额外要求\n${extraInstructions}`
+      : '';
 
     targetAgent.ws.send(JSON.stringify({
       type: 'summary_request',
@@ -603,35 +574,107 @@ const agentManager = {
           time: m.original_created_at
         })),
         request_type: 'generate_summary',
-        instructions: `请为这个话题生成一个结构化的总结，包括：
-1. narrative: 用自然语言叙述这个讨论的来龙去脉
-2. viewpoints: 每个参与者（人和Agent）的主要观点
-3. consensus: 大家达成的共识（如果有）
-4. open_questions: 还没解决的问题（如果有）
+        instructions: `你是一位专业技术分析师。以下是一段群聊讨论记录，请输出一份详细的结构化分析文档。
 
-请用JSON格式返回。`
+## 核心原则
+- 讨论中出现的每一个观点、数据、建议、分歧、决定，都必须出现在文档中。宁可冗余不可遗漏。
+- 唯一可以省略的情况：与讨论主题完全无关的内容（如纯闲聊、打招呼）。
+${extraBlock}
+
+## 输出格式要求
+用 Markdown 输出，严格按照以下结构：
+
+# ${topicTitle || '讨论总结'}
+
+## 一、背景与问题
+（完整提取讨论的问题背景、现状数据、所有被提及的痛点）
+
+## 二、技术分析
+（逐一对比讨论中涉及的所有方案，包括被否决的方案——注明被否决及原因。分析各自优劣和适用场景。每个分析点不少于3句话。如涉及数据，列出具体数值。）
+
+### 2.1 方案A vs 方案B
+（表格对比或分点对比均可）
+### 2.2 当前瓶颈定位
+（如有）
+
+## 三、分歧与争议
+（如有分歧，列出双方理由，注明最终是否达成一致。如无分歧则写「本次讨论未出现重大分歧」）
+
+## 四、结论
+（分阶段建议：短期/中期/长期。如讨论中无明确阶段则自行推断）
+
+## 五、待办事项
+（所有明确或暗示的待办，标注优先级和提出背景）
+
+---
+> 基于 ${messages.length} 条聊天记录生成
+
+## 写作规则
+1. 全文不写「某人说」「XX提醒」「有人反驳」「XX认为」等元描述，直接陈述观点本身
+2. 不写「综上所述」「总而言之」等水词
+3. 每个观点独立成段，不要合并不同人的不同观点
+4. 讨论中如果缺乏某方面关键信息，在对应章节末尾标注「讨论中未涉及XX」
+5. 原始聊天记录如下：
+
+${chatContent}`
       }
     }));
-
-    return { success: true, agentName: targetAgent.config.name };
   },
 
-  handleSummaryResponse(msg) {
+  handleSummaryResponse(msg, agentConfig) {
     const { topic_id, summary } = msg.payload || {};
 
-    if (!topic_id || !summary) {
-      console.log('[Agent] 收到无效的总结响应');
+    if (!topic_id) {
+      console.log('[Agent] 收到无效的总结响应：缺少topic_id');
       return;
     }
 
-    console.log(`[Agent] 收到话题总结: ${topic_id}`);
+    // 解析summary（可能是JSON字符串或Markdown纯文本）
+    let parsedSummary = summary;
+    if (!summary) {
+      console.log('[Agent] 收到空的总结响应');
+      return;
+    }
+    if (typeof summary === 'string') {
+      try {
+        parsedSummary = JSON.parse(summary);
+      } catch (e) {
+        // Agent 直接返回了 Markdown 文本
+        parsedSummary = { narrative: summary, viewpoints: [], consensus: '', open_questions: [] };
+      }
+    }
+
+    // 如果是纯文本 narrative（Markdown），不再次包裹
+    const narrative = parsedSummary.narrative || (typeof summary === 'string' ? summary : '');
+    const viewpoints = parsedSummary.viewpoints || [];
+    const consensus = parsedSummary.consensus || '';
+    const openQuestions = parsedSummary.open_questions || [];
+
+    // 清除超时
+    if (this._summaryTimers.has(topic_id)) {
+      clearTimeout(this._summaryTimers.get(topic_id));
+      this._summaryTimers.delete(topic_id);
+    }
+
+    // 获取 agent 信息
+    const agentId = agentConfig?.id || 'unknown';
+    const agentName = agentConfig?.name || 'Unknown Agent';
+
+    // 获取用户要求
+    const userInstructions = (this._userInstructions && this._userInstructions.get(topic_id)) || null;
+    if (this._userInstructions) this._userInstructions.delete(topic_id);
+
+    console.log(`[Agent] 收到话题总结: ${topic_id} from ${agentName}`);
 
     const saved = db.saveTopicSummary(
       topic_id,
-      summary.narrative || '',
-      summary.viewpoints || [],
-      summary.consensus || '',
-      summary.open_questions || []
+      narrative,
+      viewpoints,
+      consensus,
+      openQuestions,
+      agentId,
+      agentName,
+      userInstructions
     );
 
     chat.broadcast('topic_summary_ready', {
@@ -686,6 +729,132 @@ const agentManager = {
           console.error(`[Agent] 广播给 ${agentId} 失败:`, err.message);
         }
       }
+    }
+  },
+
+  /**
+   * 发送技能目录给指定 Agent
+   */
+  sendSkillsToAgent(ws) {
+    if (!ws || ws.readyState !== 1) return;
+    const skills = db.getActiveSkills();
+    ws.send(JSON.stringify({
+      type: 'skills_sync',
+      payload: {
+        skills: skills.map(s => ({
+          id: s.id, name: s.name,
+          description: s.description || '',
+          category: s.category || '',
+          input_schema: s.input_schema || {},
+          output_schema: s.output_schema || {},
+          usage_hint: s.usage_hint || ''
+        })),
+        total: skills.length,
+        hint: '使用 capability_update 声明你支持的技能ID列表'
+      }
+    }));
+  },
+
+  /**
+   * 广播技能目录给所有在线 Agent
+   */
+  broadcastSkillsSync() {
+    const skills = db.getActiveSkills();
+    const payload = JSON.stringify({
+      type: 'skills_sync',
+      payload: {
+        skills: skills.map(s => ({
+          id: s.id, name: s.name,
+          description: s.description || '',
+          category: s.category || '',
+          input_schema: s.input_schema || {},
+          output_schema: s.output_schema || {}
+        })),
+        total: skills.length,
+        hint: '技能目录已更新，使用 capability_update 声明你支持的技能ID列表'
+      }
+    });
+
+    let count = 0;
+    for (const [, agent] of connectedAgents) {
+      if (agent.ws.readyState === 1) {
+        agent.ws.send(payload);
+        count++;
+      }
+    }
+    if (count > 0) {
+      console.log(`[Agent] 技能目录已推送至 ${count} 个在线 Agent`);
+    }
+  },
+
+  /**
+   * 发送 Agent 个人配置
+   */
+  sendAgentConfigToAgent(ws, agentConfig) {
+    if (!ws || ws.readyState !== 1) return;
+    const full = db.getAgentFullConfig(agentConfig.id);
+    if (!full) return;
+    ws.send(JSON.stringify({
+      type: 'agent_config',
+      payload: {
+        agent_id: full.id,
+        name: full.name,
+        persona: full.persona || null,
+        conversation_mode: full.conversation_mode || 'free',
+        message_filter: full.message_filter || 'all',
+        keywords: full.keywords || [],
+        history_limit: full.history_limit || 50,
+        custom_settings: full.custom_settings || {},
+        hint: '这是平台为你设定的行为和角色配置。请按照 persona 定义的 role 进行对话，遵守 conversation_mode 的参与策略。'
+      }
+    }));
+  },
+
+  /**
+   * 发送平台规则给指定 Agent
+   */
+  sendRulesToAgent(ws) {
+    if (!ws || ws.readyState !== 1) return;
+    const rules = db.getActiveRules();
+    ws.send(JSON.stringify({
+      type: 'rules_sync',
+      payload: {
+        rules: rules.map(r => ({
+          id: r.id, summary: r.summary, priority: r.priority || 100,
+          trigger: r.trigger, must: r.must || null, must_not: r.must_not || null
+        })),
+        total: rules.length,
+        hint: '以上规则按优先级从高到低排列。消息到达时请检查是否触发规则，must 必须执行，must_not 禁止执行。'
+      }
+    }));
+  },
+
+  /**
+   * 广播规则更新给所有在线 Agent
+   */
+  broadcastRulesSync() {
+    const rules = db.getActiveRules();
+    const payload = JSON.stringify({
+      type: 'rules_sync',
+      payload: {
+        rules: rules.map(r => ({
+          id: r.id, summary: r.summary, priority: r.priority || 100,
+          trigger: r.trigger, must: r.must || null, must_not: r.must_not || null
+        })),
+        total: rules.length,
+        hint: '规则已更新。以上规则按优先级排列，请遵守。'
+      }
+    });
+
+    let count = 0;
+    for (const [, agent] of connectedAgents) {
+      if (agent.ws.readyState === 1) {
+        agent.ws.send(payload);
+        count++;
+      }
+    }
+    if (count > 0) {
+      console.log(`[Agent] 规则已推送至 ${count} 个在线 Agent`);
     }
   },
 
