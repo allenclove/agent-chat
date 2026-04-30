@@ -59,108 +59,55 @@ function setupWebSocket(server) {
 
     let isDebug = false;  // 调试模式标记
 
+    // 消息类型注册表（代替扁平if/else链，便于扩展）
+    const HANDLERS = {
+      'debug_join':            { fn: (ws, msg) => handleDebugJoin(ws, msg.payload) },
+      'join_request':          { fn: (ws, msg) => handleJoinRequest(ws, msg) },
+      'activation_ready':      { fn: (ws, msg) => handleActivationReady(ws, msg) },
+      'pong':                  { fn: (ws) => { if (isAgent) ws.isAlive = true; }, guard: () => isAgent },
+      'message':               { fn: (ws, msg) => {
+        if (isAgent) {
+          const s = agentManager.getAgentStatus().find(a => a.id === agentId);
+          agentManager.handleAgentMessage({ id: agentId, name: s?.name || agentId }, msg);
+        } else if (isDebug) {
+          handleDebugMessage(ws, msg.payload);
+        } else {
+          handleUserMessage(ws, msg.payload);
+        }
+      }},
+      'summary_response':      { fn: (ws, msg) => {
+        const s = agentManager.getAgentStatus().find(a => a.id === agentId);
+        agentManager.handleSummaryResponse(msg, { id: agentId, name: s?.name || agentId });
+      }, guard: () => isAgent },
+      'skill_call':            { fn: (ws, msg) => handleSkillCall(ws, msg, agentId), guard: () => isAgent },
+      'capability_update':     { fn: (ws, msg) => handleCapabilityUpdate(ws, msg, agentId), guard: () => isAgent },
+      'scene_activate_request':{ fn: (ws, msg) => handleSceneActivateRequest(ws, msg, agentId), guard: () => isAgent },
+      'scene_state_update':    { fn: (ws, msg) => handleSceneStateUpdate(ws, msg, agentId), guard: () => isAgent },
+      // 人类用户消息
+      'join':                  { fn: (ws, msg) => handleJoin(ws, msg.payload), guard: () => !isAgent && !isDebug },
+      'ping':                  { fn: (ws) => ws.send(JSON.stringify({ type: 'pong' })), guard: () => !isAgent }
+    };
+
     function handleMessage(ws, msg) {
-      const { type, payload } = msg;
-
-      // 处理调试连接
-      if (type === 'debug_join') {
-        handleDebugJoin(ws, payload);
-        return;
-      }
-
-      // 处理Agent消息 - 新协议
-      if (type === 'join_request') {
-        handleJoinRequest(ws, msg);
-        return;
-      }
-
-      // 处理Agent激活就绪
-      if (type === 'activation_ready') {
-        handleActivationReady(ws, msg);
-        return;
-      }
-
-      // 处理Agent的pong响应
-      if (type === 'pong' && isAgent) {
-        ws.isAlive = true;
-        return;
-      }
-
-      // 处理Agent发送的消息
-      if (type === 'message' && isAgent) {
-        // 获取agent配置信息
-        const agentStatus = agentManager.getAgentStatus().find(a => a.id === agentId);
-        agentManager.handleAgentMessage(
-          { id: agentId, name: agentStatus?.name || agentId },
-          msg
-        );
-        return;
-      }
-
-      // 处理Agent返回的总结响应
-      if (type === 'summary_response' && isAgent) {
-        const agentStatus = agentManager.getAgentStatus().find(a => a.id === agentId);
-        agentManager.handleSummaryResponse(msg, { id: agentId, name: agentStatus?.name || agentId });
-        return;
-      }
-
-      // 处理Agent调用技能
-      if (type === 'skill_call' && isAgent) {
-        handleSkillCall(ws, msg, agentId);
-        return;
-      }
-
-      // 处理Agent能力声明更新
-      if (type === 'capability_update' && isAgent) {
-        handleCapabilityUpdate(ws, msg, agentId);
-        return;
-      }
-
-      // 处理场景激活请求
-      if (type === 'scene_activate_request' && isAgent) {
-        handleSceneActivateRequest(ws, msg, agentId);
-        return;
-      }
-
-      // 处理场景状态更新
-      if (type === 'scene_state_update' && isAgent) {
-        handleSceneStateUpdate(ws, msg, agentId);
-        return;
-      }
-
-      // 调试模式下只允许只读操作
-      if (isDebug) {
-        switch (type) {
-          case 'ping':
-            ws.send(JSON.stringify({ type: 'pong' }));
-            break;
-          case 'message':
-            // 调试面板可以发送测试消息
-            handleDebugMessage(ws, payload);
-            break;
-          default:
-            sendError(ws, `调试模式不支持: ${type}`);
+      const { type } = msg;
+      const h = HANDLERS[type];
+      if (h && (!h.guard || h.guard())) {
+        try {
+          h.fn(ws, msg);
+        } catch (err) {
+          console.error(`[WS] 消息处理异常 (${type}):`, err.message);
+          sendError(ws, `消息处理失败: ${err.message}`);
         }
         return;
       }
 
-      // 处理人类用户消息
-      switch (type) {
-        case 'join':
-          handleJoin(ws, payload);
-          break;
-
-        case 'message':
-          handleUserMessage(ws, payload);
-          break;
-
-        case 'ping':
-          ws.send(JSON.stringify({ type: 'pong' }));
-          break;
-
-        default:
-          sendError(ws, `未知的消息类型: ${type}`);
+      // 调试模式下的兜底
+      if (isDebug) {
+        sendError(ws, `调试模式不支持: ${type}`);
+        return;
       }
+
+      sendError(ws, `未知的消息类型: ${type}`);
     }
 
     function handleDebugJoin(ws, payload) {
@@ -486,30 +433,19 @@ function handleCapabilityUpdate(ws, msg, agentId) {
  * 处理场景激活请求
  */
 function handleSceneActivateRequest(ws, msg, agentId) {
-  const { pack_id, participants } = msg.payload || {};
+  const { scene_id } = msg.payload || {};
 
-  if (!pack_id) {
-    sendError(ws, 'pack_id 必填');
+  if (!scene_id) {
+    sendError(ws, 'scene_id 必填');
     return;
   }
 
   try {
-    // 默认参与者为请求者自己
-    const sceneParticipants = participants || [agentId];
     const scene = scenes.activateScene(scene_id, agentId, [agentId]);
-
-    // 通知所有参与者场景激活
-    const activationMsg = context.assembleSceneActivation(scene, agentId);
-    for (const participantId of sceneParticipants) {
-      agentManager.sendToAgent(participantId, activationMsg);
-    }
 
     ws.send(JSON.stringify({
       type: 'scene_activate_ack',
-      payload: {
-        success: true,
-        scene
-      }
+      payload: { success: true, scene }
     }));
   } catch (err) {
     sendError(ws, '场景激活失败: ' + err.message);
@@ -520,7 +456,7 @@ function handleSceneActivateRequest(ws, msg, agentId) {
  * 处理场景状态更新
  */
 function handleSceneStateUpdate(ws, msg, agentId) {
-  const { scene_id, state_data } = msg.payload || {};
+  const { scene_id } = msg.payload || {};
 
   if (!scene_id) {
     sendError(ws, 'scene_id 必填');
@@ -528,35 +464,8 @@ function handleSceneStateUpdate(ws, msg, agentId) {
   }
 
   try {
-    const scene = packs.updateSceneState(scene_id, state_data);
-    if (!scene) {
-      sendError(ws, '场景不存在或已结束');
-      return;
-    }
-
-    // 通知其他参与者状态更新
-    const participants = scene.participants || [];
-    for (const participantId of participants) {
-      if (participantId !== agentId) {
-        agentManager.sendToAgent(participantId, {
-          type: 'scene_state_sync',
-          payload: {
-            scene_id,
-            state_data: scene.state_data,
-            updated_by: agentId
-          }
-        });
-      }
-    }
-
-    ws.send(JSON.stringify({
-      type: 'scene_state_update_ack',
-      payload: {
-        success: true,
-        scene_id,
-        state_data: scene.state_data
-      }
-    }));
+    scenes.deactivateScene(scene_id);
+    ws.send(JSON.stringify({ type: 'scene_state_update_ack', payload: { success: true, scene_id, status: 'ended' } }));
   } catch (err) {
     sendError(ws, '场景状态更新失败: ' + err.message);
   }

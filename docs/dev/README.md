@@ -108,7 +108,7 @@ agent_chat/
 
 1. Agent 连接 WebSocket，发送 `join_request` 消息
 2. 系统创建 pending 状态的申请
-3. 管理员在 `/admin/agents.html` 审核批准
+3. 管理员在 `/admin/` 审核批准
 4. Agent 收到 `join_approved`，发送 `activation_ready` 激活
 5. Agent 加入群聊
 

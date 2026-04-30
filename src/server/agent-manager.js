@@ -9,6 +9,7 @@ const chat = require('./chat');
 const protocol = require('./protocol');
 const context = require('./context');
 const rules = require('./rules');
+const scenes = require('./scenes');
 const { traceStore, EVENT_TYPES } = require('./trace-store');
 
 // 存储已连接的Agent
@@ -272,29 +273,45 @@ const agentManager = {
       );
 
       if (message) {
-        // 规则引擎处理Agent消息（审计用）
+        // 规则引擎 + 场景检测（与人类消息处理路径一致）
         try {
           const runtimeCtx = context.getRuntimeState(message, config.id);
           const result = rules.processRules(message, runtimeCtx);
           if (result.matchedRules.length > 0) {
             result.matchedRules.forEach(r => db.incrementRuleHitCount(r.id));
           }
+          // 场景关键词检测 → 自动激活
+          const triggeredScene = scenes.detectTrigger(msg.payload.content);
+          if (triggeredScene && triggeredScene.auto_activate) {
+            scenes.activateScene(triggeredScene.id, config.id, []);
+            chat.broadcast('system', {
+              type: 'scene_activated',
+              message: `${triggeredScene.icon || '📦'} 已进入「${triggeredScene.name}」模式`,
+              scene_id: triggeredScene.id,
+              scene_name: triggeredScene.name
+            });
+            this.broadcastToAgents({
+              type: 'scene_activated',
+              payload: { scene_id: triggeredScene.id, scene_name: triggeredScene.name, scene_mode: triggeredScene.context_prompt }
+            });
+          }
         } catch (err) {
-          console.error('[Agent] 规则处理异常:', err.message);
+          console.error('[Agent] 规则/场景处理异常:', err.message);
         }
 
         chat.broadcast('message', message);
 
+        // 转发给其他Agent（复用 forwardToAgents 逻辑：独立计算上下文+记录trace）
         for (const [agentId, agent] of connectedAgents) {
           if (agentId === config.id) continue;
           if (agent.ws.readyState !== 1) continue;
 
-          // 每个接收Agent独立计算运行时上下文
           const enriched = context.injectContext(message, agentId);
-          agent.ws.send(JSON.stringify({
-            type: 'message',
-            payload: enriched
-          }));
+          const runtimeState = enriched._context?.runtime_state;
+          if (runtimeState && message.trace_id) {
+            traceStore.addContextEvent(message.trace_id, agentId, runtimeState);
+          }
+          agent.ws.send(JSON.stringify({ type: 'message', payload: enriched }));
         }
       }
     }

@@ -148,7 +148,7 @@
             + 新增技能
           </button>
           <button onclick="switchSection('packs')" class="bg-green-100 text-green-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-200 transition">
-            + 新增能力包
+            管理场景
           </button>
           <button onclick="switchSection('scenes')" class="bg-orange-100 text-orange-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-orange-200 transition">
             激活场景
@@ -361,10 +361,9 @@
     // 加载所有数据
     async function loadAllData() {
       try {
-        const [rulesRes, skillsRes, packsRes, scenesRes, contextRes, statsRes] = await Promise.all([
+        const [rulesRes, skillsRes, scenesRes, contextRes, statsRes] = await Promise.all([
           fetch(`${API_BASE}/rules`),
           fetch(`${API_BASE}/skills`),
-          // packs removed
           fetch(`${API_BASE}/scenes`),
           fetch(`${API_BASE}/context`),
           fetch(`${API_BASE}/stats`)
@@ -372,14 +371,12 @@
 
         const rulesData = await rulesRes.json();
         const skillsData = await skillsRes.json();
-        const packsData = await packsRes.json();
         const scenesData = await scenesRes.json();
         const contextData = await contextRes.json();
         const statsData = await statsRes.json();
 
         if (rulesData.success) data.rules = rulesData.rules;
         if (skillsData.success) data.skills = skillsData.skills;
-        if (packsData.success) data.packs = packsData.packs;
         if (scenesData.success) data.scenes = scenesData.scenes;
         if (contextData.success) data.context = contextData.context;
         if (statsData.success) data.stats = statsData.stats;

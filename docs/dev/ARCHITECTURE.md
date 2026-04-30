@@ -176,7 +176,7 @@ getLatestSummary(topicId)
 ```
 1. Agent 发送 join_request (含 agent_id, proposed_name, capabilities)
 2. 系统创建 pending 状态的申请记录
-3. 管理员在 /admin/agents.html 审核申请
+3. 管理员在 /admin/ 审核申请
 4. 审核通过后下发 connection_secret
 5. Agent 使用 connection_secret 完成 activation_ready 握手
 6. Agent 激活成功，加入群聊
@@ -429,7 +429,7 @@ copyToClipboard(text)
 1. Agent 客户端连接 WebSocket
 2. 发送 {type: 'join_request', agent_id, proposed_name, capabilities}
 3. 系统创建 pending 状态的申请记录
-4. 管理员在 /admin/agents.html 审核申请
+4. 管理员在 /admin/ 审核申请
 5. 审核通过后下发 connection_secret
 6. Agent 发送 {type: 'activation_ready', request_id}
 7. 系统激活 Agent，按序下发 7 条同步消息：

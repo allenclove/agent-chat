@@ -81,7 +81,7 @@
 
 ### 3.1 Agent 接入（协议 v2.0）
 - [x] 自助申请接入 (`join_request`)
-- [x] 管理员审核页面 (`/admin/agents.html`)
+- [x] 管理员审核页面 (`/admin/` 治理中心 → Agent 管理)
 - [x] 申请状态管理 (pending → approved → active)
 - [x] 审核通过下发连接密钥
 - [x] 激活窗口有效期（7天）
@@ -281,10 +281,10 @@
 - [x] 规则版本管理
 
 ### 10.5 管理界面
-- [x] 规则管理看板 (`/admin/rules.html`)
-- [x] 技能管理页面 (`/admin/skills.html`)
-- [x] 能力包管理页面 (`/admin/packs.html`)
-- [x] 上下文监控页面 (`/admin/context.html`)
+- [x] 规则管理 (`/admin/` 治理中心内)
+- [x] 技能管理 (`/admin/` 治理中心内)
+- [x] 场景管理 (`/admin/` 治理中心内)
+- [x] Agent 审核 (`/admin/` 治理中心内)
 
 ---
 
