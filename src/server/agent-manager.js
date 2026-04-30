@@ -749,130 +749,33 @@ ${chatContent}`
     }
   },
 
-  /**
-   * 发送技能目录给指定 Agent
-   */
-  sendSkillsToAgent(ws) {
-    if (!ws || ws.readyState !== 1) return;
-    const skills = db.getActiveSkills();
-    ws.send(JSON.stringify({
-      type: 'skills_sync',
-      payload: {
-        skills: skills.map(s => ({
-          id: s.id, name: s.name,
-          description: s.description || '',
-          category: s.category || '',
-          input_schema: s.input_schema || {},
-          output_schema: s.output_schema || {},
-          usage_hint: s.usage_hint || ''
-        })),
-        total: skills.length,
-        hint: '使用 capability_update 声明你支持的技能ID列表'
-      }
-    }));
-  },
+  // 单Agent技能发送 → 委托 protocol.sendSkillsSync
+  sendSkillsToAgent(ws) { protocol.sendSkillsSync(ws); },
 
-  /**
-   * 广播技能目录给所有在线 Agent
-   */
+  // 广播技能 → 遍历连接（agent-manager独有职责）
   broadcastSkillsSync() {
-    const skills = db.getActiveSkills();
-    const payload = JSON.stringify({
-      type: 'skills_sync',
-      payload: {
-        skills: skills.map(s => ({
-          id: s.id, name: s.name,
-          description: s.description || '',
-          category: s.category || '',
-          input_schema: s.input_schema || {},
-          output_schema: s.output_schema || {}
-        })),
-        total: skills.length,
-        hint: '技能目录已更新，使用 capability_update 声明你支持的技能ID列表'
-      }
-    });
-
     let count = 0;
     for (const [, agent] of connectedAgents) {
-      if (agent.ws.readyState === 1) {
-        agent.ws.send(payload);
-        count++;
-      }
+      if (agent.ws.readyState === 1) { protocol.sendSkillsSync(agent.ws); count++; }
     }
-    if (count > 0) {
-      console.log(`[Agent] 技能目录已推送至 ${count} 个在线 Agent`);
-    }
+    if (count > 0) console.log(`[Agent] 技能目录已推送至 ${count} 个在线 Agent`);
   },
 
-  /**
-   * 发送 Agent 个人配置
-   */
+  // 单Agent配置发送 → 委托 protocol.sendAgentConfig
   sendAgentConfigToAgent(ws, agentConfig) {
-    if (!ws || ws.readyState !== 1) return;
-    const full = db.getAgentFullConfig(agentConfig.id);
-    if (!full) return;
-    ws.send(JSON.stringify({
-      type: 'agent_config',
-      payload: {
-        agent_id: full.id,
-        name: full.name,
-        persona: full.persona || null,
-        conversation_mode: full.conversation_mode || 'free',
-        message_filter: full.message_filter || 'all',
-        keywords: full.keywords || [],
-        history_limit: full.history_limit || 50,
-        custom_settings: full.custom_settings || {},
-        hint: '这是平台为你设定的行为和角色配置。请按照 persona 定义的 role 进行对话，遵守 conversation_mode 的参与策略。'
-      }
-    }));
+    protocol.sendAgentConfig(ws, { agent_id: agentConfig.id, display_name: agentConfig.name });
   },
 
-  /**
-   * 发送平台规则给指定 Agent
-   */
-  sendRulesToAgent(ws) {
-    if (!ws || ws.readyState !== 1) return;
-    const rules = db.getActiveRules();
-    ws.send(JSON.stringify({
-      type: 'rules_sync',
-      payload: {
-        rules: rules.map(r => ({
-          id: r.id, summary: r.summary, priority: r.priority || 100,
-          trigger: r.trigger, must: r.must || null, must_not: r.must_not || null
-        })),
-        total: rules.length,
-        hint: '以上规则按优先级从高到低排列。消息到达时请检查是否触发规则，must 必须执行，must_not 禁止执行。'
-      }
-    }));
-  },
+  // 单Agent规则发送 → 委托 protocol.sendRulesSync
+  sendRulesToAgent(ws) { protocol.sendRulesSync(ws); },
 
-  /**
-   * 广播规则更新给所有在线 Agent
-   */
+  // 广播规则 → 遍历连接
   broadcastRulesSync() {
-    const rules = db.getActiveRules();
-    const payload = JSON.stringify({
-      type: 'rules_sync',
-      payload: {
-        rules: rules.map(r => ({
-          id: r.id, summary: r.summary, priority: r.priority || 100,
-          trigger: r.trigger, must: r.must || null, must_not: r.must_not || null
-        })),
-        total: rules.length,
-        hint: '规则已更新。以上规则按优先级排列，请遵守。'
-      }
-    });
-
     let count = 0;
     for (const [, agent] of connectedAgents) {
-      if (agent.ws.readyState === 1) {
-        agent.ws.send(payload);
-        count++;
-      }
+      if (agent.ws.readyState === 1) { protocol.sendRulesSync(agent.ws); count++; }
     }
-    if (count > 0) {
-      console.log(`[Agent] 规则已推送至 ${count} 个在线 Agent`);
-    }
+    if (count > 0) console.log(`[Agent] 规则已推送至 ${count} 个在线 Agent`);
   },
 
   // ==================== 暴露给 protocol 模块 ====================

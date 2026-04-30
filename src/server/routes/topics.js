@@ -24,6 +24,14 @@ router.post('/', (req, res) => {
   try {
     const topic = db.createTopic(title.trim(), description, created_by, message_ids);
     console.log(`[API] 创建话题: ${topic.title}`);
+    // 广播到聊天流
+    const chat = require('../chat');
+    chat.broadcast('system', {
+      type: 'topic_created',
+      message: `📋 话题已创建: <a href="/topics.html" target="_blank">${topic.title}</a>`,
+      topic_id: topic.id,
+      topic_title: topic.title
+    });
     res.json({ success: true, topic });
   } catch (e) {
     res.status(400).json({ error: '创建失败: ' + e.message });
